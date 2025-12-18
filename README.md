@@ -1,6 +1,76 @@
-# Welcome to your Expo app 👋
+# Intruder-alert app
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is an Expo project, which uses TypeScript markup. All of the tabs have been created: Vault, Activity, and Settings should have a bit of functionality, but the main focus is Dashboard. We will split Dashboard code into blocks where each of us will work on a separate block.
+
+## Development workflow
+
+This project follows a feature-branch workflow to keep `main` stable and reduce merge conflicts. We should be able to work efficiently and know see all changes made to the code more clearly:
+
+### 1. Sync With Main
+Firstly ensure your local `main` branch is up to date:
+
+```bash
+git checkout main
+git pull origin main
+```
+
+### 2. Create a feature branch
+All new work should be done on a feature branch:
+
+```bash
+git checkout -b feature/<short-feature-name>
+```
+
+Example:
+```bash
+git checkout -b feature/vault-jpeg-support
+```
+
+### 3. Make changes and commit them
+Commit changes with a descriptive message of the changes made:
+
+```bash
+git add .
+git commit -m "feat: added jpeg support to vault"
+```
+
+### 4. Push your branch
+Push your feature branch to GitHub:
+
+```bash
+git push -u origin feature/<short-feature-name>
+```
+
+Example (upon jpeg support added to vault):
+```bash
+git push -u origin feature/vault-jpeg-support
+```
+
+### 5. Open a pull request
+- Open a pull request from your feature branch into `main` (there should be a button that shows an option for this after pushing)
+- Request at least one review from one of us on frontend team
+- Address any feedback before merging
+
+### 6. Keep feature branch up to date
+- If changes are being made to main branch whilst feature branch is still under review, then pull the latest `main` regularly to ensure compatibility:
+
+Example (upon jpeg support added to vault):
+```bash
+git checkout feature/vault-jpeg-support
+git pull origin main
+```
+
+### 7. After merge
+Once your pull request is merged:
+- Delete the feature branch
+- Pull the latest `main` before starting new work:
+
+```bash
+git branch -d feature/vault-jpeg-support
+git checkout main
+git pull origin main
+```
+
 
 ## Get started
 
@@ -16,35 +86,8 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
 - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
