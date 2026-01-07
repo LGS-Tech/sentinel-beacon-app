@@ -86,6 +86,15 @@ git pull origin main
    npx expo start
    ```
 
+## Server
+
+The "server" folder is where a Node.js/Express, file-based database will be contained for temporary use to simulate true backend. 
+This contains tables for User and Case that will be connected to the Expo app.
+
+## Documentation
+
+For any team members that are learning Expo alongside...
+
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
 - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
