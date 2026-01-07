@@ -8,6 +8,8 @@ expo-app/.expo/
 dist/
 **/web-build/
 expo-app/expo-env.d.ts
+expo-app/app/expo-env.d.ts
+expo-env.d.ts
 **/*.expo-shared
 
 # Native
