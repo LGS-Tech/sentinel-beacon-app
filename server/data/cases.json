@@ -1,0 +1,7 @@
+{
+  "cases": [
+    { "id": 1, "title": "Intruders on playground", "date": "11/12/25", "status": "closed", "description": "Teenagers spotted on playground. Left the premises after 2 minutes" },
+    { "id": 2, "title": "Intruder in IT room", "date": "11/12/25", "status": "closed", "description": "Thief spotted in IT room. Initially spotted by Mrs Williams. Police took him away." },
+    { "id": 3, "title": "Dog in the corridoor", "date": "09/08/25", "status": "closed", "description": "Small dog found running around in the corridor, barking at a handful of students" }
+]
+}

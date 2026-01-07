@@ -1,0 +1,8 @@
+{
+  "users": [
+    { "id": 1, "username": "jimstevens322", "password": "London588", "email": "jimstevens@gmail.com", "name": "Jim", "phone number": "+4476338674998", "role": "Art teacher", "authorisation": 2 },
+    { "id": 2, "username": "markdavis99", "password": "Football456", "email": "markdavis@gmail.com", "name": "Mark", "phone number": "+447658713447", "role": "Maths teacher", "authorisation": 2 },
+    { "id": 3, "username": "lindsaywilliams1874", "password": "TableTop22", "email": "lindsaywilliams@gmail.com", "name": "Lindsay", "phone number": "+447566345922", "role": "Head teacher", "authorisation": 1 },
+    { "id": 4, "username": "ellamcintosh111", "password": "TableTop22", "email": "ellamcintosh@gmail.com", "name": "Ella", "phone number": "+447455698236", "role": "English teacher", "authorisation": 2 }
+  ]
+}
