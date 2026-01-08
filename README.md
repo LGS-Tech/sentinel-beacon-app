@@ -91,6 +91,10 @@ git pull origin main
 The "server" folder is where a Node.js/Express, file-based database will be contained for temporary use to simulate true backend. 
 This contains tables for User and Case that will be connected to the Expo app.
 
+## Backend
+
+The folder "backend' is where the python logic and API will be stored. Then it will be connected to the frontend through the expo-app folder.
+
 ## Documentation
 
 For any team members that are learning Expo alongside...
