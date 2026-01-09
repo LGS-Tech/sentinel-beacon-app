@@ -45,3 +45,6 @@ app-example
 # generated native folders
 /ios
 /android
+
+.expo/
+expo-app/.gitignore
