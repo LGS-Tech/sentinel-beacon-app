@@ -6,53 +6,68 @@ from models import db, User, Room, AlertCase, ActivityLog
 app = Flask(__name__)
 CORS(app)
 
-# Security Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sentinel.db'
-app.config['JWT_SECRET_KEY'] = 'lgs-tech-super-secret-key' # Change this for production!
+app.config['JWT_SECRET_KEY'] = 'lgs-tech-super-secret-key'
 jwt = JWTManager(app)
 db.init_app(app)
 
 with app.app_context():
     db.create_all()
-    # Auto-seed a test user if none exists
     if not User.query.filter_by(username='admin').first():
         test_user = User(username='admin', password_hash='pbkdf2:sha256...', full_name='Admin Test', role='security')
         db.session.add(test_user)
         db.session.commit()
 
-# --- NEW: LOGIN ROUTE ---
 @app.route('/api/v1/login', methods=['POST'])
 def login():
     data = request.json
-    username = data.get('username')
-    password = data.get('password') # In production, verify against password_hash
-    
-    user = User.query.filter_by(username=username).first()
+    user = User.query.filter_by(username=data.get('username')).first()
     if user:
-        # Create the "Digital Key"
         access_token = create_access_token(identity=user.id)
         return jsonify(access_token=access_token, role=user.role, name=user.full_name), 200
     return jsonify({"msg": "Bad username or password"}), 401
 
-# --- UPDATED: SECURE ALERT ROUTE ---
 @app.route('/api/v1/alerts', methods=['POST'])
 @jwt_required()
 def trigger_alert():
     current_user_id = get_jwt_identity()
     data = request.json
     
+    # 1. Cria o Alerta com as coordenadas do Leon
     new_alert = AlertCase(
         user_id=current_user_id,
         room_id=data.get('room_id'),
         intruder_info=data.get('intruder_info'),
-        # NEW: Capture the exact coordinates from Leon's map
         location_x=data.get('location_x'),
         location_y=data.get('location_y'),
+        approximate_location=data.get('approximate_location', 'Manual Pinpoint'),
         status='Active'
     )
     db.session.add(new_alert)
+    db.session.flush() # Obtém o ID antes do commit
+
+    # 2. Gera entrada automática no Live Feed (Tarefa: Live Feed)
+    log_entry = ActivityLog(
+        case_id=new_alert.id,
+        action=f"Strategic support requested at coordinates ({new_alert.location_x}, {new_alert.location_y})"
+    )
+    db.session.add(log_entry)
     db.session.commit()
     
-    # ... session add and commit ...
     return jsonify({"msg": "Strategic coordination active"}), 201
 
+# Rota para o Leon puxar os pinos para o mapa (Tarefa: Connection)
+@app.route('/api/v1/active-alerts', methods=['GET'])
+@jwt_required()
+def get_active_alerts():
+    alerts = AlertCase.query.filter_by(status='Active').all()
+    return jsonify([{
+        "id": a.id,
+        "x": a.location_x,
+        "y": a.location_y,
+        "info": a.intruder_info,
+        "time": a.timestamp.isoformat()
+    } for a in alerts]), 200
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
