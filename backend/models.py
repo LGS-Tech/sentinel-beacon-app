@@ -9,7 +9,6 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     full_name = db.Column(db.String(120))
-    # 'role' is used for the "depending on authority" logic
     role = db.Column(db.String(20), default='staff') 
 
 class Room(db.Model):
@@ -21,22 +20,22 @@ class Room(db.Model):
 class AlertCase(db.Model):
     __tablename__ = 'alert_case'
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), default="Intruder Alert")
-    status = db.Column(db.String(20), default='Active') # Active/Resolved
+    title = db.Column(db.String(100), default="Strategic Support Request")
+    status = db.Column(db.String(20), default='Active')
+    
+    # Coordenadas contínuas para o mapa do Leon
     location_x = db.Column(db.Float) 
     location_y = db.Column(db.Float)
 
-    # NEW: Specific fields to match the frontend index.tsx
+    # Informações vitais para o "Live Feed"
     intruder_info = db.Column(db.String(500)) 
     police_notified = db.Column(db.Boolean, default=False)
     approximate_location = db.Column(db.String(100))
     
-    # Relationships
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     room_id = db.Column(db.Integer, db.ForeignKey('room.id'))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Helper to see names in the relationship
     room = db.relationship('Room', backref='alerts')
     user = db.relationship('User', backref='alerts')
 
