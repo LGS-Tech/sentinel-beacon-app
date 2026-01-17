@@ -12,7 +12,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 
-const floorPlan = require('../../assets/images/floorplanTEMP.png');
+const floorPlan = require('../../assets/images/LGSFloorPlan_v1.png');
 //TODO: floor plan will be behind ui but should be scrollable and clickable
 export default function HomeScreen() {
   const status = 'Intruder in corridor';  // TODO: replace with realtime API data
@@ -29,7 +29,8 @@ export default function HomeScreen() {
         </ThemedText>
       </ThemedView>
 
-      <View style={styles.actions}>   //TODO: button functionality added
+      <View style={styles.actions}> 
+        {/* TODO: button functionality added */}
         <Pressable style={[styles.roundBtn, styles.chatPos]} onPress={handleChat}>
           <Text style={styles.btnText}>Chat</Text>
         </Pressable>
