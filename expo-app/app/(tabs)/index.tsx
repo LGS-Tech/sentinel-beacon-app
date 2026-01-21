@@ -1,65 +1,114 @@
 // Dashboard - MAIN FILE
 
-import React from 'react';
+import React, { useEffect, useState } from "react";
+
 import {
   ImageBackground,
   Pressable,
   StyleSheet,
   Text,
-  View
-} from 'react-native';
+  View,
+} from "react-native";
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 
-const floorPlan = require('../../assets/images/LGSFloorPlan_v1.png');
+const floorPlan = require("../../assets/images/LGSFloorPlan_v1.png");
 //TODO: floor plan will be behind ui but should be scrollable and clickable
 export default function HomeScreen() {
-  const status = 'Intruder in corridor';  // TODO: replace with realtime API data
+  const status = "Intruder in corridor"; // TODO: replace with realtime API data
+  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+
+  const positions = [
+    { x: 100 / 800, y: 150 / 400 },
+    { x: 170 / 800, y: 150 / 400 },
+    { x: 170 / 800, y: 180 / 400 },
+    { x: 500 / 800, y: 180 / 400 },
+  ];
+
+  const [currentPos, setCurrentPos] = useState(positions[0]);
+
+  useEffect(() => {
+    let index = 0;
+
+    const interval = setInterval(() => {
+      index = (index + 1) % positions.length;
+      setCurrentPos(positions[index]);
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <ImageBackground
-      source={floorPlan}
-      style={styles.root}
-      resizeMode="cover"
-    >
+    <View style={styles.root}>
       <ThemedView style={styles.statusBar}>
-        <ThemedText style={styles.statusText}>
-          Status: {status}
-        </ThemedText>
+        <ThemedText style={styles.statusText}>Status: {status}</ThemedText>
       </ThemedView>
 
-      <View style={styles.actions}> 
-        {/* TODO: button functionality added */}
-        <Pressable style={[styles.roundBtn, styles.chatPos]} onPress={handleChat}>
+      <View
+        style={styles.mapContainer}
+        onLayout={(e) => {
+          const { width, height } = e.nativeEvent.layout;
+          setMapSize({ width, height });
+        }}
+      >
+        <ImageBackground
+          source={floorPlan}
+          style={styles.map}
+          resizeMode="contain"
+        >
+          {/* Intruder indicator */}
+          {mapSize.width > 0 && (
+            <View
+              style={[
+                styles.intruderPin,
+                {
+                  left: currentPos.x * mapSize.width,
+                  top: currentPos.y * mapSize.height,
+                },
+              ]}
+            />
+          )}
+        </ImageBackground>
+      </View>
+
+      <View style={styles.actions}>
+        <Pressable
+          style={[styles.roundBtn, styles.chatPos]}
+          onPress={handleChat}
+        >
           <Text style={styles.btnText}>Chat</Text>
         </Pressable>
 
-        <Pressable style={[styles.roundBtn, styles.feedBtn, styles.feedPos]} onPress={handleFeed}>
+        <Pressable
+          style={[styles.roundBtn, styles.feedBtn, styles.feedPos]}
+          onPress={handleFeed}
+        >
           <Text style={styles.btnText}>Live feed</Text>
         </Pressable>
 
-        <Pressable style={[styles.policeBtn, styles.policeBtnPos]} onPress={handlePolice}>
+        <Pressable
+          style={[styles.policeBtn, styles.policeBtnPos]}
+          onPress={handlePolice}
+        >
           <Text style={styles.policeText}>Call police</Text>
         </Pressable>
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 
-
 const handleChat = () => {
-  console.log('Opening chat...');
+  console.log("Opening chat...");
 };
 
 const handleFeed = () => {
-  console.log('Opening live feed');
+  console.log("Opening live feed");
 };
-
 
 const handlePolice = () => {
   // probably should add confirmation modal here
-  console.log('Calling police...');
+  console.log("Calling police...");
 };
 
 const SIZE = 80;
@@ -67,71 +116,72 @@ const SIZE = 80;
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: "#F5F7FA", // light dashboard background
   },
 
   statusBar: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
-    width: '100%',
-    paddingVertical: 48,
-    backgroundColor: 'rgba(248,0,0,0.83)',
-    alignItems: 'center',
+    width: "100%",
+    paddingVertical: 20,
+    backgroundColor: "rgba(248,0,0,0.83)",
+    alignItems: "center",
   },
 
   statusText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 22,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 16,
   },
 
   actions: {
-    position: 'absolute',
-    bottom: 36,
-    width: '100%',
+    position: "absolute",
+    bottom: 1,
+    width: "100%",
     height: 190,
-    justifyContent: 'center',
+    justifyContent: "center",
+    zIndex: 10,
+    alignItems: "center",
   },
-
   roundBtn: {
-    position: 'absolute',
+    position: "absolute",
     width: SIZE,
     height: SIZE,
     borderRadius: SIZE / 2,
-    backgroundColor: 'rgba(112,213,222,1)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(112,213,222,1)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   feedBtn: {
-    backgroundColor: 'rgba(101,201,131,1)',
+    backgroundColor: "rgba(101,201,131,1)",
   },
 
   policeBtn: {
-    position: 'absolute',
+    position: "absolute",
     width: SIZE * 2,
     height: SIZE,
     borderRadius: 20,
-    backgroundColor: 'rgba(228,10,10,0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(228,10,10,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-
   btnText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: "#fff",
+    fontWeight: "600",
     fontSize: 15,
   },
 
   policeText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 22,
   },
 
   policeBtnPos: {
-    alignSelf: 'center',
+    alignSelf: "center",
     bottom: 18,
   },
 
@@ -145,5 +195,32 @@ const styles = StyleSheet.create({
     right: 28,
   },
 
+  intruderPin: {
+    position: "absolute",
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#E53935",
+    shadowColor: "#E53935",
+    shadowOpacity: 0.8,
+    shadowRadius: 10,
+    elevation: 10,
+  },
 
+  mapContainer: {
+    marginTop: 120,
+    marginHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+
+  map: {
+    width: "100%",
+    height: 460,
+    borderRadius: 16,
+  },
 });
