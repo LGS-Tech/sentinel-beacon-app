@@ -1,15 +1,18 @@
 // Dashboard - MAIN FILE
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
 import {
-  ImageBackground,
   Pressable,
   StyleSheet,
   Text,
-  View,
+  View
 } from "react-native";
 
+import ChatSheet from "@/components/chat";
+import IntruderMap from "@/components/intruder-map";
+import LiveFeedSheet from "@/components/live-feed";
+import BottomSheet from "@/components/sheet";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 
@@ -17,7 +20,7 @@ const floorPlan = require("../../assets/images/LGSFloorPlan_v1.png");
 //TODO: floor plan will be behind ui but should be scrollable and clickable
 export default function HomeScreen() {
   const status = "Intruder in corridor"; // TODO: replace with realtime API data
-  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+  //const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
 
   const positions = [
     { x: 100 / 800, y: 150 / 400 },
@@ -26,18 +29,27 @@ export default function HomeScreen() {
     { x: 500 / 800, y: 180 / 400 },
   ];
 
-  const [currentPos, setCurrentPos] = useState(positions[0]);
+  //const [currentPos, setCurrentPos] = useState(positions[0]);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [feedOpen, setFeedOpen] = useState(false);
 
-  useEffect(() => {
-    let index = 0;
+  const handleChat = () => {
+  console.log("Opening chat...");
+  setChatOpen(true);
+};
 
-    const interval = setInterval(() => {
-      index = (index + 1) % positions.length;
-      setCurrentPos(positions[index]);
-    }, 1500);
+const handleFeed = () => {
+  console.log("Opening live feed");
+  setFeedOpen(true);
+};
 
-    return () => clearInterval(interval);
-  }, []);
+const handlePolice = () => {
+  // probably should add confirmation modal here
+  console.log("Calling police...");
+};
+
+
+  
 
   return (
     <View style={styles.root}>
@@ -45,32 +57,11 @@ export default function HomeScreen() {
         <ThemedText style={styles.statusText}>Status: {status}</ThemedText>
       </ThemedView>
 
-      <View
-        style={styles.mapContainer}
-        onLayout={(e) => {
-          const { width, height } = e.nativeEvent.layout;
-          setMapSize({ width, height });
-        }}
-      >
-        <ImageBackground
-          source={floorPlan}
-          style={styles.map}
-          resizeMode="contain"
-        >
-          {/* Intruder indicator */}
-          {mapSize.width > 0 && (
-            <View
-              style={[
-                styles.intruderPin,
-                {
-                  left: currentPos.x * mapSize.width,
-                  top: currentPos.y * mapSize.height,
-                },
-              ]}
-            />
-          )}
-        </ImageBackground>
-      </View>
+      <IntruderMap
+        floorPlan={floorPlan}
+        positions={positions}
+        intervalMs={1500}
+      />
 
       <View style={styles.actions}>
         <Pressable
@@ -94,22 +85,34 @@ export default function HomeScreen() {
           <Text style={styles.policeText}>Call police</Text>
         </Pressable>
       </View>
+
+      {/* ✅ Bottom sheets go HERE */}
+      <BottomSheet
+        visible={chatOpen}
+        onClose={() => setChatOpen(false)}
+      >
+        <ChatSheet />
+      </BottomSheet>
+
+      <BottomSheet
+        visible={feedOpen}
+        onClose={() => setFeedOpen(false)}
+      >
+        <LiveFeedSheet />
+      </BottomSheet>
+
+
     </View>
+
+    
   );
 }
 
-const handleChat = () => {
-  console.log("Opening chat...");
-};
 
-const handleFeed = () => {
-  console.log("Opening live feed");
-};
 
-const handlePolice = () => {
-  // probably should add confirmation modal here
-  console.log("Calling police...");
-};
+
+
+
 
 const SIZE = 80;
 
@@ -223,4 +226,7 @@ const styles = StyleSheet.create({
     height: 460,
     borderRadius: 16,
   },
+  
 });
+
+
