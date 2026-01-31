@@ -1,4 +1,3 @@
-// FINAL INTEGRATED VERSION - LGS STRATEGIC COORDINATION
 import React, { useState } from "react";
 import { ImageBackground, StyleSheet, View, TouchableOpacity, GestureResponderEvent } from "react-native";
 
@@ -20,12 +19,12 @@ export default function IntruderMap({
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [currentPos, setCurrentPos] = useState<Position | null>(null);
 
-  // MAIN FUNCTION: Captures touch and syncs with CodeSandbox Backend
+  // Main Function: Captures touch events and syncs with CodeSandbox Backend
   const handleMapClick = async (event: GestureResponderEvent) => {
     const { locationX, locationY } = event.nativeEvent;
 
-    // NORMALIZATION: Converting pixel clicks to a 0.0 - 1.0 range
-    // This is critical so the pin stays in the same place for Ka To Tou
+    // COORDINATE NORMALIZATION: Ensures the pin stays in the correct 
+    // relative spot on any device screen (iPad, iPhone, etc.)
     const normalizedX = locationX / mapSize.width;
     const normalizedY = locationY / mapSize.height;
 
@@ -35,7 +34,7 @@ export default function IntruderMap({
     if (onLocationChange) onLocationChange(newLabel);
 
     try {
-      // LINKED TO YOUR CODESANDBOX BACKEND
+      // LINKED TO YOUR LIVE CODESANDBOX BACKEND
       const response = await fetch('https://8k8sph-5000.csb.app/api/v1/alerts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,7 +60,7 @@ export default function IntruderMap({
         setMapSize({ width, height });
       }}
     >
-      {/* TOUCHABLE LAYER: Captures coordinates for the database */}
+      {/* TOUCHABLE LAYER: Captures clicks for real-time reporting */}
       <TouchableOpacity activeOpacity={1} onPress={handleMapClick} style={{ flex: 1 }}>
         <ImageBackground source={floorPlan} style={styles.map} resizeMode="contain">
           {mapSize.width > 0 && currentPos && (
@@ -100,7 +99,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "rgba(255, 255, 255, 0.5)",
     marginLeft: -10, 
-    marginTop: -10, // Centers the pin exactly on the touch
+    marginTop: -10, // Centers the pin directly on the touch coordinate
     shadowColor: "#E53935", 
     shadowOpacity: 0.9, 
     shadowRadius: 12, 
