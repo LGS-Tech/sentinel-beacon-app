@@ -1,10 +1,10 @@
-// FINAL INTEGRATED VERSION - COORDINATION LOGIC
+// FINAL INTEGRATED VERSION - LGS STRATEGIC COORDINATION
 import React, { useState } from "react";
-import { Dimensions, ImageBackground, StyleSheet, View, TouchableOpacity, GestureResponderEvent, Alert } from "react-native";
+import { ImageBackground, StyleSheet, View, TouchableOpacity, GestureResponderEvent } from "react-native";
 
 type Position = {
-  x: number;
-  y: number;
+  x: number; // Normalized coordinate (0 to 1)
+  y: number; // Normalized coordinate (0 to 1)
   label: string;
 };
 
@@ -20,12 +20,12 @@ export default function IntruderMap({
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [currentPos, setCurrentPos] = useState<Position | null>(null);
 
-  // MAIN FUNCTION: Captures the touch and sends it to the Backend
+  // MAIN FUNCTION: Captures touch and syncs with CodeSandbox Backend
   const handleMapClick = async (event: GestureResponderEvent) => {
     const { locationX, locationY } = event.nativeEvent;
 
-    // NORMALIZATION: Converting pixel clicks to 0.0 - 1.0 range
-    // This ensures pins stay in the same spot on any screen size.
+    // NORMALIZATION: Converting pixel clicks to a 0.0 - 1.0 range
+    // This is critical so the pin stays in the same place for Ka To Tou
     const normalizedX = locationX / mapSize.width;
     const normalizedY = locationY / mapSize.height;
 
@@ -35,8 +35,8 @@ export default function IntruderMap({
     if (onLocationChange) onLocationChange(newLabel);
 
     try {
-      // NOTE: Replace 'YOUR_IPAD_IP' with your actual local IP (e.g., 192.168.1.15)
-      const response = await fetch('http://YOUR_IPAD_IP:5000/api/v1/alerts', {
+      // LINKED TO YOUR CODESANDBOX BACKEND
+      const response = await fetch('https://8k8sph-5000.csb.app/api/v1/alerts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -47,9 +47,9 @@ export default function IntruderMap({
       });
 
       if (!response.ok) throw new Error("Backend sync failed");
-      console.log("Success: Alert synced to DB");
+      console.log("Success: Strategic alert synced to CodeSandbox");
     } catch (error) {
-      console.error("Sync Error:", error);
+      console.error("Integration Error:", error);
     }
   };
 
@@ -61,7 +61,7 @@ export default function IntruderMap({
         setMapSize({ width, height });
       }}
     >
-      {/* TOUCHABLE LAYER: Makes the whole map clickable */}
+      {/* TOUCHABLE LAYER: Captures coordinates for the database */}
       <TouchableOpacity activeOpacity={1} onPress={handleMapClick} style={{ flex: 1 }}>
         <ImageBackground source={floorPlan} style={styles.map} resizeMode="contain">
           {mapSize.width > 0 && currentPos && (
@@ -82,13 +82,28 @@ export default function IntruderMap({
 }
 
 const styles = StyleSheet.create({
-  mapContainer: { width: "92%", height: 460, borderRadius: 16, backgroundColor: "#FFF", overflow: "hidden", marginTop: 10 },
+  mapContainer: { 
+    width: "92%", 
+    height: 460, 
+    borderRadius: 16, 
+    backgroundColor: "#FFF", 
+    overflow: "hidden", 
+    marginTop: 10 
+  },
   map: { width: "100%", height: 460 },
   intruderPin: {
     position: "absolute",
-    width: 16, height: 16, borderRadius: 8,
+    width: 20, 
+    height: 20, 
+    borderRadius: 10,
     backgroundColor: "#E53935",
-    marginLeft: -8, marginTop: -8, // Centers the pin exactly on the touch point
-    shadowColor: "#E53935", shadowOpacity: 0.8, shadowRadius: 10, elevation: 10
+    borderWidth: 3,
+    borderColor: "rgba(255, 255, 255, 0.5)",
+    marginLeft: -10, 
+    marginTop: -10, // Centers the pin exactly on the touch
+    shadowColor: "#E53935", 
+    shadowOpacity: 0.9, 
+    shadowRadius: 12, 
+    elevation: 10
   },
 });
