@@ -1,7 +1,9 @@
 import ChatSheet from "@/components/chat";
 import IntruderMap from "@/components/intruder-map";
 import LiveFeedSheet from "@/components/live-feed";
+import PoliceConfirmation from "@/components/police-confirmation";
 import BottomSheet from "@/components/sheet";
+
 import { ThemedView } from "@/components/themed-view";
 import React, { useState } from "react";
 import {
@@ -36,7 +38,7 @@ export default function HomeScreen() {
 
   const [chatOpen, setChatOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
-
+  const [confirmOpen, setConfirmOpen] = useState(false);
   React.useEffect(() => {
     const timer = setInterval(() => {
       const diff = Date.now() - lastLocationChange;
@@ -110,9 +112,7 @@ export default function HomeScreen() {
 
           <Pressable
             style={styles.policeBtn}
-            onPress={() => {
-              setResponseStatus("Police notified");
-            }}
+            onPress={() => setConfirmOpen(true)}
           >
             <Text style={styles.policeText}>Call Police</Text>
           </Pressable>
@@ -126,6 +126,16 @@ export default function HomeScreen() {
 
       <BottomSheet visible={feedOpen} onClose={() => setFeedOpen(false)}>
         <LiveFeedSheet />
+      </BottomSheet>
+
+      <BottomSheet visible={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <PoliceConfirmation
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => {
+            setResponseStatus("Police notified");
+            setConfirmOpen(false);
+          }}
+        />
       </BottomSheet>
     </View>
   );
@@ -195,13 +205,13 @@ const styles = StyleSheet.create({
   },
 
   movementValue: {
-    color: "#FACC15", // yellow
+    color: "#FACC15",
     fontSize: 15,
     fontWeight: "600",
   },
 
   responseValue: {
-    color: "#60A5FA", // blue
+    color: "#60A5FA",
     fontSize: 15,
     fontWeight: "600",
   },
