@@ -14,16 +14,24 @@ const LOGS: LogItem[] = [
     message: "Movement noticed near the front entrance",
   },
   {
+    time: "14:32",
+    message: "Mrs Smith messaged: 'Spotted a male in the corridor outside C1. He has a red hoodie and white trainers, looks like he's in his early 20s'",
+  },
+  {
     time: "14:33",
-    message: "Someone’s now inside corridor A",
+    message: "Mrs Smith updated the location of the suspect",
   },
   {
     time: "14:34",
-    message: "Security has been notified and is responding",
+    message: "Mrs Martin uploaded a picture of the suspect",
   },
   {
     time: "14:36",
-    message: "They appear to be heading toward the storage area",
+    message: "Mr Albot messaged: 'Police have been notified and are on the way'",
+  },
+  {
+    time: "14:37",
+    message: "Mr Wallace updated the location of the suspect",
   },
 ];
 
