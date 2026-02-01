@@ -15,7 +15,7 @@ import {
   View,
 } from "react-native";
 
-const floorPlan = require("../../assets/images/LGSFloorPlan_v1.png");
+const floorPlan = require("../../assets/images/LGSFloorPlan_v3.png");
 const windowHeight = Dimensions.get("window").height;
 
 export default function HomeScreen() {
