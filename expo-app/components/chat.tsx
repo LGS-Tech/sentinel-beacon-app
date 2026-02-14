@@ -1,6 +1,6 @@
 // Chat panel used by staff to coordinate in real time
 
-import React from "react";
+import React, { useState } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -16,17 +16,17 @@ type Message = {
   time: string;
 };
 
-const MESSAGES: Message[] = [
+const INITIAL_MESSAGES: Message[] = [
   {
     id: "1",
     name: "Mrs Smith",
-    text: "Spotted a male in the corridor outside C1. He has a red hoodie and white trainers, looks like he's in his early 20s" , 
+    text: "Spotted a male in the corridor outside C1. He has a red hoodie and white trainers, looks like he's in his early 20s",
     time: "14:32",
   },
   {
     id: "2",
     name: "Mrs Martin",
-    text: "Sent a picture            View",  // TODO: add actual button
+    text: "Sent a picture            View",
     time: "14:34",
   },
   {
@@ -34,18 +34,33 @@ const MESSAGES: Message[] = [
     name: "Mr Albot",
     text: "Police have been notified and are on the way",
     time: "14:36",
-  }
-
+  },
 ];
 
-
 export default function ChatSheet() {
+  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+  const [inputText, setInputText] = useState("");
+
+  const handleSend = () => {
+    if (!inputText.trim()) return;
+
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      name: "Mr Wallace",
+      text: inputText.trim(),
+      time: "14:43",
+    };
+
+    setMessages((prev) => [...prev, newMessage]);
+    setInputText("");
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Team Chat</Text>
 
       <FlatList
-        data={MESSAGES}
+        data={messages}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messages}
         renderItem={({ item }) => (
@@ -65,6 +80,10 @@ export default function ChatSheet() {
           placeholder="Type a message…"
           style={styles.input}
           placeholderTextColor="#888"
+          value={inputText}
+          onChangeText={setInputText}
+          onSubmitEditing={handleSend}
+          returnKeyType="send"
         />
       </View>
     </View>
@@ -94,9 +113,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: "#444",
-    marginBottom:4,
+    marginBottom: 4,
   },
-
 
   messageRow: {
     flexDirection: "row",
@@ -106,12 +124,12 @@ const styles = StyleSheet.create({
   messageTxt: {
     flex: 1,
     fontSize: 15,
-    color: "#222" ,
+    color: "#222",
     marginRight: 8,
   },
 
   time: {
-    fontSize:12,
+    fontSize: 12,
     color: "#999",
   },
 
@@ -129,6 +147,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#000",
   },
-
-
 });

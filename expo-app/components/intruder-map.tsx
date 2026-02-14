@@ -1,64 +1,72 @@
-import React, { useEffect, useState } from "react";
-import { ImageBackground, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import {
+  ImageBackground,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-// using mock data atm but to be replaced with actual pin drops and manual status updates
 interface IntruderMapProps {
   floorPlan: any;
+  updateMode?: boolean;
+  selectedCoords?: { x: number; y: number } | null;
+  onMapPress?: (coords: { x: number; y: number }) => void;
 }
 
-// Mocked intruder movement path (normalized coordinates)
-const MOCK_SIM = [
-  { x: 0.22, y: 0.17, label: "Movement Detected" },
-  { x: 0.22, y: 0.28, label: "Intruder outside C1" },
-  { x: 0.46, y: 0.49, label: "Intruder outside Sports Hall" },
-  { x: 0.62, y: 0.48, label: "Police notified" },
-  { x: 0.52, y: 0.79, label: "Intruder at the bottom of Sports Hall" },
-];
-
-export default function IntruderMap({ floorPlan }: IntruderMapProps) {
+export default function IntruderMap({
+  floorPlan,
+  updateMode,
+  selectedCoords,
+  onMapPress,
+}: IntruderMapProps) {
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
-  const [currentPos, setCurrentPos] = useState(MOCK_SIM[0]);
 
-  useEffect(() => {
-    let index = 0;
+  const handlePress = (event: any) => {
+    if (!updateMode || !mapSize.width) return;
 
-    const timer = setInterval(() => {
-      index = (index + 1) % MOCK_SIM.length;
-      setCurrentPos(MOCK_SIM[index]);
-    }, 3000);
+    const { locationX, locationY } = event.nativeEvent;
 
-    return () => clearInterval(timer);
-  }, []);
+    const normalized = {
+      x: locationX / mapSize.width,
+      y: locationY / mapSize.height,
+    };
+
+    onMapPress?.(normalized);
+  };
 
   return (
     <View
       style={styles.container}
       onLayout={(e) => setMapSize(e.nativeEvent.layout)}
     >
-      <ImageBackground
-        source={floorPlan}
-        style={styles.map}
-        resizeMode="contain"
-      >
-        {mapSize.width > 0 && (
-          <View
-            style={[
-              styles.pin,
-              {
-                left: currentPos.x * mapSize.width,
-                top: currentPos.y * mapSize.height,
-              },
-            ]}
-          />
-        )}
-      </ImageBackground>
+      <Pressable style={{ flex: 1 }} onPress={handlePress}>
+        <ImageBackground
+          source={floorPlan}
+          style={styles.map}
+          resizeMode="contain"
+        >
+          {selectedCoords && (
+            <View
+              style={[
+                styles.pin,
+                {
+                  left: selectedCoords.x * mapSize.width,
+                  top: selectedCoords.y * mapSize.height,
+                },
+              ]}
+            />
+          )}
+        </ImageBackground>
+      </Pressable>
 
-      {/* Dynamic status label providing context for the Live Feed */}
-      <View style={styles.infoBox}>
-        <Text style={styles.statusText}>
-          STATUS: {currentPos.label}
-        </Text>
-      </View>
+      {updateMode && (
+        <View style={styles.updateBanner}>
+          <Text style={styles.updateText}>
+            Tap map to mark intruder location
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -78,22 +86,6 @@ const styles = StyleSheet.create({
     height: 450,
     opacity: 0.85,
   },
-  infoBox: {
-    position: "absolute",
-    top: 15,
-    left: 15,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    padding: 10,
-    borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: "#FF4444",
-  },
-  statusText: {
-    color: "#FF4444",
-    fontWeight: "bold",
-    fontSize: 11,
-    letterSpacing: 1,
-  },
   pin: {
     position: "absolute",
     width: 24,
@@ -104,9 +96,18 @@ const styles = StyleSheet.create({
     borderColor: "white",
     marginLeft: -12,
     marginTop: -12,
-    shadowColor: "#FF4444",
-    shadowOpacity: 1,
-    shadowRadius: 15,
-    elevation: 15,
+  },
+  updateBanner: {
+    position: "absolute",
+    top: 15,
+    left: 15,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    padding: 10,
+    borderRadius: 10,
+  },
+  updateText: {
+    color: "#FF4444",
+    fontWeight: "bold",
+    fontSize: 12,
   },
 });

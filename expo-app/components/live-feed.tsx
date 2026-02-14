@@ -30,8 +30,12 @@ const LOGS: LogItem[] = [
     message: "Mr Albot messaged: 'Police have been notified and are on the way'",
   },
   {
-    time: "14:37",
+    time: "14:43",
     message: "Mr Wallace updated the location of the suspect",
+  },
+  {
+    time: "14:43",
+    message: "Mr Wallace messaged: 'Spotted him near the back entrance. Also, the police are here now'",
   },
 ];
 
