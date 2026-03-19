@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons"
 import { router } from "expo-router"
 import React from "react"
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native"
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native"
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -60,13 +60,14 @@ function FolderCard({ item }: any) {
 
 export default function VaultScreen() {
 
+  const logo = require("../../assets/images/LGS-logo.png");
+
   return (
     <View style={styles.screen}>
 
-      {/* top title */}
-      <View style={styles.topBar}>
-        <Text style={styles.title}>Vault</Text>
-        <MaterialIcons name="lock" size={20} color="#343434ff" />
+      {/* Header */}
+      <View style={styles.header}>
+        <Image source={logo} style={styles.logoImage} resizeMode="contain" />
       </View>
 
       <FlatList
@@ -99,6 +100,23 @@ const styles = StyleSheet.create({
     gap: 6
   },
 
+  header: {
+    height: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.08)",
+    elevation: 3,
+  },
+
+  logoImage: {
+    width: 150,
+    height: 50,
+    marginLeft: -25,
+  },
+
+  
 
 
   title: {
