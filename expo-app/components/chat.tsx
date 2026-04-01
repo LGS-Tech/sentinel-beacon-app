@@ -1,62 +1,132 @@
 // Chat panel used by staff to coordinate in real time
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react"
 import {
   FlatList,
   StyleSheet,
   Text,
   TextInput,
   View,
-} from "react-native";
+} from "react-native"
+
+import * as SQLite from "expo-sqlite"
+
+const db = SQLite.openDatabaseSync("app.db")
 
 type Message = {
-  id: string;
-  name: string;
-  text: string;
-  time: string;
-};
+  id: string
+  name: string
+  text: string
+  time: string
+}
 
-const INITIAL_MESSAGES: Message[] = [
-  {
-    id: "1",
-    name: "Mrs Smith",
-    text: "Spotted a male in the corridor outside C1. He has a red hoodie and white trainers, looks like he's in his early 20s",
-    time: "14:32",
-  },
-  {
-    id: "2",
-    name: "Mrs Martin",
-    text: "Sent a picture            View",
-    time: "14:34",
-  },
-  {
-    id: "3",
-    name: "Mr Albot",
-    text: "Police have been notified and are on the way",
-    time: "14:36",
-  },
-];
+
+// quick table setup (same db as index)
+const ensureChatTable = () => {
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      text TEXT,
+      createdAt INTEGER
+    );
+  `)
+}
+
+
+// load messages from db
+const loadMessages = (): Message[] => {
+  const rows = db.getAllSync(
+    "SELECT * FROM messages ORDER BY createdAt ASC"
+  ) as any[]
+
+  return rows.map((row) => {
+    const date = new Date(row.createdAt)
+
+    const hours = String(date.getHours()).padStart(2, "0")
+    const mins = String(date.getMinutes()).padStart(2, "0")
+
+    return {
+      id: row.id.toString(),
+      name: row.name,
+      text: row.text,
+      time: `${hours}:${mins}`,
+    }
+  })
+}
+
+
+// save message
+export const addMessageToDb = (name: string, text: string) => {
+  db.runSync(
+    "INSERT INTO messages (name, text, createdAt) VALUES (?, ?, ?)",
+    [name, text, Date.now()]
+  )
+}
+
+
 
 export default function ChatSheet() {
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
-  const [inputText, setInputText] = useState("");
+
+  const [messages, setMessages] = useState<Message[]>([])
+  const [inputText, setInputText] = useState("")
+
+
+  // load messages on open
+  useEffect(() => {
+
+    ensureChatTable()
+
+    const data = loadMessages()
+
+    // if empty, seed initial messages once
+    if (data.length === 0) {
+
+      const seed = [
+        {
+          name: "Mrs Smith",
+          text: "Spotted a male in the corridor outside C1. He has a red hoodie and white trainers, looks like he's in his early 20s",
+        },
+        {
+          name: "Mrs Martin",
+          text: "Sent a picture            View",
+        },
+        {
+          name: "Mr Albot",
+          text: "Police have been notified and are on the way",
+        },
+      ]
+
+      seed.forEach((msg) => {
+        addMessageToDb(msg.name, msg.text)
+      })
+
+      setMessages(loadMessages())
+    } else {
+      setMessages(data)
+    }
+
+  }, [])
+
 
   const handleSend = () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim()) return
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      name: "Mr Wallace",
-      text: inputText.trim(),
-      time: "14:43",
-    };
+    const text = inputText.trim()
 
-    setMessages((prev) => [...prev, newMessage]);
-    setInputText("");
-  };
+    // save to db
+    addMessageToDb("Mr Wallace", text)
+
+    // reload messages (simple approach)
+    setMessages(loadMessages())
+
+    setInputText("")
+  }
+
 
   return (
     <View style={styles.container}>
+
       <Text style={styles.title}>Team Chat</Text>
 
       <FlatList
@@ -86,9 +156,11 @@ export default function ChatSheet() {
           returnKeyType="send"
         />
       </View>
+
     </View>
-  );
+  )
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -147,4 +219,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#000",
   },
-});
+})
