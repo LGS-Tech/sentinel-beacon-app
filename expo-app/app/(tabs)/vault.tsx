@@ -1,138 +1,283 @@
-import { MaterialIcons } from "@expo/vector-icons"
-import { router } from "expo-router"
-import React from "react"
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native"
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring
-} from "react-native-reanimated"
+import { useState } from "react";
+import {
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
+import { ThemedText } from "../../components/themed-text";
+import { ThemedView } from "../../components/themed-view";
 
-import { vaultFolders } from "@/components/vaultdata/vault-data"
+/* ================= DATA ================= */
 
+const vaultData = [
+  {
+    id: "2",
+    title: "Case 001",
+    files: [{ id: "f4", name: "notes.pdf", type: "document" }],
+  },
+  {
+    id: "3",
+    title: "Case 002",
+    files: [
+      {
+        id: "f6",
+        name: "report2.txt",
+        type: "text",
+        content:
+          "Intruder detected near entrance. Movement recorded at 21:43. Security alerted.",
+      },
+      { id: "f7", name: "summary.pdf", type: "document" },
+      {
+        id: "f8",
+        name: "intruder_scene.jpg",
+        type: "image",
+        uri: "https://picsum.photos/800",
+      },
+    ],
+  },
+];
 
-// individual folder tile
-function FolderCard({ item }: any) {
-
-  // simple press animation
-  const scaleValue = useSharedValue(1)
-
-  const scaleStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scaleValue.value }]
-    }
-  })
-
-  const handlePress = () => {
-    router.push({
-      pathname: "/vault-folder",
-      params: { folderId: item.id }
-    })
-  }
-
-
-  return (
-    <Animated.View style={[styles.folderCard, scaleStyle]}>
-
-      <Pressable
-        style={styles.cardInner}
-        onPressIn={() => {
-          scaleValue.value = withSpring(0.96)
-        }}
-        onPressOut={() => {
-          scaleValue.value = withSpring(1)
-        }}
-        onPress={handlePress}
-      >
-
-        <MaterialIcons name="folder" size={34} color="#FFD166" />
-
-        <Text style={styles.folderLabel}>
-          {item.name}
-        </Text>
-
-      </Pressable>
-
-    </Animated.View>
-  )
-}
-
+/* ================= COMPONENT ================= */
 
 export default function VaultScreen() {
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedText, setSelectedText] = useState<string | null>(null);
 
-  return (
-    <View style={styles.screen}>
+  const renderFile = ({ item }: any) => (
+    <Pressable
+      style={styles.fileItem}
+      onPress={() => {
+        if (item.type === "image" && item.uri) {
+          setSelectedImage(item.uri);
+        } else if (item.type === "text" && item.content) {
+          setSelectedText(item.content);
+        }
+      }}
+    >
+      <ThemedText style={styles.fileText}>
+        {getFileIcon(item.type)} {item.name}
+      </ThemedText>
+    </Pressable>
+  );
 
-      {/* top title */}
-      <View style={styles.topBar}>
-        <Text style={styles.title}>Vault</Text>
-        <MaterialIcons name="lock" size={20} color="#343434ff" />
+  const renderCase = ({ item }: any) => (
+    <ThemedView style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View>
+          <ThemedText style={styles.caseTitle}>{item.title}</ThemedText>
+          <ThemedText style={styles.caseSubtitle}>Evidence files</ThemedText>
+        </View>
+
+        <View style={styles.badge}>
+          <ThemedText style={styles.badgeText}>{item.files.length}</ThemedText>
+        </View>
       </View>
 
+      <View style={styles.divider} />
+
       <FlatList
-        data={vaultFolders}
-        numColumns={2}
-        keyExtractor={(folder) => folder.id}
-        renderItem={({ item }) => <FolderCard item={item} />}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.listPadding}
+        data={item.files}
+        keyExtractor={(file) => file.id}
+        renderItem={renderFile}
+        scrollEnabled={false}
+      />
+    </ThemedView>
+  );
+
+  return (
+    <ThemedView style={styles.container}>
+      {/* HEADER */}
+      <View style={styles.headerContainer}>
+        <ThemedText style={styles.header}>Vault</ThemedText>
+        <ThemedText style={styles.subHeader}>
+          Secure evidence & case files
+        </ThemedText>
+      </View>
+
+      {/* LIST */}
+      <FlatList
+        data={vaultData}
+        keyExtractor={(item) => item.id}
+        renderItem={renderCase}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
       />
 
-    </View>
-  )
+      {/* 🔥 IMAGE MODAL */}
+      <Modal visible={!!selectedImage} transparent animationType="fade">
+        <View style={styles.modalContainer}>
+          <Pressable
+            style={styles.modalBackground}
+            onPress={() => setSelectedImage(null)}
+          />
+
+          {selectedImage && (
+            <Image source={{ uri: selectedImage }} style={styles.fullImage} />
+          )}
+        </View>
+      </Modal>
+
+      {/* 🔥 TEXT MODAL */}
+      <Modal visible={!!selectedText} transparent animationType="fade">
+        <View style={styles.modalContainer}>
+          <Pressable
+            style={styles.modalBackground}
+            onPress={() => setSelectedText(null)}
+          />
+
+          <View style={styles.textModalBox}>
+            <ThemedText style={styles.textContent}>{selectedText}</ThemedText>
+          </View>
+        </View>
+      </Modal>
+    </ThemedView>
+  );
 }
 
+/* ================= HELPERS ================= */
+
+function getFileIcon(type: string) {
+  switch (type) {
+    case "image":
+      return "🖼️";
+    case "document":
+      return "📄";
+    case "text":
+      return "📝";
+    default:
+      return "📁";
+  }
+}
+
+/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
-
-  screen: {
+  container: {
     flex: 1,
-    backgroundColor: "#f2f2f2ff"
+    padding: 16,
+    backgroundColor: "#F5F7FB",
   },
 
-  topBar: {
-    paddingTop: 60,
-    paddingBottom: 18,
+  headerContainer: {
+    marginBottom: 24,
+  },
+
+  header: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: "#111827",
+  },
+
+  subHeader: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginTop: 4,
+  },
+
+  list: {
+    paddingBottom: 30,
+  },
+
+  card: {
+    backgroundColor: "#FFFFFF",
+    padding: 18,
+    borderRadius: 18,
+    marginBottom: 16,
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+
+  cardHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  caseTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#111827",
+  },
+
+  caseSubtitle: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    marginTop: 2,
+  },
+
+  badge: {
+    backgroundColor: "#E5EDFF",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+
+  badgeText: {
+    color: "#2563EB",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: "#F0F2F5",
+    marginVertical: 12,
+  },
+
+  fileItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginTop: 8,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+
+  fileText: {
+    fontSize: 14,
+    color: "#374151",
+  },
+
+  /* MODALS */
+
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
     justifyContent: "center",
     alignItems: "center",
-    gap: 6
   },
 
-
-
-  title: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "black"
+  modalBackground: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
   },
 
-  row: {
-    justifyContent:  "space-between"
+  fullImage: {
+    width: "90%",
+    height: "70%",
+    resizeMode: "contain",
+    borderRadius: 12,
   },
 
-  listPadding: {
-    padding: 18
-  },
-
-  folderCard: {
-    width: "48%",
-    height: 110,
+  textModalBox: {
+    width: "85%",
+    backgroundColor: "#FFFFFF",
+    padding: 20,
     borderRadius: 16,
-    marginBottom: 16,
-    backgroundColor: "#ffffffff"
   },
 
-  cardInner: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center"
+  textContent: {
+    fontSize: 15,
+    color: "#111827",
+    lineHeight: 22,
   },
-
-  folderLabel: {
-    marginTop: 8,
-    fontSize: 15 ,
-    color: "black"
-  }
-
-})
+});
