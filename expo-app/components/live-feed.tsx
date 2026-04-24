@@ -61,12 +61,14 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
 
   logContainer: {
     borderRadius: 12,
     backgroundColor: "#F4F6F9",
     paddingVertical: 8,
+    paddingHorizontal: 16,
   },
 
   logRow: {

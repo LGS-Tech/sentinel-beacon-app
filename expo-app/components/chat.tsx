@@ -33,6 +33,10 @@ const ensureChatTable = () => {
   `)
 }
 
+export const clearMessages = () => {
+  db.runSync("DELETE FROM messages")
+}
+
 
 // load messages from db
 const loadMessages = (): Message[] => {
@@ -143,6 +147,8 @@ export default function ChatSheet() {
             </View>
           </View>
         )}
+        style={{ flex: 1 }}
+        inverted
       />
 
       <View style={styles.inputBar}>
@@ -165,6 +171,8 @@ export default function ChatSheet() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
 
   title: {

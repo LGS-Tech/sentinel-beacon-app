@@ -1,113 +1,143 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react"
 import {
-  ImageBackground,
-  Pressable,
+  Image,
+  NativeSyntheticEvent,
+  NativeTouchEvent,
+  ScrollView,
   StyleSheet,
-  Text,
   View,
-} from "react-native";
+} from "react-native"
 
-interface IntruderMapProps {
-  floorPlan: any;
-  updateMode?: boolean;
-  selectedCoords?: { x: number; y: number } | null;
-  onMapPress?: (coords: { x: number; y: number }) => void;
+type Coords = {
+  x: number
+  y: number
+}
+
+type Props = {
+  floorPlan: any
+  updateMode: boolean
+  showMarker: boolean
+  selectedCoords: Coords
+  onMapPress: (coords: Coords) => void
 }
 
 export default function IntruderMap({
   floorPlan,
   updateMode,
+  showMarker, 
   selectedCoords,
   onMapPress,
-}: IntruderMapProps) {
-  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+}: Props) {
 
-  const handlePress = (event: any) => {
-    if (!updateMode || !mapSize.width) return;
+  const [layout, setLayout] = useState({ width: 1, height: 1 })
 
-    const { locationX, locationY } = event.nativeEvent;
+  const startTouch = useRef<{ x: number; y: number } | null>(null)
 
-    const normalized = {
-      x: locationX / mapSize.width,
-      y: locationY / mapSize.height,
-    };
+  const onTouchStart = (e: NativeSyntheticEvent<NativeTouchEvent>) => {
+    startTouch.current = {
+      x: e.nativeEvent.pageX,
+      y: e.nativeEvent.pageY,
+    }
+  }
 
-    onMapPress?.(normalized);
-  };
+  const onTouchEnd = (e: NativeSyntheticEvent<NativeTouchEvent>) => {
+    if (!startTouch.current || !updateMode) return
+
+    const dx = Math.abs(e.nativeEvent.pageX - startTouch.current.x)
+    const dy = Math.abs(e.nativeEvent.pageY - startTouch.current.y)
+
+    // treat as tap only if finger barely moved
+    if (dx > 10 || dy > 10) return
+
+    const { locationX, locationY } = e.nativeEvent
+
+    const x = locationX / layout.width
+    const y = locationY / layout.height
+
+    onMapPress({ x, y })
+  }
 
   return (
-    <View
+    <ScrollView
       style={styles.container}
-      onLayout={(e) => setMapSize(e.nativeEvent.layout)}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      showsVerticalScrollIndicator={false}
+      maximumZoomScale={2}
+      minimumZoomScale={1}
+      contentContainerStyle={styles.content}
     >
-      <Pressable style={{ flex: 1 }} onPress={handlePress}>
-        <ImageBackground
-          source={floorPlan}
-          style={styles.map}
-          resizeMode="contain"
-        >
-          {selectedCoords && (
-            <View
-              style={[
-                styles.pin,
-                {
-                  left: selectedCoords.x * mapSize.width,
-                  top: selectedCoords.y * mapSize.height,
-                },
-              ]}
-            />
-          )}
-        </ImageBackground>
-      </Pressable>
 
-      {updateMode && (
-        <View style={styles.updateBanner}>
-          <Text style={styles.updateText}>
-            Tap map to mark intruder location
-          </Text>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+        maximumZoomScale={2}
+        minimumZoomScale={1}
+        contentContainerStyle={styles.content}
+      >
+
+        <View
+          onLayout={(e) => {
+            const { width, height } = e.nativeEvent.layout
+            setLayout({ width, height })
+          }}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+
+          <Image
+            source={floorPlan}
+            style={styles.image}
+            resizeMode="contain"
+          />
+
+          {showMarker && (
+  <View
+    pointerEvents="none"
+    style={[
+      styles.marker,
+      {
+        left: `${selectedCoords.x * 100}%`,
+        top: `${selectedCoords.y * 100}%`,
+      },
+    ]}
+  />
+)}
+
         </View>
-      )}
-    </View>
-  );
+
+      </ScrollView>
+
+    </ScrollView>
+  )
 }
 
 const styles = StyleSheet.create({
+
   container: {
-    width: "95%",
-    height: 450,
-    borderRadius: 20,
-    backgroundColor: "#1A1A1A",
-    alignSelf: "center",
-    overflow: "hidden",
-    marginTop: 15,
+    flex: 1,
   },
-  map: {
-    width: "100%",
-    height: 450,
-    opacity: 0.85,
+
+  content: {
+    width: 1200,  
+    height: 1600,  
   },
-  pin: {
+
+  image: {
+    width: 1000,
+    height: 1300,
+  },
+
+  marker: {
     position: "absolute",
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#FF4444",
-    borderWidth: 4,
-    borderColor: "white",
-    marginLeft: -12,
-    marginTop: -12,
+    width: 25,
+    height: 25,
+    borderRadius: 15,
+    backgroundColor: "red",
+    borderWidth: 3,     
+    borderColor: "#faa4a4",  // bit of outlining to increase visibility
+    transform: [{ translateX: -8 }, { translateY: -8 }],
   },
-  updateBanner: {
-    position: "absolute",
-    top: 15,
-    left: 15,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    padding: 10,
-    borderRadius: 10,
-  },
-  updateText: {
-    color: "#FF4444",
-    fontWeight: "bold",
-    fontSize: 12,
-  },
-});
+
+})
