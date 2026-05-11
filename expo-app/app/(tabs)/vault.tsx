@@ -1,38 +1,60 @@
-import { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useMemo, useState } from "react";
 import {
   FlatList,
   Image,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
+  TextInput,
   View,
 } from "react-native";
+
 import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
 
+/* ================= TYPES ================= */
+
+type FileItem = {
+  id: string;
+  name: string;
+  type: "image" | "document" | "text";
+  uri?: string;
+  content?: string;
+};
+
+type CaseItem = {
+  id: string;
+  title: string;
+  createdAt: string;
+  files: FileItem[];
+};
+
 /* ================= DATA ================= */
 
-const vaultData = [
+const initialVaultData: CaseItem[] = [
   {
-    id: "2",
-    title: "Case 001",
-    files: [{ id: "f4", name: "notes.pdf", type: "document" }],
+    id: "1",
+    title: "Case #001",
+    createdAt: "2026-03-19T14:26:00",
+    files: [{ id: "f1", name: "notes.pdf", type: "document" }],
   },
   {
-    id: "3",
-    title: "Case 002",
+    id: "2",
+    title: "Case #002",
+    createdAt: "2026-03-19T16:12:00",
     files: [
       {
-        id: "f6",
-        name: "report2.txt",
+        id: "f2",
+        name: "report.txt",
         type: "text",
-        content:
-          "Intruder detected near entrance. Movement recorded at 21:43. Security alerted.",
+        content: "Intruder detected near entrance at 21:43.",
       },
-      { id: "f7", name: "summary.pdf", type: "document" },
       {
-        id: "f8",
-        name: "intruder_scene.jpg",
+        id: "f3",
+        name: "scene.jpg",
         type: "image",
         uri: "https://picsum.photos/800",
       },
@@ -43,93 +65,239 @@ const vaultData = [
 /* ================= COMPONENT ================= */
 
 export default function VaultScreen() {
+  const [vaultData] = useState<CaseItem[]>(initialVaultData);
+
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedText, setSelectedText] = useState<string | null>(null);
 
-  const renderFile = ({ item }: any) => (
-    <Pressable
-      style={styles.fileItem}
-      onPress={() => {
-        if (item.type === "image" && item.uri) {
-          setSelectedImage(item.uri);
-        } else if (item.type === "text" && item.content) {
-          setSelectedText(item.content);
-        }
-      }}
-    >
-      <ThemedText style={styles.fileText}>
-        {getFileIcon(item.type)} {item.name}
-      </ThemedText>
-    </Pressable>
-  );
+  const [search, setSearch] = useState("");
 
-  const renderCase = ({ item }: any) => (
+  /* ================= HELPERS ================= */
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+
+    return `${String(date.getDate()).padStart(2, "0")}/${String(
+      date.getMonth() + 1,
+    ).padStart(2, "0")}/${date.getFullYear()}`;
+  };
+
+  const getFileMeta = (type: string) => {
+    switch (type) {
+      case "image":
+        return {
+          icon: "image-outline",
+          color: "#2563EB",
+          bg: "#DBEAFE",
+        };
+
+      case "document":
+        return {
+          icon: "document-text-outline",
+          color: "#7C3AED",
+          bg: "#EDE9FE",
+        };
+
+      case "text":
+        return {
+          icon: "reader-outline",
+          color: "#059669",
+          bg: "#D1FAE5",
+        };
+
+      default:
+        return {
+          icon: "folder-outline",
+          color: "#6B7280",
+          bg: "#E5E7EB",
+        };
+    }
+  };
+
+  /* ================= FILTER ================= */
+
+  const filteredCases = useMemo(() => {
+    return vaultData.filter((item) =>
+      item.title.toLowerCase().includes(search.toLowerCase()),
+    );
+  }, [vaultData, search]);
+
+  /* ================= RENDER FILE ================= */
+
+  const renderFile = ({ item }: { item: FileItem }) => {
+    const meta = getFileMeta(item.type);
+
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.fileItem, pressed && { opacity: 0.7 }]}
+        onPress={() => {
+          if (item.type === "image" && item.uri) {
+            setSelectedImage(item.uri);
+          }
+
+          if (item.type === "text" && item.content) {
+            setSelectedText(item.content);
+          }
+        }}
+      >
+        <View style={[styles.fileIconBox, { backgroundColor: meta.bg }]}>
+          <Ionicons name={meta.icon as any} size={20} color={meta.color} />
+        </View>
+
+        <View style={{ flex: 1 }}>
+          <ThemedText style={styles.fileName}>{item.name}</ThemedText>
+
+          <ThemedText style={styles.fileType}>
+            {item.type.toUpperCase()}
+          </ThemedText>
+        </View>
+
+        <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+      </Pressable>
+    );
+  };
+
+  /* ================= RENDER CASE ================= */
+
+  const renderCase = ({ item }: { item: CaseItem }) => (
     <ThemedView style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View>
+      {/* TOP */}
+      <LinearGradient
+        colors={["#2563EB", "#1D4ED8"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.topSection}
+      >
+        <View style={styles.caseIcon}>
+          <Ionicons name="shield-checkmark" size={22} color="#fff" />
+        </View>
+
+        <View style={{ flex: 1 }}>
           <ThemedText style={styles.caseTitle}>{item.title}</ThemedText>
-          <ThemedText style={styles.caseSubtitle}>Evidence files</ThemedText>
+
+          <ThemedText style={styles.caseDate}>
+            Created {formatDate(item.createdAt)}
+          </ThemedText>
         </View>
 
         <View style={styles.badge}>
           <ThemedText style={styles.badgeText}>{item.files.length}</ThemedText>
         </View>
+      </LinearGradient>
+
+      {/* FILES */}
+      <View style={styles.filesContainer}>
+        <FlatList
+          data={item.files}
+          keyExtractor={(f) => f.id}
+          renderItem={renderFile}
+          scrollEnabled={false}
+        />
       </View>
-
-      <View style={styles.divider} />
-
-      <FlatList
-        data={item.files}
-        keyExtractor={(file) => file.id}
-        renderItem={renderFile}
-        scrollEnabled={false}
-      />
     </ThemedView>
   );
+
+  /* ================= UI ================= */
 
   return (
     <ThemedView style={styles.container}>
       {/* HEADER */}
-      <View style={styles.headerContainer}>
-        <ThemedText style={styles.header}>Vault</ThemedText>
-        <ThemedText style={styles.subHeader}>
-          Secure evidence & case files
-        </ThemedText>
+      <View style={styles.header}>
+        <View>
+          <ThemedText style={styles.title}>Vault</ThemedText>
+
+          <ThemedText style={styles.subtitle}>
+            Secure investigation cases
+          </ThemedText>
+        </View>
+
+        <View style={styles.headerCircle}>
+          <Ionicons name="lock-closed" size={22} color="#2563EB" />
+        </View>
+      </View>
+
+      {/* SEARCH */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search-outline" size={20} color="#9CA3AF" />
+
+        <TextInput
+          placeholder="Search cases..."
+          placeholderTextColor="#9CA3AF"
+          value={search}
+          onChangeText={setSearch}
+          style={styles.searchInput}
+        />
+      </View>
+
+      {/* STATS */}
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <ThemedText style={styles.statValue}>{vaultData.length}</ThemedText>
+
+          <ThemedText style={styles.statLabel}>Total Cases</ThemedText>
+        </View>
+
+        <View style={styles.statCard}>
+          <ThemedText style={styles.statValue}>
+            {vaultData.reduce((a, b) => a + b.files.length, 0)}
+          </ThemedText>
+
+          <ThemedText style={styles.statLabel}>Files</ThemedText>
+        </View>
       </View>
 
       {/* LIST */}
       <FlatList
-        data={vaultData}
+        data={filteredCases}
         keyExtractor={(item) => item.id}
         renderItem={renderCase}
-        contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.list}
       />
 
-      {/* 🔥 IMAGE MODAL */}
+      {/* IMAGE MODAL */}
       <Modal visible={!!selectedImage} transparent animationType="fade">
-        <View style={styles.modalContainer}>
+        <View style={styles.modal}>
           <Pressable
-            style={styles.modalBackground}
+            style={styles.overlay}
             onPress={() => setSelectedImage(null)}
           />
 
           {selectedImage && (
-            <Image source={{ uri: selectedImage }} style={styles.fullImage} />
+            <>
+              <Pressable
+                style={styles.closeBtn}
+                onPress={() => setSelectedImage(null)}
+              >
+                <Ionicons name="close" size={26} color="#fff" />
+              </Pressable>
+
+              <Image source={{ uri: selectedImage }} style={styles.fullImage} />
+            </>
           )}
         </View>
       </Modal>
 
-      {/* 🔥 TEXT MODAL */}
+      {/* TEXT MODAL */}
       <Modal visible={!!selectedText} transparent animationType="fade">
-        <View style={styles.modalContainer}>
+        <View style={styles.modal}>
           <Pressable
-            style={styles.modalBackground}
+            style={styles.overlay}
             onPress={() => setSelectedText(null)}
           />
 
-          <View style={styles.textModalBox}>
-            <ThemedText style={styles.textContent}>{selectedText}</ThemedText>
+          <View style={styles.textBox}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Report Content</ThemedText>
+
+              <Pressable onPress={() => setSelectedText(null)}>
+                <Ionicons name="close" size={22} color="#111827" />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <ThemedText style={styles.textContent}>{selectedText}</ThemedText>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -137,42 +305,93 @@ export default function VaultScreen() {
   );
 }
 
-/* ================= HELPERS ================= */
-
-function getFileIcon(type: string) {
-  switch (type) {
-    case "image":
-      return "🖼️";
-    case "document":
-      return "📄";
-    case "text":
-      return "📝";
-    default:
-      return "📁";
-  }
-}
-
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: "#F5F7FB",
-  },
-
-  headerContainer: {
-    marginBottom: 24,
+    backgroundColor: "#F3F6FB",
+    paddingHorizontal: 16,
+    paddingTop: 20,
   },
 
   header: {
-    fontSize: 32,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  title: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: "#111827",
+  },
+
+  subtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginTop: 4,
+  },
+
+  headerCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  searchContainer: {
+    height: 52,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    marginBottom: 18,
+
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    color: "#111827",
+    fontSize: 15,
+  },
+
+  statsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 18,
+  },
+
+  statCard: {
+    flex: 1,
+    backgroundColor: "#fff",
+    paddingVertical: 18,
+    borderRadius: 18,
+    alignItems: "center",
+
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  statValue: {
+    fontSize: 24,
     fontWeight: "700",
     color: "#111827",
   },
 
-  subHeader: {
-    fontSize: 14,
+  statLabel: {
+    fontSize: 12,
     color: "#6B7280",
     marginTop: 4,
   },
@@ -182,102 +401,143 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: "#FFFFFF",
-    padding: 18,
-    borderRadius: 18,
-    marginBottom: 16,
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    overflow: "hidden",
+    marginBottom: 18,
 
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowRadius: 12,
+    elevation: 4,
   },
 
-  cardHeader: {
+  topSection: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    padding: 18,
+  },
+
+  caseIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
   },
 
   caseTitle: {
+    color: "#fff",
     fontSize: 18,
-    fontWeight: "600",
-    color: "#111827",
+    fontWeight: "700",
   },
 
-  caseSubtitle: {
+  caseDate: {
+    color: "rgba(255,255,255,0.8)",
+    marginTop: 4,
     fontSize: 12,
-    color: "#9CA3AF",
-    marginTop: 2,
   },
 
   badge: {
-    backgroundColor: "#E5EDFF",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 999,
   },
 
   badgeText: {
-    color: "#2563EB",
-    fontSize: 12,
-    fontWeight: "600",
+    color: "#fff",
+    fontWeight: "700",
   },
 
-  divider: {
-    height: 1,
-    backgroundColor: "#F0F2F5",
-    marginVertical: 12,
+  filesContainer: {
+    padding: 16,
   },
 
   fileItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#F9FAFB",
-    borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
   },
 
-  fileText: {
-    fontSize: 14,
-    color: "#374151",
+  fileIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
 
-  /* MODALS */
+  fileName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
+  },
 
-  modalContainer: {
+  fileType: {
+    fontSize: 11,
+    color: "#6B7280",
+    marginTop: 3,
+    letterSpacing: 1,
+  },
+
+  modal: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.9)",
+    backgroundColor: "rgba(0,0,0,0.92)",
     justifyContent: "center",
     alignItems: "center",
   },
 
-  modalBackground: {
+  overlay: {
     position: "absolute",
     width: "100%",
     height: "100%",
   },
 
-  fullImage: {
-    width: "90%",
-    height: "70%",
-    resizeMode: "contain",
-    borderRadius: 12,
+  closeBtn: {
+    position: "absolute",
+    top: 60,
+    right: 24,
+    zIndex: 10,
   },
 
-  textModalBox: {
-    width: "85%",
-    backgroundColor: "#FFFFFF",
+  fullImage: {
+    width: "92%",
+    height: "72%",
+    resizeMode: "contain",
+    borderRadius: 18,
+  },
+
+  textBox: {
+    width: "88%",
+    maxHeight: "70%",
+    backgroundColor: "#fff",
+    borderRadius: 24,
     padding: 20,
-    borderRadius: 16,
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
   },
 
   textContent: {
     fontSize: 15,
-    color: "#111827",
-    lineHeight: 22,
+    lineHeight: 25,
+    color: "#374151",
   },
 });
