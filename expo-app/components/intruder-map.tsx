@@ -120,13 +120,13 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    width: 1200,  
-    height: 1600,  
+    width: 1525,  
+    height: 959,  
   },
 
   image: {
-    width: 1000,
-    height: 1300,
+    width: 1525,
+    height: 959,
   },
 
   marker: {

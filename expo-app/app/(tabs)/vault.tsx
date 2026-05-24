@@ -1,224 +1,529 @@
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { useMemo, useState } from "react";
+//-vault - needs an exposql update for storing pics and videos, live feed messages need reading
+import { Ionicons } from "@expo/vector-icons"
+import { LinearGradient } from "expo-linear-gradient"
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
+
 import {
+  Alert,
   FlatList,
-  Image,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
-} from "react-native";
+} from "react-native"
 
-import { ThemedText } from "../../components/themed-text";
-import { ThemedView } from "../../components/themed-view";
+import {
+  useFocusEffect,
+} from "@react-navigation/native"
 
-/* ================= TYPES ================= */
+import * as SQLite from "expo-sqlite"
+import { ThemedText } from "../../components/themed-text"
+import { ThemedView } from "../../components/themed-view"
+
+const db = SQLite.openDatabaseSync("app.db")
 
 type FileItem = {
-  id: string;
-  name: string;
-  type: "image" | "document" | "text";
-  uri?: string;
-  content?: string;
-};
+  id: string
+  name: string
+  type: "text"
+  content: string
+}
 
 type CaseItem = {
-  id: string;
-  title: string;
-  createdAt: string;
-  files: FileItem[];
-};
+  id: string
+  title: string
+  createdAt: string
+  files: FileItem[]
+}
 
-/* ================= DATA ================= */
+const setupVaultDb = () => {
 
-const initialVaultData: CaseItem[] = [
-  {
-    id: "1",
-    title: "Case #001",
-    createdAt: "2026-03-19T14:26:00",
-    files: [{ id: "f1", name: "notes.pdf", type: "document" }],
-  },
-  {
-    id: "2",
-    title: "Case #002",
-    createdAt: "2026-03-19T16:12:00",
-    files: [
+
+
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS vault_cases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT,
+      createdAt INTEGER
+    );
+  `)
+
+  const columns = db.getAllSync(`
+    PRAGMA table_info(vault_cases)
+  `) as any[]
+
+  const columnNames = columns.map(
+    (col) => col.name
+  )
+
+  if (!columnNames.includes("chat")) {
+
+    db.execSync(`
+      ALTER TABLE vault_cases
+      ADD COLUMN chat TEXT;
+    `)
+
+  }
+
+  if (!columnNames.includes("feed")) {
+    db.execSync(`
+      ALTER TABLE vault_cases
+      ADD COLUMN feed TEXT;
+    `)
+
+  }
+}
+
+const loadCases = (): CaseItem[] => {
+
+  const rows = db.getAllSync(
+    `
+      SELECT *
+      FROM vault_cases
+      ORDER BY createdAt DESC
+    `
+  ) as any[]
+
+  return rows.map((row) => {
+
+    const files: FileItem[] = [
       {
-        id: "f2",
-        name: "report.txt",
+        id: `chat-${row.id}`,
+        name: "team-chat.txt",
         type: "text",
-        content: "Intruder detected near entrance at 21:43.",
+        content: row.chat || "No chat data",
       },
       {
-        id: "f3",
-        name: "scene.jpg",
-        type: "image",
-        uri: "https://picsum.photos/800",
+        id: `feed-${row.id}`,
+        name: "live-feed.txt",
+        type: "text",
+        content: row.feed || "No live feed data",
       },
-    ],
-  },
-];
+    ]
 
-/* ================= COMPONENT ================= */
+    return {
+      id: row.id.toString(),
+      title: row.title,
+      createdAt: new Date(
+        row.createdAt
+      ).toISOString(),
+      files,
+    }
+  })
+}
 
 export default function VaultScreen() {
-  const [vaultData] = useState<CaseItem[]>(initialVaultData);
 
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [selectedText, setSelectedText] = useState<string | null>(null);
+  const [vaultData, setVaultData] =
+    useState<CaseItem[]>([])
 
-  const [search, setSearch] = useState("");
+  const [selectedText, setSelectedText] =
+    useState<string | null>(null)
 
-  /* ================= HELPERS ================= */
+  const [search, setSearch] =
+    useState("")
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const [renameModalOpen, setRenameModalOpen] =
+    useState(false)
+  const [renameValue, setRenameValue] =
+    useState("")
 
-    return `${String(date.getDate()).padStart(2, "0")}/${String(
-      date.getMonth() + 1,
-    ).padStart(2, "0")}/${date.getFullYear()}`;
-  };
+  const [selectedFileId, setSelectedFileId] =
+    useState<string | null>(null)
 
-  const getFileMeta = (type: string) => {
-    switch (type) {
-      case "image":
-        return {
-          icon: "image-outline",
-          color: "#2563EB",
-          bg: "#DBEAFE",
-        };
+  const [selectedCaseId, setSelectedCaseId] =
+    useState<string | null>(null)
 
-      case "document":
-        return {
-          icon: "document-text-outline",
-          color: "#7C3AED",
-          bg: "#EDE9FE",
-        };
+  const [renameType, setRenameType] =
+    useState<"file" | "folder">("file")
 
-      case "text":
-        return {
-          icon: "reader-outline",
-          color: "#059669",
-          bg: "#D1FAE5",
-        };
+  useEffect(() => {
+    setupVaultDb()
 
-      default:
-        return {
-          icon: "folder-outline",
-          color: "#6B7280",
-          bg: "#E5E7EB",
-        };
-    }
-  };
+  }, [])
 
-  /* ================= FILTER ================= */
+  useFocusEffect(
+    React.useCallback(() => {
+
+      setVaultData(loadCases())
+    }, [])
+  )
+
+  const refreshVault = () => {
+    setVaultData(loadCases())
+  }
+
+  const deleteCase = (
+    caseId: string
+  ) => {
+
+    Alert.alert(
+      "Delete Folder",
+      "Are you sure you want to permanently delete this folder?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+
+            db.runSync(
+              `
+                DELETE FROM vault_cases
+                WHERE id = ?
+              `,
+              [caseId]
+            )
+
+            refreshVault()
+          },
+        },
+      ]
+    )
+
+
+  }
+
+  const renameFile = () => {
+
+    if (
+      !selectedFileId ||
+      !selectedCaseId ||
+      !renameValue.trim()
+    ) return
+
+    const updatedCases = vaultData.map((c) => {
+
+      if (c.id !== selectedCaseId) {
+        return c
+      }
+
+      return {
+        ...c,
+        files: c.files.map((f) => {
+
+          if (f.id !== selectedFileId) {
+            return f
+          }
+
+          return {
+            ...f,
+            name: renameValue.trim(),
+          }
+        }),
+      }
+    })
+
+    setVaultData(updatedCases)
+
+    setRenameModalOpen(false)
+    setRenameValue("")
+  }
+
+  const renameFolder = () => {
+    if (
+      !selectedCaseId ||
+      !renameValue.trim()
+    ) return
+
+    db.runSync(
+      `
+        UPDATE vault_cases
+        SET title = ?
+        WHERE id = ?
+      `,
+      [
+        renameValue.trim(),
+        selectedCaseId,
+      ]
+    )
+
+    refreshVault()
+
+    setRenameModalOpen(false)
+
+    setRenameValue("")
+  }
+
+  const openRenameFile = (
+    caseId: string,
+    fileId: string,
+    currentName: string
+  ) => {
+
+    setRenameType("file")
+
+    setSelectedCaseId(caseId)
+
+    setSelectedFileId(fileId)
+
+    setRenameValue(currentName)
+
+    setRenameModalOpen(true)
+  }
+
+  const openRenameFolder = (
+    caseId: string,
+    currentTitle: string
+  ) => {
+
+    setRenameType("folder")
+
+    setSelectedCaseId(caseId)
+
+    setRenameValue(currentTitle)
+
+    setRenameModalOpen(true)
+  }
+
+  const formatDate = (
+    dateString: string
+  ) => {
+
+    const date = new Date(dateString)
+
+    const formattedDate =
+      `${String(
+        date.getDate()
+      ).padStart(2, "0")}/${String(
+        date.getMonth() + 1
+      ).padStart(2, "0")}/${date.getFullYear()}`
+
+    const formattedTime =
+      date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+
+    return `${formattedDate} • ${formattedTime}`
+  }
 
   const filteredCases = useMemo(() => {
+
     return vaultData.filter((item) =>
-      item.title.toLowerCase().includes(search.toLowerCase()),
-    );
-  }, [vaultData, search]);
+      item.title
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    )
 
-  /* ================= RENDER FILE ================= */
+  }, [vaultData, search])
 
-  const renderFile = ({ item }: { item: FileItem }) => {
-    const meta = getFileMeta(item.type);
+  const renderFile = ({
+    item,
+    caseId,
+  }: {
+    item: FileItem
+    caseId: string
+  }) => (
 
-    return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.fileItem,
+        pressed && { opacity: 0.7 },
+      ]}
+      onPress={() => {
+        setSelectedText(item.content)
+      }}
+    >
+
+      <View
+        style={[
+          styles.fileIconBox,
+          {
+            backgroundColor: "#D1FAE5",
+          },
+        ]}
+      >
+
+        <Ionicons
+          name="reader-outline"
+          size={20}
+          color="#059669"
+        />
+
+      </View>
+
+      <View style={{ flex: 1 }}>
+
+        <ThemedText style={styles.fileName}>
+          {item.name}
+        </ThemedText>
+
+        <ThemedText style={styles.fileType}>
+          TEXT
+        </ThemedText>
+
+      </View>
+
       <Pressable
-        style={({ pressed }) => [styles.fileItem, pressed && { opacity: 0.7 }]}
+        style={styles.renameBtn}
         onPress={() => {
-          if (item.type === "image" && item.uri) {
-            setSelectedImage(item.uri);
-          }
 
-          if (item.type === "text" && item.content) {
-            setSelectedText(item.content);
-          }
+          openRenameFile(
+            caseId,
+            item.id,
+            item.name
+          )
+
         }}
       >
-        <View style={[styles.fileIconBox, { backgroundColor: meta.bg }]}>
-          <Ionicons name={meta.icon as any} size={20} color={meta.color} />
-        </View>
 
-        <View style={{ flex: 1 }}>
-          <ThemedText style={styles.fileName}>{item.name}</ThemedText>
+        <Ionicons
+          name="create-outline"
+          size={18}
+          color="#2563EB"
+        />
 
-          <ThemedText style={styles.fileType}>
-            {item.type.toUpperCase()}
-          </ThemedText>
-        </View>
-
-        <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
       </Pressable>
-    );
-  };
 
-  /* ================= RENDER CASE ================= */
+      <Ionicons
+        name="chevron-forward"
+        size={18}
+        color="#9CA3AF"
+      />
 
-  const renderCase = ({ item }: { item: CaseItem }) => (
+    </Pressable>
+  )
+
+  const renderCase = ({
+    item,
+  }: {
+    item: CaseItem
+  }) => (
+
     <ThemedView style={styles.card}>
-      {/* TOP */}
+
       <LinearGradient
         colors={["#2563EB", "#1D4ED8"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.topSection}
       >
+
         <View style={styles.caseIcon}>
-          <Ionicons name="shield-checkmark" size={22} color="#fff" />
+
+          <Ionicons
+            name="folder-open"
+            size={22}
+            color="#fff"
+          />
+
         </View>
 
         <View style={{ flex: 1 }}>
-          <ThemedText style={styles.caseTitle}>{item.title}</ThemedText>
+
+          <ThemedText style={styles.caseTitle}>
+            {item.title}
+          </ThemedText>
 
           <ThemedText style={styles.caseDate}>
             Created {formatDate(item.createdAt)}
           </ThemedText>
+
         </View>
 
-        <View style={styles.badge}>
-          <ThemedText style={styles.badgeText}>{item.files.length}</ThemedText>
-        </View>
+        <Pressable
+          style={styles.renameFolderBtn}
+          onPress={() => {
+
+            openRenameFolder(
+              item.id,
+              item.title
+            )
+
+          }}
+        >
+
+          <Ionicons
+            name="create-outline"
+            size={18}
+            color="#fff"
+          />
+
+        </Pressable>
+
+        <Pressable
+          style={styles.deleteBtn}
+          onPress={() => {
+            deleteCase(item.id)
+          }}
+        >
+
+          <Ionicons
+            name="trash-outline"
+            size={20}
+            color="#fff"
+          />
+
+        </Pressable>
+
       </LinearGradient>
 
-      {/* FILES */}
       <View style={styles.filesContainer}>
+
         <FlatList
           data={item.files}
           keyExtractor={(f) => f.id}
-          renderItem={renderFile}
+          renderItem={({ item: file }) =>
+            renderFile({
+              item: file,
+              caseId: item.id,
+            })
+          }
           scrollEnabled={false}
         />
-      </View>
-    </ThemedView>
-  );
 
-  /* ================= UI ================= */
+      </View>
+
+    </ThemedView>
+  )
 
   return (
     <ThemedView style={styles.container}>
-      {/* HEADER */}
       <View style={styles.header}>
+
         <View>
-          <ThemedText style={styles.title}>Vault</ThemedText>
+
+          <ThemedText style={styles.title}>
+            Vault
+          </ThemedText>
 
           <ThemedText style={styles.subtitle}>
             Secure investigation cases
           </ThemedText>
+
         </View>
 
         <View style={styles.headerCircle}>
-          <Ionicons name="lock-closed" size={22} color="#2563EB" />
+
+          <Ionicons
+            name="lock-closed"
+            size={22}
+            color="#2563EB"
+          />
         </View>
+
+
       </View>
 
-      {/* SEARCH */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={20} color="#9CA3AF" />
+
+        <Ionicons
+          name="search-outline"
+          size={20}
+          color="#9CA3AF"
+        />
 
         <TextInput
           placeholder="Search cases..."
@@ -227,26 +532,40 @@ export default function VaultScreen() {
           onChangeText={setSearch}
           style={styles.searchInput}
         />
+
       </View>
 
-      {/* STATS */}
       <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <ThemedText style={styles.statValue}>{vaultData.length}</ThemedText>
-
-          <ThemedText style={styles.statLabel}>Total Cases</ThemedText>
-        </View>
 
         <View style={styles.statCard}>
+
           <ThemedText style={styles.statValue}>
-            {vaultData.reduce((a, b) => a + b.files.length, 0)}
+            {vaultData.length}
           </ThemedText>
 
-          <ThemedText style={styles.statLabel}>Files</ThemedText>
+          <ThemedText style={styles.statLabel}>
+            Total Cases
+          </ThemedText>
+
         </View>
+
+        <View style={styles.statCard}>
+
+          <ThemedText style={styles.statValue}>
+            {vaultData.reduce(
+              (a, b) => a + b.files.length,
+              0
+            )}
+          </ThemedText>
+
+          <ThemedText style={styles.statLabel}>
+            Files
+          </ThemedText>
+
+        </View>
+
       </View>
 
-      {/* LIST */}
       <FlatList
         data={filteredCases}
         keyExtractor={(item) => item.id}
@@ -255,57 +574,128 @@ export default function VaultScreen() {
         contentContainerStyle={styles.list}
       />
 
-      {/* IMAGE MODAL */}
-      <Modal visible={!!selectedImage} transparent animationType="fade">
+      {/* file viewer */}
+      <Modal
+        visible={!!selectedText}
+        transparent
+        animationType="fade"
+      >
+
         <View style={styles.modal}>
+
           <Pressable
             style={styles.overlay}
-            onPress={() => setSelectedImage(null)}
-          />
-
-          {selectedImage && (
-            <>
-              <Pressable
-                style={styles.closeBtn}
-                onPress={() => setSelectedImage(null)}
-              >
-                <Ionicons name="close" size={26} color="#fff" />
-              </Pressable>
-
-              <Image source={{ uri: selectedImage }} style={styles.fullImage} />
-            </>
-          )}
-        </View>
-      </Modal>
-
-      {/* TEXT MODAL */}
-      <Modal visible={!!selectedText} transparent animationType="fade">
-        <View style={styles.modal}>
-          <Pressable
-            style={styles.overlay}
-            onPress={() => setSelectedText(null)}
+            onPress={() =>
+              setSelectedText(null)
+            }
           />
 
           <View style={styles.textBox}>
-            <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>Report Content</ThemedText>
 
-              <Pressable onPress={() => setSelectedText(null)}>
-                <Ionicons name="close" size={22} color="#111827" />
+            <View style={styles.modalHeader}>
+
+              <ThemedText style={styles.modalTitle}>
+                File Content
+              </ThemedText>
+
+              <Pressable
+                onPress={() =>
+                  setSelectedText(null)
+                }
+              >
+
+                <Ionicons
+                  name="close"
+                  size={22}
+                  color="#111827"
+                />
+
               </Pressable>
+
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <ThemedText style={styles.textContent}>{selectedText}</ThemedText>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </ThemedView>
-  );
-}
+            <ScrollView>
 
-/* ================= STYLES ================= */
+              <ThemedText style={styles.textContent}>
+                {selectedText}
+              </ThemedText>
+
+            </ScrollView>
+
+          </View>
+
+        </View>
+
+      </Modal>
+
+      {/* rename modal */}
+      <Modal
+        visible={renameModalOpen}
+        transparent
+        animationType="fade"
+      >
+
+        <View style={styles.modal}>
+
+          <Pressable
+            style={styles.overlay}
+            onPress={() => {
+              setRenameModalOpen(false)
+            }}
+          />
+
+          <View style={styles.renameBox}>
+
+            <ThemedText style={styles.modalTitle}>
+              Rename {renameType === "file"
+                ? "File"
+                : "Folder"}
+            </ThemedText>
+
+            <TextInput
+              value={renameValue}
+              onChangeText={setRenameValue}
+              style={styles.renameInput}
+              placeholder={
+                renameType === "file"
+                  ? "Enter file name"
+                  : "Enter folder name"
+              }
+              placeholderTextColor="#9CA3AF"
+            />
+
+            <Pressable
+              style={styles.saveRenameBtn}
+              onPress={() => {
+
+                if (
+                  renameType === "file"
+                ) {
+                  renameFile()
+                } else {
+                  renameFolder()
+                }
+
+              }}
+            >
+
+              <ThemedText
+                style={styles.saveRenameText}
+              >
+                Save Changes
+              </ThemedText>
+
+            </Pressable>
+
+          </View>
+
+        </View>
+
+      </Modal>
+
+    </ThemedView>
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -343,6 +733,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
+
   searchContainer: {
     height: 52,
     backgroundColor: "#fff",
@@ -351,11 +742,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 14,
     marginBottom: 18,
-
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
   },
 
   searchInput: {
@@ -364,6 +750,8 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontSize: 15,
   },
+
+
 
   statsRow: {
     flexDirection: "row",
@@ -374,20 +762,15 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     backgroundColor: "#fff",
-    paddingVertical: 18,
+    paddingVertical: 18 ,
     borderRadius: 18,
     alignItems: "center",
-
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
   },
 
   statValue: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#111827",
+    color: "#111827" ,
   },
 
   statLabel: {
@@ -405,17 +788,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: "hidden",
     marginBottom: 18,
-
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 4,
   },
 
   topSection: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 18,
+    padding:  18,
   },
 
   caseIcon: {
@@ -425,7 +803,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 14,
+    marginRight:  14,
   },
 
   caseTitle: {
@@ -440,16 +818,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  badge: {
-    backgroundColor: "rgba(255,255,255,0.18)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
+  deleteBtn: {
+    width: 35,
+    height: 35,
+    borderRadius: 12,
+    backgroundColor: "rgba(220,38,38,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft:  10 ,
   },
 
-  badgeText: {
-    color: "#fff",
-    fontWeight: "700",
+  renameFolderBtn: {
+    width: 35,
+    height: 35,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   filesContainer: {
@@ -484,7 +869,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#6B7280",
     marginTop: 3,
-    letterSpacing: 1,
+    letterSpacing:  1,
+  },
+
+  renameBtn: {
+    marginRight: 12,
   },
 
   modal: {
@@ -500,26 +889,44 @@ const styles = StyleSheet.create({
     height: "100%",
   },
 
-  closeBtn: {
-    position: "absolute",
-    top: 60,
-    right: 24,
-    zIndex: 10,
-  },
-
-  fullImage: {
-    width: "92%",
-    height: "72%",
-    resizeMode: "contain",
-    borderRadius: 18,
-  },
-
   textBox: {
     width: "88%",
     maxHeight: "70%",
     backgroundColor: "#fff",
     borderRadius: 24,
     padding: 20,
+  },
+
+  renameBox: {
+    width: "85%",
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 20,
+  },
+
+  renameInput: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 16,
+    color: "#111827",
+  },
+
+
+  saveRenameBtn: {
+    backgroundColor: "#2563EB",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 18,
+  },
+
+  saveRenameText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
   },
 
   modalHeader: {
@@ -534,10 +941,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#111827",
   },
-
   textContent: {
     fontSize: 15,
     lineHeight: 25,
     color: "#374151",
   },
-});
+
+
+
+}
+)

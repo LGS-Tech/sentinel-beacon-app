@@ -34,21 +34,21 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "700",
-    marginBottom: 10,
+    marginBottom: 20,
   },
 
   text: {
     fontSize: 15,
-    marginBottom: 6,
+    marginBottom: 7,
     color: "#333",
   },
 
   subText: {
     fontSize: 13,
     color: "#666",
-    marginBottom: 20,
+    marginBottom: 30,
   },
 
   btn: {

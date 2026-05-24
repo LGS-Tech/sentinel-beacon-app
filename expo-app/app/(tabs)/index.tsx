@@ -1,11 +1,6 @@
-import ChatSheet, { addMessageToDb, clearMessages } from "@/components/chat"
-import IntruderMap from "@/components/intruder-map"
-import LiveFeedSheet from "@/components/live-feed"
-import PoliceConfirmation from "@/components/police-confirmation"
-import BottomSheet from "@/components/sheet"
-import { ThemedView } from "@/components/themed-view"
-
+//dashboard - needs prompts for specialised cases  and needs chat to have a proper destination instead of sheet
 import React, { useEffect, useState } from "react"
+
 import {
   Alert,
   Image,
@@ -17,28 +12,40 @@ import {
   View,
 } from "react-native"
 
-import CaseClosedSheet from "@/components/close-sheet"
 import * as SQLite from "expo-sqlite"
 
-// simple local db, nothing fancy
+import ChatSheet, {
+  addMessageToDb,
+  clearMessages,
+  getAllMessages,
+} from "@/components/chat"
+
+import IntruderMap from "@/components/intruder-map"
+
+import LiveFeedSheet, {
+  addFeedItem,
+  clearFeed,
+  ensureFeedTable,
+  getAllFeedItems,
+} from "@/components/live-feed"
+
+import CaseClosedSheet from "@/components/close-sheet"
+import PoliceConfirmation from "@/components/police-confirmation"
+import BottomSheet from "@/components/sheet"
+
+import { ThemedView } from "@/components/themed-view"
+
 const db = SQLite.openDatabaseSync("app.db")
 
-// assets
-const floorPlan = require("../../assets/images/LGSFloorPlan_v3.png")
+const floorPlan = require("../../assets/images/LGSUniFloorPlan.png")
 const logo = require("../../assets/images/LGS-logo.png")
 
-// fallback coords so marker isn't null on first load
-const DEFAULT_COORDS = { x: 0.52, y: 0.79 }
-
-type SavedLocation = {
-  id: number
-  x: number
-  y: number
-  label: string
+const defaultCoords = {
+  x: 0.52,
+  y: 0.79,
 }
 
-// initialise table if it doesn't exist yet
-const setupDb = () => {
+function createLocationTable() {
   db.execSync(`
     CREATE TABLE IF NOT EXISTS intruder_location (
       id INTEGER PRIMARY KEY NOT NULL,
@@ -49,311 +56,647 @@ const setupDb = () => {
   `)
 }
 
-// always storing a single row (id = 1), just overwriting
-const persistLocation = (x: number, y: number, label: string) => {
+function saveLocation(
+  x: number,
+  y: number,
+  label: string
+) {
   db.runSync(
-    "INSERT OR REPLACE INTO intruder_location (id, x, y, label) VALUES (1, ?, ?, ?)",
+    `
+      INSERT OR REPLACE INTO intruder_location
+      (id, x, y, label)
+      VALUES (1, ?, ?, ?)
+    `,
     [x, y, label]
   )
 }
 
 export default function HomeScreen() {
 
-  // core state
   const [caseActive, setCaseActive] = useState(false)
-  const [caseClosedOpen, setCaseClosedOpen] = useState(false)
 
-  // status stuff
-  const [intruderLocation, setIntruderLocation] = useState("")
-  const [movementStatus] = useState("Stationary") // not dynamic yet
-  const [responseStatus, setResponseStatus] = useState("Notified")
+  const [incidentType, setIncidentType] =
+    useState("Intruder")
 
-  // coords handling
-  const [confirmedCoords, setConfirmedCoords] = useState(DEFAULT_COORDS)
-  const [updateMode, setUpdateMode] = useState(false)
-  const [selectedCoords, setSelectedCoords] = useState<null | { x: number; y: number }>(null)
+  const [showSituationModal, setShowSituationModal] =
+    useState(false)
 
-  // modal + input
-  const [labelModalOpen, setLabelModalOpen] = useState(false)
-  const [locationLabel, setLocationLabel] = useState("")
+  const [locationConfirmed, setLocationConfirmed] =
+    useState(false)
 
-  // sheets
-  const [chatOpen, setChatOpen] = useState(false)
-  const [feedOpen, setFeedOpen] = useState(false)
-  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [showCaseClosed, setShowCaseClosed] =
+    useState(false)
 
-  // bottom actions
-  const [actionsExpanded, setActionsExpanded] = useState(false)
+  const [intruderLocation, setIntruderLocation] =
+    useState("")
 
-  // hacky but effective way to force map refresh
-  const [mapKey, setMapKey] = useState(0)
+  const [movementStatus] = useState("Stationary")
+
+  const [policeStatus, setPoliceStatus] =
+    useState("Notified")
+
+  const [confirmedCoords, setConfirmedCoords] =
+    useState(defaultCoords)
+
+  const [updatingLocation, setUpdatingLocation] =
+    useState(false)
+  const [selectedCoords, setSelectedCoords] =
+    useState<{ x: number; y: number } | null>(null)
+
+  const [showLabelModal, setShowLabelModal] =
+    useState(false)
+
+  const [locationInput, setLocationInput] =
+    useState("")
+
+  const [chatVisible, setChatVisible] =
+    useState(false)
+
+  const [feedVisible, setFeedVisible] =
+    useState(false)
+
+  const [policeModalVisible, setPoliceModalVisible] =
+    useState(false)
+
+
 
   useEffect(() => {
-    setupDb()
+    createLocationTable()
+    ensureFeedTable()
   }, [])
 
-  const startCase = () => {
-    clearMessages()
-    setCaseActive(true)
-    setUpdateMode(true)
+   const [actionsOpen, setActionsOpen] =
+    useState(false)
 
-    addMessageToDb("Mr Wallace", "Started a new case")
+
+  const [mapRefreshKey, setMapRefreshKey] = useState(0)
+
+  function openCase(type: string) {
+
+    clearMessages()
+    clearFeed()
+
+    setIncidentType(type)
+
+    setCaseActive(true)
+
+    setUpdatingLocation(true)
+
+    setLocationConfirmed(false)
+
+    setSelectedCoords(null)
+
+    addFeedItem(
+      `Mr C Wallace started a new ${type.toLowerCase()} case`
+
+    )
   }
 
-  const closeCase = () => {
+ 
+
+  function handleCloseCase() {
+
     Alert.alert(
       "Close Case",
       "Are you sure you want to close this case?",
       [
-        { text: "Cancel", style: "cancel" },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
         {
           text: "Yes",
           style: "destructive",
+
           onPress: () => {
 
-            // reset basically everything
+            const messages = getAllMessages()
+            const feedItems = getAllFeedItems()
+
+            const chatHistory = messages
+              .map((msg) => {
+                return `[${new Date(
+                  msg.createdAt
+                ).toLocaleTimeString()}] ${msg.name}: ${msg.text}`
+              })
+              .join("\n")
+
+            const feedHistory = feedItems
+              .map((item) => {
+                return `[${new Date(
+                  item.createdAt
+                ).toLocaleTimeString()}] ${item.text}`
+              })
+              .join("\n")
+
+            db.runSync(
+              `
+                INSERT INTO vault_cases
+                (title, createdAt, chat, feed)
+                VALUES (?, ?, ?, ?)
+              `,
+              [
+                `${incidentType} Case`,
+                Date.now(),
+                chatHistory,
+                feedHistory,
+              ]
+            )
+
             setCaseActive(false)
-            setUpdateMode(false)
+
+            setLocationConfirmed(false)
+
+            setUpdatingLocation(false)
             setSelectedCoords(null)
             setIntruderLocation("")
-            setLocationLabel("")
+            setLocationInput("")
 
-            addMessageToDb("Mr Wallace", "Closed the case")
+            addMessageToDb(
+              "SYSTEM",
+              "This case has now been closed."
+            )
 
-            setCaseClosedOpen(true)
+            addFeedItem(
+              "Mr C Wallace closed the case"
+            )
+
+            setShowCaseClosed(true)
           },
         },
       ]
     )
   }
 
-  return (
-    <View style={styles.root}>
+   function handleStartCase() {
+    setShowSituationModal(true)
 
-      {/* header */}
+  }
+
+  return (
+
+    <View style={styles.container}>
+
       <View style={styles.header}>
-        <Image source={logo} style={styles.logoImage} resizeMode="contain" />
+
+
+
+
+        <Image
+          source={logo}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+
       </View>
 
-      {/* status bar */}
-      <ThemedView style={styles.statusBar}>
-        <Text style={styles.statusLabel}>ALERT</Text>
+      <ThemedView style={styles.alertBox}>
+
+        <Text style={styles.alertText}>
+          ALERT
+        </Text>
 
         {!caseActive ? (
-          <Text style={styles.statusText}>
+
+          <Text style={styles.infoText}>
             No current developments
           </Text>
+
         ) : (
+
           <>
-            <Text style={styles.statusText}>
-              Intruder last seen in {intruderLocation}
+            <Text style={styles.infoText}>
+              {incidentType} last seen in{" "}
+              {intruderLocation}
             </Text>
 
-            <View style={styles.statusRow}>
-              <Text style={styles.statusSubText}>Intruder movement: </Text>
-              <Text style={styles.movementValue}>{movementStatus}</Text>
+            <View style={styles.row}>
+
+              <Text style={styles.smallText}>
+                {incidentType} movement:
+              </Text>
+
+              <Text style={styles.yellowText}>
+                {movementStatus}
+              </Text>
+
             </View>
 
-            <View style={styles.statusRow}>
-              <Text style={styles.statusSubText}>Police status </Text>
-              <Text style={styles.responseValue}>{responseStatus}</Text>
+            <View style={styles.row}>
+
+              <Text style={styles.smallText}>
+                Police status
+              </Text>
+
+              <Text style={styles.blueText}>
+                {policeStatus}
+              </Text>
+
             </View>
           </>
         )}
+
       </ThemedView>
 
-      <View style={styles.mainContent}>
 
-        {/* map */}
-        <View style={styles.mapWrapper}>
+
+      <View style={styles.content}>
+
+        <View style={styles.mapContainer}>
+
           <IntruderMap
-            key={mapKey}
+            key={mapRefreshKey}
             floorPlan={floorPlan}
-            updateMode={updateMode}
-            selectedCoords={selectedCoords ?? confirmedCoords}
-            showMarker={caseActive}
+            updateMode={updatingLocation}
+            selectedCoords={
+              selectedCoords || confirmedCoords
+            }
+            showMarker={
+              selectedCoords !== null ||
+              (caseActive &&
+                intruderLocation.length > 0)
+            }
             onMapPress={(coords) => {
-              if (updateMode) setSelectedCoords(coords)
+
+              if (updatingLocation) {
+                setSelectedCoords(coords)
+
+              }
+
             }}
           />
+
         </View>
 
-        {/* confirm location button only in update mode */}
-        {updateMode && (
+        {updatingLocation && (
+
           <Pressable
             style={[
-              styles.confirmLocBtn,
+              styles.confirmButton,
               {
-                backgroundColor: selectedCoords ? "#16A34A" : "#6B7280",
+                backgroundColor: selectedCoords
+                  ? "#16A34A"
+                  : "#6B7280",
+
                 opacity: selectedCoords ? 1 : 0.4,
               },
             ]}
             disabled={!selectedCoords}
             onPress={() => {
-              if (selectedCoords) setLabelModalOpen(true)
+
+              if (selectedCoords) {
+                setShowLabelModal(true)
+              }
+
             }}
           >
-            <Text style={styles.policeText}>Confirm Location</Text>
+
+            <Text style={styles.buttonText}>
+              Confirm Location
+            </Text>
+
           </Pressable>
         )}
 
-        {/* bottom actions */}
-        <View style={styles.actionsContainer}>
+        {!caseActive && (
 
-          {!caseActive && (
-            <View style={{ width: "92%" }}>
-              <Pressable style={styles.policeBtn} onPress={startCase}>
-                <Text style={styles.policeText}>Start Case</Text>
-              </Pressable>
-            </View>
-          )}
+          <View style={styles.startButtonWrap}>
 
-          {caseActive && !updateMode && (
-            <>
-              {/* little drag handle style toggle */}
-              <Pressable
-                style={styles.sheetHandle}
-                onPress={() => setActionsExpanded(prev => !prev)}
-              >
-                <View style={styles.handleBar} />
-                <Text style={styles.handleText}>
-                  {actionsExpanded ? "Hide Actions" : "Show Actions"}
-                </Text>
-              </Pressable>
+            <Pressable
+              style={styles.redButton}
+              onPress={handleStartCase}
+            >
 
-              {actionsExpanded && (
-                <View style={styles.actions}>
+              <Text style={styles.buttonText}>
+                Start Case
+              </Text>
 
-                  <View style={styles.actionRow}>
-                    <Pressable style={styles.actionBtn} onPress={() => setChatOpen(true)}>
-                      <Text style={styles.actionText}>Chat</Text>
-                    </Pressable>
+            </Pressable>
 
-                    <Pressable
-                      style={[styles.actionBtn, styles.actionBtnLive]}
-                      onPress={() => setFeedOpen(true)}
-                    >
-                      <Text style={styles.actionText}>Live Feed</Text>
-                    </Pressable>
-                  </View>
+          </View>
+        )}
 
-                  <Pressable style={styles.policeBtn} onPress={() => setConfirmOpen(true)}>
-                    <Text style={styles.policeText}>Call Police</Text>
-                  </Pressable>
+        {caseActive && !updatingLocation && (
+
+          <View style={styles.actionsWrap}>
+
+            <Pressable
+              style={styles.handle}
+              onPress={() => {
+                setActionsOpen(!actionsOpen)
+              }}
+            >
+
+              <View style={styles.handleLine} />
+
+              <Text style={styles.handleLabel}>
+                {actionsOpen
+                  ? "Hide Actions"
+                  : "Show Actions"}
+              </Text>
+
+            </Pressable>
+
+            {actionsOpen && (
+
+              <View style={styles.actionsBox}>
+
+                <View style={styles.actionButtonsRow}>
 
                   <Pressable
-                    style={[styles.policeBtn, { backgroundColor: "#2563EB", marginTop: 10 }]}
+                    style={styles.actionButton}
                     onPress={() => {
-                      setUpdateMode(true)
-                      setSelectedCoords(null) // force reselect
+                      setChatVisible(true)
                     }}
                   >
-                    <Text style={styles.policeText}>Update Status</Text>
+
+
+                    <Text style={styles.actionButtonText}>
+                      Chat
+                    </Text>
+
                   </Pressable>
 
                   <Pressable
-                    style={[styles.policeBtn, { backgroundColor: "#6B7280", marginTop: 10 }]}
-                    onPress={closeCase}
+                    style={[
+                      styles.actionButton,
+                      styles.feedButton,
+                    ]}
+                    onPress={() => {
+                      setFeedVisible(true)
+                    }}
                   >
-                    <Text style={styles.policeText}>Close Case</Text>
+
+                    <Text style={styles.actionButtonText}>
+                      Live Feed
+                    </Text>
+
                   </Pressable>
 
                 </View>
-              )}
-            </>
-          )}
 
-        </View>
+                <Pressable
+                  style={styles.redButton}
+                  onPress={() => {
+                    setPoliceModalVisible(true)
+                  }}
+                >
+
+                  <Text style={styles.buttonText}>
+                    Call Police
+                  </Text>
+
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.redButton,
+                    {
+                      backgroundColor: "#2563EB",
+                      marginTop: 10,
+                    },
+                  ]}
+                  onPress={() => {
+
+                    setUpdatingLocation(true)
+
+                    setSelectedCoords(null)
+
+                  }}
+                >
+
+                  <Text style={styles.buttonText}>
+                    Update Status
+                  </Text>
+
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.redButton,
+                    {
+                      backgroundColor: "#6B7280",
+                      marginTop: 10,
+                    },
+                  ]}
+                  onPress={handleCloseCase}
+                >
+
+                  <Text style={styles.buttonText}>
+                    Close Case
+                  </Text>
+
+                </Pressable>
+
+
+
+              </View>
+            )}
+
+          </View>
+        )}
 
       </View>
 
-      {/* sheets */}
-      <BottomSheet visible={chatOpen} onClose={() => setChatOpen(false)}>
+      <BottomSheet
+        visible={chatVisible}
+        onClose={() => setChatVisible(false)}
+      >
         <ChatSheet />
+
       </BottomSheet>
 
-      <BottomSheet visible={feedOpen} onClose={() => setFeedOpen(false)}>
+      <BottomSheet
+        visible={feedVisible}
+        onClose={() => setFeedVisible(false)}
+      >
         <LiveFeedSheet />
       </BottomSheet>
 
-      <BottomSheet visible={confirmOpen} onClose={() => setConfirmOpen(false)}>
+      <BottomSheet
+        visible={policeModalVisible}
+        onClose={() => setPoliceModalVisible(false)}
+      >
+
+        //police button might need rethinking, might just have a prompt that appears at a certain point
         <PoliceConfirmation
-          onCancel={() => setConfirmOpen(false)}
+          onCancel={() => {
+            setPoliceModalVisible(false)
+          }}
           onConfirm={() => {
 
-            setResponseStatus("Police notified")
+            setPoliceStatus("Police notified")
 
-            addMessageToDb(
-              "Mr Wallace",
+            addFeedItem(
               "Police have been notified"
             )
 
-            setConfirmOpen(false)
+            setPoliceModalVisible(false)
           }}
         />
+
       </BottomSheet>
 
-      <BottomSheet visible={caseClosedOpen} onClose={() => setCaseClosedOpen(false)}>
-        <CaseClosedSheet onClose={() => setCaseClosedOpen(false)} />
+      <BottomSheet
+        visible={showCaseClosed}
+        onClose={() => setShowCaseClosed(false)}
+      >
+
+        <CaseClosedSheet
+          onClose={() => {
+            setShowCaseClosed(false)
+          }}
+        />
+
       </BottomSheet>
 
-      {/* location label modal */}
-      <Modal visible={labelModalOpen} transparent animationType="fade">
+
+
+      <Modal
+        visible={showSituationModal}
+        transparent
+        animationType="fade"
+      >
+
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+
+          <View style={styles.modalBox}>
 
             <Text style={styles.modalTitle}>
-              Enter Location of Intruder
+              What describes the situation?
+            </Text>
+
+            {[
+              "Fire",
+              "Intruder",
+              "Spillage",
+              "Injury",
+              "Damage",
+            ].map((type) => (
+
+              <Pressable
+                key={type}
+                style={[
+                  styles.modalButton,
+                  {
+                    backgroundColor: "#2563EB",
+                    marginTop: 10,
+                  },
+                ]}
+                onPress={() => {
+
+                  setShowSituationModal(false)
+
+                  openCase(type)
+
+                }}
+              >
+
+                <Text style={styles.modalButtonText}>
+                  {type}
+                </Text>
+
+              </Pressable>
+            ))}
+
+          </View>
+
+        </View>
+
+      </Modal>
+
+      <Modal
+        visible={showLabelModal}
+        transparent
+        animationType="fade"
+      >
+
+        <View style={styles.modalOverlay}>
+
+          <View style={styles.modalBox}>
+
+            <Text style={styles.modalTitle}>
+              Enter Location
             </Text>
 
             <TextInput
               style={styles.input}
-              placeholder="e.g. Corridor, Sports Hall"
+              placeholder="e.g. Corridor"
               placeholderTextColor="#999"
-              value={locationLabel}
-              onChangeText={(text) => {
-                // quick length guard
-                if (text.length <= 15) setLocationLabel(text)
-              }}
+              value={locationInput}
               maxLength={15}
+              onChangeText={(text) => {
+
+                if (text.length <= 15) {
+                  setLocationInput(text)
+                }
+
+              }}
             />
 
             <Pressable
-              style={[styles.modalBtn, { backgroundColor: "#16A34A", marginTop: 15 }]}
+              style={[
+                styles.modalButton,
+                {
+                  backgroundColor: "#16A34A",
+                  marginTop: 15,
+                },
+              ]}
               onPress={() => {
 
-                if (!locationLabel.trim() || !selectedCoords) return
+                if (
+                  !locationInput.trim() ||
+                  !selectedCoords
+                ) {
+                  return
+                }
+
+                const cleanLabel =
+                  locationInput.trim()
 
                 const coords = selectedCoords
-                const label = locationLabel.trim()
 
                 setConfirmedCoords(coords)
-                setIntruderLocation(label)
 
-                persistLocation(coords.x, coords.y, label)
+                setLocationConfirmed(true)
 
-                addMessageToDb(
-                  "Mr Wallace",
-                  `Updated intruder location to ${label}`
+                setIntruderLocation(cleanLabel)
+
+                saveLocation(
+                  coords.x,
+                  coords.y,
+                  cleanLabel
                 )
 
-                // force map rerender so marker updates cleanly
-                setMapKey(prev => prev + 1)
+                addFeedItem(
+                  intruderLocation
+                    ? `UPDATE! ${incidentType} location is now ${cleanLabel}`
+                    : `CAUTION! ${incidentType} spotted in ${cleanLabel}`
+                )
 
-                // reset temp state
-                setUpdateMode(false)
+                setMapRefreshKey(
+                  prev => prev + 1
+                )
+
+                setUpdatingLocation(false)
+
                 setSelectedCoords(null)
-                setLocationLabel("")
-                setLabelModalOpen(false)
 
-                // jump straight into chat after update
-                setChatOpen(true)
+                setLocationInput("")
+
+                setShowLabelModal(false)
+
+                setChatVisible(true)
               }}
             >
-              <Text style={styles.modalBtnText}>Continue</Text>
+
+              <Text style={styles.modalButtonText}>
+                Continue
+              </Text>
+
             </Pressable>
 
           </View>
+
         </View>
       </Modal>
 
@@ -362,7 +705,11 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#F5F7FA" },
+
+  container: {
+    flex: 1,
+    backgroundColor: "#F5F7FA",
+  },
 
   header: {
     height: 60,
@@ -374,10 +721,16 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  logoImage: { width: 150, height: 50, marginLeft: -25 },
+  logo: {
+    width: 150,
+    height: 50,
+    marginLeft: -25,
+  },
 
-  statusBar: {
-    marginTop: 25,
+
+
+  alertBox: {
+    marginTop: 5,
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 14,
@@ -387,92 +740,130 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  statusLabel: { color: "#FCA5A5", fontSize: 16, fontWeight: "700" },
-  statusText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  alertText: {
+    color: "#FCA5A5",
+    fontSize: 16,
+    fontWeight: "700",
+  },
 
-  statusRow: { flexDirection: "row", marginTop: 2 },
-  statusSubText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  infoText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
 
-  movementValue: { color: "#FACC15", fontSize: 15 },
-  responseValue: { color: "#60A5FA", fontSize: 15 },
+  row: {
+    flexDirection: "row",
+    marginTop: 2,
+  },
 
-  mainContent: { flex: 1, alignItems: "center", paddingBottom: 20 },
+  smallText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
 
-  mapWrapper: {
+  yellowText: {
+    color: "#FACC15",
+    fontSize: 15,
+  },
+
+  blueText: {
+    color: "#60A5FA",
+    fontSize: 15,
+  },
+
+  content: {
+    flex: 1,
+  },
+
+  mapContainer: {
     flex: 1,
     width: "100%",
   },
 
-  actionsContainer: {
+  startButtonWrap: {
+    position: "absolute",
+    bottom: 30,
+    width: "100%",
+    paddingHorizontal: 16,
+  },
+
+  actionsWrap: {
     position: "absolute",
     bottom: 0,
     width: "100%",
-    alignItems: "center",
   },
 
-  sheetHandle: {
-    width: "100%",
-    backgroundColor: "#1F2937",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+  handle: {
+    backgroundColor: "#111827",
     alignItems: "center",
     paddingVertical: 8,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
   },
 
-  handleBar: {
+  handleLine: {
     width: 40,
     height: 5,
-    borderRadius: 3,
+    borderRadius: 999,
     backgroundColor: "#6B7280",
     marginBottom: 6,
   },
 
-  handleText: {
+  handleLabel: {
     color: "#D1D5DB",
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "600" ,
   },
 
-  actions: {
-    width: "100%",
+  actionsBox: {
     backgroundColor: "#111827",
     padding: 12,
-    borderTopWidth: 1,
-    borderColor: "#374151",
   },
 
-  actionRow: { flexDirection: "row", marginBottom: 10 },
+  actionButtonsRow: {
+    flexDirection: "row",
+    marginBottom: 10,
+  },
 
-  actionBtn: {
+  actionButton: {
     flex: 1,
     marginHorizontal: 6,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "#30497cff",
+    backgroundColor: "#30497C",
     alignItems: "center",
   },
 
-  actionBtnLive: { backgroundColor: "#075b44ff" },
+  feedButton: {
+    backgroundColor: "#075B44",
+  },
 
-  actionText: { color: "#fff", fontWeight: "600" },
+  actionButtonText: {
+    color: "#fff",
+    fontWeight: "600" ,
+  },
 
-  policeBtn: {
+  redButton: {
     width: "100%",
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 12,
     backgroundColor: "#DC2626",
     alignItems: "center",
   },
 
-  confirmLocBtn: {
+  confirmButton: {
+    position: "absolute",
+    bottom: 40,
+    alignSelf: "center",
     width: "90%",
     paddingVertical: 15,
-    marginVertical: 60,
-    borderRadius: 12,
+    borderRadius: 12 ,
     alignItems: "center",
   },
 
-  policeText: {
+  buttonText: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 20,
@@ -485,11 +876,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  modalContent: {
+  modalBox: {
     width: "85%",
     backgroundColor: "#1F2937",
     padding: 20,
-    borderRadius: 16,
+    borderRadius: 16 ,
   },
 
   modalTitle: {
@@ -498,6 +889,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 10,
   },
+
 
   input: {
     backgroundColor: "#111827",
@@ -508,11 +900,18 @@ const styles = StyleSheet.create({
     borderColor: "#374151",
   },
 
-  modalBtn: {
+  modalButton: {
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
   },
 
-  modalBtnText: { color: "#fff", fontWeight: "600" },
-})
+  modalButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+
+
+
+}
+)

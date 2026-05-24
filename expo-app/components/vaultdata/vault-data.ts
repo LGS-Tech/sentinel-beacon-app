@@ -37,7 +37,7 @@ export const vaultFolders: VaultFolder[] = [
             name: "IntruderLocation.jpg",
             type: "media",
             date: "Mar 1 2026",
-            preview: require("../../assets/images/LGSFloorPlan_v3.png")
+            preview: require("../../assets/images/LGSUniFloorPlan.png")
           }
         ]
       },

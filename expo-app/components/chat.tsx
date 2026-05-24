@@ -1,8 +1,10 @@
 // Chat panel used by staff to coordinate in real time
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
+
 import {
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -10,6 +12,8 @@ import {
 } from "react-native"
 
 import * as SQLite from "expo-sqlite"
+
+import { Ionicons } from "@expo/vector-icons"
 
 const db = SQLite.openDatabaseSync("app.db")
 
@@ -20,8 +24,7 @@ type Message = {
   time: string
 }
 
-
-// quick table setup (same db as index)
+// ensure table exists
 const ensureChatTable = () => {
   db.execSync(`
     CREATE TABLE IF NOT EXISTS messages (
@@ -33,22 +36,26 @@ const ensureChatTable = () => {
   `)
 }
 
+// clear all messages
 export const clearMessages = () => {
   db.runSync("DELETE FROM messages")
 }
 
-
-// load messages from db
+// load messages (oldest → newest)
 const loadMessages = (): Message[] => {
   const rows = db.getAllSync(
     "SELECT * FROM messages ORDER BY createdAt ASC"
   ) as any[]
 
   return rows.map((row) => {
+
     const date = new Date(row.createdAt)
 
-    const hours = String(date.getHours()).padStart(2, "0")
-    const mins = String(date.getMinutes()).padStart(2, "0")
+    const hours =
+      String(date.getHours()).padStart(2, "0")
+
+    const mins =
+      String(date.getMinutes()).padStart(2, "0")
 
     return {
       id: row.id.toString(),
@@ -56,103 +63,154 @@ const loadMessages = (): Message[] => {
       text: row.text,
       time: `${hours}:${mins}`,
     }
+
   })
 }
 
+// export all chat messages for vault saving
+export const getAllMessages = () => {
+  const rows = db.getAllSync(
+    "SELECT * FROM messages ORDER BY createdAt ASC"
+  ) as any[]
 
-// save message
-export const addMessageToDb = (name: string, text: string) => {
-  db.runSync(
-    "INSERT INTO messages (name, text, createdAt) VALUES (?, ?, ?)",
-    [name, text, Date.now()]
-  )
+  return rows
 }
 
+// add message
+export const addMessageToDb = (
+  name: string,
+  text: string
+) => {
 
+  db.runSync(
+    `
+      INSERT INTO messages
+      (name, text, createdAt)
+      VALUES (?, ?, ?)
+    `,
+    [name, text, Date.now()]
+  )
+
+}
 
 export default function ChatSheet() {
 
-  const [messages, setMessages] = useState<Message[]>([])
-  const [inputText, setInputText] = useState("")
+  const [messages, setMessages] =
+    useState<Message[]>([])
 
+  const [inputText, setInputText] =
+    useState("")
 
-  // load messages on open
+  const listRef =
+    useRef<FlatList>(null)
+
+  const inputRef =
+    useRef<TextInput>(null)
+
   useEffect(() => {
 
     ensureChatTable()
 
-    const data = loadMessages()
+    setMessages(loadMessages())
 
-    // if empty, seed initial messages once
-    if (data.length === 0) {
-
-      const seed = [
-        {
-          name: "Mrs Smith",
-          text: "Spotted a male in the corridor outside C1. He has a red hoodie and white trainers, looks like he's in his early 20s",
-        },
-        {
-          name: "Mrs Martin",
-          text: "Sent a picture            View",
-        },
-        {
-          name: "Mr Albot",
-          text: "Police have been notified and are on the way",
-        },
-      ]
-
-      seed.forEach((msg) => {
-        addMessageToDb(msg.name, msg.text)
-      })
-
-      setMessages(loadMessages())
-    } else {
-      setMessages(data)
-    }
+    // auto focus input when sheet opens
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 250)
 
   }, [])
 
+  const refreshMessages = () => {
+
+    const data = loadMessages()
+
+    setMessages(data)
+
+  }
 
   const handleSend = () => {
+
     if (!inputText.trim()) return
 
     const text = inputText.trim()
 
-    // save to db
-    addMessageToDb("Mr Wallace", text)
+    addMessageToDb(
+      "Mr C Wallace",
+      text
+    )
 
-    // reload messages (simple approach)
-    setMessages(loadMessages())
+    refreshMessages()
 
     setInputText("")
-  }
 
+    // keep keyboard + focus active
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 50)
+
+  }
 
   return (
     <View style={styles.container}>
 
-      <Text style={styles.title}>Team Chat</Text>
+      <Text style={styles.title}>
+        Team Chat
+      </Text>
 
       <FlatList
+        ref={listRef}
         data={messages}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messages}
         renderItem={({ item }) => (
+
           <View style={styles.messageBlk}>
-            <Text style={styles.name}>{item.name}</Text>
+
+            <Text style={styles.name}>
+              {item.name}
+            </Text>
 
             <View style={styles.messageRow}>
-              <Text style={styles.messageTxt}>{item.text}</Text>
-              <Text style={styles.time}>{item.time}</Text>
+
+              <Text style={styles.messageTxt}>
+                {item.text}
+              </Text>
+
+              <Text style={styles.time}>
+                {item.time}
+              </Text>
+
             </View>
+
           </View>
+
         )}
         style={{ flex: 1 }}
-        inverted
+        onContentSizeChange={() => {
+
+          listRef.current?.scrollToEnd({
+            animated: true,
+          })
+
+        }}
       />
 
       <View style={styles.inputBar}>
+
+        {/* camera button */}
+        <Pressable style={styles.cameraBtn}>
+
+          <Ionicons
+            name="camera"
+            size={22}
+            color="#4B5563"
+          />
+
+        </Pressable>
+
+        {/* message input */}
         <TextInput
+          ref={inputRef}
           placeholder="Type a message…"
           style={styles.input}
           placeholderTextColor="#888"
@@ -160,15 +218,17 @@ export default function ChatSheet() {
           onChangeText={setInputText}
           onSubmitEditing={handleSend}
           returnKeyType="send"
+          blurOnSubmit={false}
         />
+
       </View>
 
     </View>
   )
 }
 
-
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
     paddingHorizontal: 16,
@@ -214,12 +274,25 @@ const styles = StyleSheet.create({
   },
 
   inputBar: {
+    flexDirection: "row",
+    alignItems: "center",
     borderTopWidth: 1,
     borderTopColor: "#E1E5EA",
     paddingTop: 10,
   },
 
+  cameraBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#F1F3F6",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+
   input: {
+    flex: 1,
     height: 44,
     borderRadius: 22,
     backgroundColor: "#F1F3F6",
@@ -227,4 +300,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#000",
   },
+
 })
