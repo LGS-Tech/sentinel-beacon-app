@@ -71,6 +71,7 @@ const setupVaultDb = () => {
 
   }
 
+  //need to sort out reading live-feed messages but think its a dashboard issue
   if (!columnNames.includes("feed")) {
     db.execSync(`
       ALTER TABLE vault_cases
@@ -80,6 +81,7 @@ const setupVaultDb = () => {
   }
 }
 
+// looks good, just needs proper backend now
 const loadCases = (): CaseItem[] => {
 
   const rows = db.getAllSync(
@@ -91,6 +93,8 @@ const loadCases = (): CaseItem[] => {
   ) as any[]
 
   return rows.map((row) => {
+
+
 
     const files: FileItem[] = [
       {
@@ -108,11 +112,12 @@ const loadCases = (): CaseItem[] => {
     ]
 
     return {
+
       id: row.id.toString(),
       title: row.title,
       createdAt: new Date(
         row.createdAt
-      ).toISOString(),
+      ).toISOString() ,
       files,
     }
   })
@@ -229,6 +234,7 @@ export default function VaultScreen() {
     setRenameModalOpen(false)
     setRenameValue("")
   }
+
 
   const renameFolder = () => {
     if (
@@ -491,31 +497,7 @@ export default function VaultScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.header}>
-
-        <View>
-
-          <ThemedText style={styles.title}>
-            Vault
-          </ThemedText>
-
-          <ThemedText style={styles.subtitle}>
-            Secure investigation cases
-          </ThemedText>
-
-        </View>
-
-        <View style={styles.headerCircle}>
-
-          <Ionicons
-            name="lock-closed"
-            size={22}
-            color="#2563EB"
-          />
-        </View>
-
-
-      </View>
+      
 
       <View style={styles.searchContainer}>
 
@@ -697,12 +679,15 @@ export default function VaultScreen() {
   )
 }
 
+
+
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F3F6FB",
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: 10,
   },
 
   header: {
@@ -713,9 +698,10 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 34,
+    fontSize: 30,
     fontWeight: "800",
     color: "#111827",
+    marginTop: 35,
   },
 
   subtitle: {
@@ -741,7 +727,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    marginBottom: 18,
+    marginBottom: 14,
+    marginTop: 40,
   },
 
   searchInput: {

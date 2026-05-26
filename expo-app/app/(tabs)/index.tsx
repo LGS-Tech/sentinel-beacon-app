@@ -100,6 +100,7 @@ export default function HomeScreen() {
 
   const [updatingLocation, setUpdatingLocation] =
     useState(false)
+
   const [selectedCoords, setSelectedCoords] =
     useState<{ x: number; y: number } | null>(null)
 
@@ -118,22 +119,24 @@ export default function HomeScreen() {
   const [policeModalVisible, setPoliceModalVisible] =
     useState(false)
 
-
-
-  useEffect(() => {
-    createLocationTable()
-    ensureFeedTable()
-  }, [])
-
-   const [actionsOpen, setActionsOpen] =
+  const [actionsOpen, setActionsOpen] =
     useState(false)
 
+  const [mapRefreshKey, setMapRefreshKey] =
+    useState(0)
 
-  const [mapRefreshKey, setMapRefreshKey] = useState(0)
+  useEffect(() => {
+
+    createLocationTable()
+
+    ensureFeedTable()
+
+  }, [])
 
   function openCase(type: string) {
 
     clearMessages()
+
     clearFeed()
 
     setIncidentType(type)
@@ -148,11 +151,8 @@ export default function HomeScreen() {
 
     addFeedItem(
       `Mr C Wallace started a new ${type.toLowerCase()} case`
-
     )
   }
-
- 
 
   function handleCloseCase() {
 
@@ -171,6 +171,7 @@ export default function HomeScreen() {
           onPress: () => {
 
             const messages = getAllMessages()
+
             const feedItems = getAllFeedItems()
 
             const chatHistory = messages
@@ -208,8 +209,11 @@ export default function HomeScreen() {
             setLocationConfirmed(false)
 
             setUpdatingLocation(false)
+
             setSelectedCoords(null)
+
             setIntruderLocation("")
+
             setLocationInput("")
 
             addMessageToDb(
@@ -228,7 +232,10 @@ export default function HomeScreen() {
     )
   }
 
-   function handleStartCase() {
+
+
+  function handleStartCase() {
+
     setShowSituationModal(true)
 
   }
@@ -238,9 +245,6 @@ export default function HomeScreen() {
     <View style={styles.container}>
 
       <View style={styles.header}>
-
-
-
 
         <Image
           source={logo}
@@ -298,8 +302,6 @@ export default function HomeScreen() {
 
       </ThemedView>
 
-
-
       <View style={styles.content}>
 
         <View style={styles.mapContainer}>
@@ -319,6 +321,7 @@ export default function HomeScreen() {
             onMapPress={(coords) => {
 
               if (updatingLocation) {
+
                 setSelectedCoords(coords)
 
               }
@@ -326,7 +329,7 @@ export default function HomeScreen() {
             }}
           />
 
-        </View>
+        </View >
 
         {updatingLocation && (
 
@@ -410,7 +413,6 @@ export default function HomeScreen() {
                     }}
                   >
 
-
                     <Text style={styles.actionButtonText}>
                       Chat
                     </Text>
@@ -469,7 +471,8 @@ export default function HomeScreen() {
                     Update Status
                   </Text>
 
-                </Pressable>
+                </Pressable >
+
                 <Pressable
                   style={[
                     styles.redButton,
@@ -487,8 +490,6 @@ export default function HomeScreen() {
 
                 </Pressable>
 
-
-
               </View>
             )}
 
@@ -501,6 +502,7 @@ export default function HomeScreen() {
         visible={chatVisible}
         onClose={() => setChatVisible(false)}
       >
+
         <ChatSheet />
 
       </BottomSheet>
@@ -509,7 +511,9 @@ export default function HomeScreen() {
         visible={feedVisible}
         onClose={() => setFeedVisible(false)}
       >
+
         <LiveFeedSheet />
+
       </BottomSheet>
 
       <BottomSheet
@@ -517,7 +521,6 @@ export default function HomeScreen() {
         onClose={() => setPoliceModalVisible(false)}
       >
 
-        //police button might need rethinking, might just have a prompt that appears at a certain point
         <PoliceConfirmation
           onCancel={() => {
             setPoliceModalVisible(false)
@@ -549,8 +552,6 @@ export default function HomeScreen() {
 
       </BottomSheet>
 
-
-
       <Modal
         visible={showSituationModal}
         transparent
@@ -561,6 +562,7 @@ export default function HomeScreen() {
 
           <View style={styles.modalBox}>
 
+//in section were gonna have situations that need specialised prompting like "what level is the fire?"
             <Text style={styles.modalTitle}>
               What describes the situation?
             </Text>
@@ -568,9 +570,9 @@ export default function HomeScreen() {
             {[
               "Fire",
               "Intruder",
-              "Spillage",
               "Injury",
-              "Damage",
+              "Missing",
+              "Maintenence",
             ].map((type) => (
 
               <Pressable
@@ -597,6 +599,25 @@ export default function HomeScreen() {
 
               </Pressable>
             ))}
+
+            <Pressable
+              style={[
+                styles.modalButton,
+                {
+                  backgroundColor: "#6B7280",
+                  marginTop: 16,
+                },
+              ]}
+              onPress={() => {
+                setShowSituationModal(false)
+              }}
+            >
+
+              <Text style={styles.modalButtonText}>
+                Cancel
+              </Text>
+
+            </Pressable>
 
           </View>
 
@@ -698,6 +719,7 @@ export default function HomeScreen() {
           </View>
 
         </View>
+
       </Modal>
 
     </View>
@@ -726,8 +748,6 @@ const styles = StyleSheet.create({
     height: 50,
     marginLeft: -25,
   },
-
-
 
   alertBox: {
     marginTop: 5,
@@ -814,7 +834,7 @@ const styles = StyleSheet.create({
   handleLabel: {
     color: "#D1D5DB",
     fontSize: 12,
-    fontWeight: "600" ,
+    fontWeight: "600",
   },
 
   actionsBox: {
@@ -842,7 +862,7 @@ const styles = StyleSheet.create({
 
   actionButtonText: {
     color: "#fff",
-    fontWeight: "600" ,
+    fontWeight: "600",
   },
 
   redButton: {
@@ -859,7 +879,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     width: "90%",
     paddingVertical: 15,
-    borderRadius: 12 ,
+    borderRadius: 12,
     alignItems: "center",
   },
 
@@ -880,7 +900,7 @@ const styles = StyleSheet.create({
     width: "85%",
     backgroundColor: "#1F2937",
     padding: 20,
-    borderRadius: 16 ,
+    borderRadius: 16,
   },
 
   modalTitle: {
@@ -889,7 +909,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 10,
   },
-
 
   input: {
     backgroundColor: "#111827",
@@ -911,7 +930,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-
-
-}
-)
+})
