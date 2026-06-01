@@ -8,13 +8,13 @@ type PoliceConfirmationProps = {
 };
 
 export default function PoliceConfirmation({
-  message = "Are you sure you want to notify the police?",
+  message = "Are you sure you want to notify the emergency services?",
   onConfirm,
   onCancel,
 }: PoliceConfirmationProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Call Police</Text>
+      <Text style={styles.title}>Call Emergency Services</Text>
 
       <Text style={styles.message}>{message}</Text>
 
@@ -37,14 +37,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   title: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: "700",
-    marginBottom: 10,
+    marginBottom: 20,
   },
   message: {
     fontSize: 15,
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 60,
     color: "#374151",
   },
   actions: {

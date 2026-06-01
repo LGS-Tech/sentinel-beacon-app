@@ -39,6 +39,7 @@ type CaseItem = {
   id: string
   title: string
   createdAt: string
+  status: "OPEN" | "CLOSED"
   files: FileItem[]
 }
 
@@ -47,12 +48,13 @@ const setupVaultDb = () => {
 
 
   db.execSync(`
-    CREATE TABLE IF NOT EXISTS vault_cases (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT,
-      createdAt INTEGER
-    );
-  `)
+  CREATE TABLE IF NOT EXISTS vault_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    createdAt INTEGER,
+    status TEXT DEFAULT 'CLOSED'
+  );
+`)
 
   const columns = db.getAllSync(`
     PRAGMA table_info(vault_cases)
@@ -79,6 +81,18 @@ const setupVaultDb = () => {
     `)
 
   }
+
+  if (!columnNames.includes("status")) {
+
+  db.execSync(`
+    ALTER TABLE vault_cases
+    ADD COLUMN status TEXT DEFAULT 'CLOSED';
+  `)
+
+}
+
+
+  
 }
 
 // looks good, just needs proper backend now
@@ -113,13 +127,14 @@ const loadCases = (): CaseItem[] => {
 
     return {
 
-      id: row.id.toString(),
-      title: row.title,
-      createdAt: new Date(
-        row.createdAt
-      ).toISOString() ,
-      files,
-    }
+  id: row.id.toString(),
+  title: row.title,
+  createdAt: new Date(
+    row.createdAt
+  ).toISOString(),
+  status: row.status || "CLOSED",
+  files,
+}
   })
 }
 
@@ -432,6 +447,21 @@ export default function VaultScreen() {
           <ThemedText style={styles.caseTitle}>
             {item.title}
           </ThemedText>
+
+          <View
+            style={[
+              styles.statusBadge,
+              item.status === "OPEN"
+              ? styles.openBadge
+              : styles.closedBadge,
+            ]}
+          >
+            <ThemedText
+              style={styles.statusBadgeText}
+            >
+              {item.status}
+            </ThemedText>
+          </View>
 
           <ThemedText style={styles.caseDate}>
             Created {formatDate(item.createdAt)}
@@ -824,6 +854,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
+
+
   filesContainer: {
     padding: 16,
   },
@@ -834,7 +866,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FAFB",
     borderRadius: 16,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 12 ,
   },
 
   fileIconBox: {
@@ -933,6 +965,28 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     color: "#374151",
   },
+
+  statusBadge: {
+  alignSelf: "flex-start",
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderRadius: 999,
+  marginTop: 6,
+},
+
+openBadge: {
+  backgroundColor: "#DCFCE7",
+},
+
+closedBadge: {
+  backgroundColor: "#E5E7EB",
+},
+
+statusBadgeText: {
+  fontSize: 11,
+  fontWeight: "700",
+  color: "#111827",
+},
 
 
 

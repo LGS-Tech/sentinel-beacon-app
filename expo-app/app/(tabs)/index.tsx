@@ -1,4 +1,4 @@
-//dashboard - needs prompts for specialised cases  and needs chat to have a proper destination instead of sheet
+//dashboard - specialised prompts added for each case type
 import React, { useEffect, useState } from "react"
 
 import {
@@ -6,6 +6,7 @@ import {
   Image,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,11 +15,9 @@ import {
 
 import * as SQLite from "expo-sqlite"
 
-import ChatSheet, {
-  addMessageToDb,
-  clearMessages,
-  getAllMessages,
-} from "@/components/chat"
+import ChatSheet from "@/components/chat"
+
+
 
 import IntruderMap from "@/components/intruder-map"
 
@@ -41,11 +40,41 @@ const floorPlan = require("../../assets/images/LGSUniFloorPlan.png")
 const logo = require("../../assets/images/LGS-logo.png")
 
 const defaultCoords = {
+
   x: 0.52,
   y: 0.79,
 }
 
+
+const caseQuestions: Record<string, string[]> = {
+  Fire: [
+    "Rate the fire severity (Red / Amber / Green)",
+    "Have there been any injuries or casualties?",
+  ],
+
+  Intruder: [
+    "Describe the intruder",
+    "Are they carrying anything suspicious?",
+  ],
+
+  Injury: [
+    "What type of injury has occurred?",
+    "Is medical assistance required immediately?",
+  ],
+
+  Missing: [
+    "Who is missing?",
+    "When were they last seen?",
+  ],
+
+  Maintenence: [
+    "Describe the maintenance issue",
+    "Is the area dangerous or inaccessible?",
+  ],
+}
+
 function createLocationTable() {
+
   db.execSync(`
     CREATE TABLE IF NOT EXISTS intruder_location (
       id INTEGER PRIMARY KEY NOT NULL,
@@ -61,6 +90,7 @@ function saveLocation(
   y: number,
   label: string
 ) {
+
   db.runSync(
     `
       INSERT OR REPLACE INTO intruder_location
@@ -70,6 +100,8 @@ function saveLocation(
     [x, y, label]
   )
 }
+
+
 
 export default function HomeScreen() {
 
@@ -93,7 +125,7 @@ export default function HomeScreen() {
   const [movementStatus] = useState("Stationary")
 
   const [policeStatus, setPoliceStatus] =
-    useState("Notified")
+    useState("Not notified")
 
   const [confirmedCoords, setConfirmedCoords] =
     useState(defaultCoords)
@@ -106,6 +138,7 @@ export default function HomeScreen() {
 
   const [showLabelModal, setShowLabelModal] =
     useState(false)
+
 
   const [locationInput, setLocationInput] =
     useState("")
@@ -125,9 +158,23 @@ export default function HomeScreen() {
   const [mapRefreshKey, setMapRefreshKey] =
     useState(0)
 
+  const [showQuestionModal, setShowQuestionModal] =
+    useState(false)
+
+  const [selectedCaseType, setSelectedCaseType] =
+    useState("")
+
+  const [questionAnswers, setQuestionAnswers] =
+     useState<string[]>(["", ""])
+
+  const [currentVaultCaseId, setCurrentVaultCaseId] =
+  useState<number | null>(null)
+
   useEffect(() => {
 
     createLocationTable()
+
+    createActiveCaseTable()
 
     ensureFeedTable()
 
@@ -135,7 +182,6 @@ export default function HomeScreen() {
 
   function openCase(type: string) {
 
-    clearMessages()
 
     clearFeed()
 
@@ -144,14 +190,77 @@ export default function HomeScreen() {
     setCaseActive(true)
 
     setUpdatingLocation(true)
-
     setLocationConfirmed(false)
-
     setSelectedCoords(null)
 
     addFeedItem(
       `Mr C Wallace started a new ${type.toLowerCase()} case`
     )
+
+    updateVaultCaseData()
+
+    const answers = questionAnswers.filter(
+      answer => answer.trim().length > 0
+    )
+
+    answers.forEach((answer, index) => {
+
+      const question =
+        caseQuestions[type][index]
+
+      addFeedItem(
+        `${question}: ${answer}`
+      )
+
+      updateVaultCaseData()
+
+    })
+
+    db.runSync(
+  `
+    INSERT INTO vault_cases
+    (
+      title,
+      createdAt,
+      status,
+      chat,
+      feed
+    )
+    VALUES (?, ?, ?, ?, ?)
+  `,
+  [
+    `${type} Case`,
+    Date.now(),
+    "OPEN",
+    "",
+    "",
+  ]
+)
+
+const result = db.getFirstSync(
+  `
+    SELECT id
+    FROM vault_cases
+    ORDER BY id DESC
+    LIMIT 1
+  `
+) as any
+
+if (result?.id) {
+
+  setCurrentVaultCaseId(result.id)
+
+  db.runSync(
+    `
+      INSERT OR REPLACE INTO active_case
+      (id, vaultCaseId)
+      VALUES (1, ?)
+    `,
+    [result.id]
+  )
+
+}
+
   }
 
   function handleCloseCase() {
@@ -164,47 +273,56 @@ export default function HomeScreen() {
           text: "Cancel",
           style: "cancel",
         },
+
         {
           text: "Yes",
           style: "destructive",
 
           onPress: () => {
 
-            const messages = getAllMessages()
+            
 
             const feedItems = getAllFeedItems()
 
-            const chatHistory = messages
-              .map((msg) => {
-                return `[${new Date(
-                  msg.createdAt
-                ).toLocaleTimeString()}] ${msg.name}: ${msg.text}`
-              })
-              .join("\n")
+            
 
             const feedHistory = feedItems
               .map((item) => {
+
                 return `[${new Date(
                   item.createdAt
-                ).toLocaleTimeString()}] ${item.text}`
+                ).toLocaleTimeString()}] ${item.message}`
+
               })
               .join("\n")
 
-            db.runSync(
-              `
-                INSERT INTO vault_cases
-                (title, createdAt, chat, feed)
-                VALUES (?, ?, ?, ?)
-              `,
-              [
-                `${incidentType} Case`,
-                Date.now(),
-                chatHistory,
-                feedHistory,
-              ]
-            )
+            if (currentVaultCaseId) {
+
+              db.runSync(
+    `
+                UPDATE vault_cases
+                SET
+                  feed = ?,
+                  status = 'CLOSED'
+                  WHERE id = ?
+    `           ,
+                [
+                  feedHistory,
+                  currentVaultCaseId,
+                ]
+              )
+
+}
 
             setCaseActive(false)
+            setCurrentVaultCaseId(null)
+
+            db.runSync(
+  `
+    DELETE FROM active_case
+    WHERE id = 1
+  `
+)
 
             setLocationConfirmed(false)
 
@@ -216,14 +334,12 @@ export default function HomeScreen() {
 
             setLocationInput("")
 
-            addMessageToDb(
-              "SYSTEM",
-              "This case has now been closed."
-            )
 
             addFeedItem(
               "Mr C Wallace closed the case"
             )
+
+            updateVaultCaseData()
 
             setShowCaseClosed(true)
           },
@@ -233,12 +349,57 @@ export default function HomeScreen() {
   }
 
 
-
+  
   function handleStartCase() {
 
     setShowSituationModal(true)
 
   }
+
+  function createActiveCaseTable() {
+
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS active_case (
+      id INTEGER PRIMARY KEY,
+      vaultCaseId INTEGER
+    );
+  `)
+
+}
+
+  function updateVaultCaseData() {
+
+  if (!currentVaultCaseId) {
+    return
+  }
+
+
+  const feedItems = getAllFeedItems()
+
+
+  const feedHistory = feedItems
+    .map(item => {
+
+      return `[${new Date(
+        item.createdAt
+      ).toLocaleTimeString()}] ${item.message}`
+
+    })
+    .join("\n")
+
+  db.runSync(
+    `
+      UPDATE vault_cases
+      SET
+        feed = ?
+      WHERE id = ?
+    `,
+    [
+      feedHistory,
+      currentVaultCaseId,
+    ]
+  )
+}
 
   return (
 
@@ -274,22 +435,15 @@ export default function HomeScreen() {
               {intruderLocation}
             </Text>
 
-            <View style={styles.row}>
-
-              <Text style={styles.smallText}>
-                {incidentType} movement:
-              </Text>
-
-              <Text style={styles.yellowText}>
-                {movementStatus}
-              </Text>
-
-            </View>
 
             <View style={styles.row}>
 
               <Text style={styles.smallText}>
-                Police status
+                Emergency Services
+              </Text>
+
+              <Text style={styles.smallText}>
+                  
               </Text>
 
               <Text style={styles.blueText}>
@@ -329,7 +483,7 @@ export default function HomeScreen() {
             }}
           />
 
-        </View >
+        </View>
 
         {updatingLocation && (
 
@@ -406,18 +560,7 @@ export default function HomeScreen() {
 
                 <View style={styles.actionButtonsRow}>
 
-                  <Pressable
-                    style={styles.actionButton}
-                    onPress={() => {
-                      setChatVisible(true)
-                    }}
-                  >
-
-                    <Text style={styles.actionButtonText}>
-                      Chat
-                    </Text>
-
-                  </Pressable>
+                  
 
                   <Pressable
                     style={[
@@ -445,7 +588,7 @@ export default function HomeScreen() {
                 >
 
                   <Text style={styles.buttonText}>
-                    Call Police
+                    Emergency Services
                   </Text>
 
                 </Pressable>
@@ -468,10 +611,10 @@ export default function HomeScreen() {
                 >
 
                   <Text style={styles.buttonText}>
-                    Update Status
+                    Update Location
                   </Text>
 
-                </Pressable >
+                </Pressable>
 
                 <Pressable
                   style={[
@@ -533,6 +676,8 @@ export default function HomeScreen() {
               "Police have been notified"
             )
 
+            updateVaultCaseData()
+
             setPoliceModalVisible(false)
           }}
         />
@@ -562,7 +707,6 @@ export default function HomeScreen() {
 
           <View style={styles.modalBox}>
 
-//in section were gonna have situations that need specialised prompting like "what level is the fire?"
             <Text style={styles.modalTitle}>
               What describes the situation?
             </Text>
@@ -572,7 +716,7 @@ export default function HomeScreen() {
               "Intruder",
               "Injury",
               "Missing",
-              "Maintenence",
+              "Maintenance",
             ].map((type) => (
 
               <Pressable
@@ -586,9 +730,13 @@ export default function HomeScreen() {
                 ]}
                 onPress={() => {
 
+                  setSelectedCaseType(type)
+
+                  setQuestionAnswers(["", ""])
+
                   setShowSituationModal(false)
 
-                  openCase(type)
+                  setShowQuestionModal(true)
 
                 }}
               >
@@ -618,6 +766,86 @@ export default function HomeScreen() {
               </Text>
 
             </Pressable>
+
+          </View>
+
+        </View>
+
+      </Modal>
+
+      <Modal
+        visible={showQuestionModal}
+        transparent
+        animationType="fade"
+      >
+
+        <View style={styles.modalOverlay}>
+
+          <View style={styles.modalBox}>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+            >
+
+              <Text style={styles.modalTitle}>
+                {selectedCaseType} Details
+              </Text>
+
+              {(caseQuestions[selectedCaseType] || [])
+                .map((question, index) => (
+
+                  <View
+                    key={question}
+                    style={{ marginBottom: 16 }}
+                  >
+
+                    <Text style={styles.questionLabel}>
+                      {question}
+                    </Text>
+
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter response..."
+                      placeholderTextColor="#999"
+                      value={questionAnswers[index] || ""}
+                      onChangeText={(text) => {
+
+                        const updated = [...questionAnswers]
+
+                        updated[index] = text
+
+                        setQuestionAnswers(updated)
+
+                      }}
+                    />
+
+                  </View>
+                ))}
+
+              <Pressable
+                style={[
+                  styles.modalButton,
+                  {
+                    backgroundColor: "#16A34A",
+                    marginTop: 10,
+                  },
+                ]}
+                onPress={() => {
+
+                  setShowQuestionModal(false)
+
+                  openCase(selectedCaseType)
+
+                }}
+              >
+
+                <Text style={styles.modalButtonText}>
+                  Continue
+                </Text>
+
+              </Pressable>
+
+            </ScrollView>
 
           </View>
 
@@ -682,6 +910,22 @@ export default function HomeScreen() {
 
                 setIntruderLocation(cleanLabel)
 
+                if (currentVaultCaseId) {
+
+                  db.runSync(
+    `
+                    UPDATE vault_cases
+                    SET title = ?
+                    WHERE id = ?
+                    `,
+                    [
+                      `${incidentType} Case in ${cleanLabel}`,
+                        currentVaultCaseId,
+                    ]
+                  )
+
+                }
+
                 saveLocation(
                   coords.x,
                   coords.y,
@@ -693,6 +937,8 @@ export default function HomeScreen() {
                     ? `UPDATE! ${incidentType} location is now ${cleanLabel}`
                     : `CAUTION! ${incidentType} spotted in ${cleanLabel}`
                 )
+
+                updateVaultCaseData()
 
                 setMapRefreshKey(
                   prev => prev + 1
@@ -706,7 +952,6 @@ export default function HomeScreen() {
 
                 setShowLabelModal(false)
 
-                setChatVisible(true)
               }}
             >
 
@@ -837,9 +1082,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
+
+
   actionsBox: {
     backgroundColor: "#111827",
-    padding: 12,
+    padding: 12 ,
   },
 
   actionButtonsRow: {
@@ -898,6 +1145,7 @@ const styles = StyleSheet.create({
 
   modalBox: {
     width: "85%",
+    maxHeight: "75%",
     backgroundColor: "#1F2937",
     padding: 20,
     borderRadius: 16,
@@ -908,6 +1156,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 10,
+  },
+
+  questionLabel: {
+    color: "#D1D5DB",
+    fontSize: 14,
+    marginBottom: 6,
+    fontWeight: "600",
   },
 
   input: {
@@ -930,4 +1185,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-})
+
+
+
+
+}
+)

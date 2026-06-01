@@ -24,17 +24,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Chat',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="message.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="vault"
         options={{
           title: 'Vault',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="lock.shield.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="activity"
-        options={{
-          title: 'Activity',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="document.fill" color={color} />,
         }}
       />
       <Tabs.Screen
