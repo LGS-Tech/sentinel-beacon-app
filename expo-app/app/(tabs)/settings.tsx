@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons"
+import { useRouter } from "expo-router"
 import React from "react"
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native"
-import { useRouter } from "expo-router"
 
 
 
@@ -37,7 +37,13 @@ const sections = [
       { id: "8", label: "App Version" },
       { id: "9", label: "Privacy Policy" }
     ]
-  }
+  },
+  {
+  title: "Login page test",
+  data: [
+    { id: "dev1", label: "Open Login Screen", route: "/login-page" }
+  ]
+}
 
 
 ]
