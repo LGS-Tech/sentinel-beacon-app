@@ -8,9 +8,9 @@ import {
   View,
 } from "react-native"
 
-import * as SQLite from "expo-sqlite"
 
-const db = SQLite.openDatabaseSync("app.db")
+//const db = SQLite.openDatabaseSync("app.db")
+import { db } from "@/lib/db"
 
 type FeedItem = {
   id: string

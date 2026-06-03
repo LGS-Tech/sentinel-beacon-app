@@ -10,13 +10,13 @@ import {
   View
 } from "react-native"
 
-import * as SQLite from "expo-sqlite"
 
 import { Ionicons } from "@expo/vector-icons"
 
 import { useFocusEffect } from "@react-navigation/native"
 
-const db = SQLite.openDatabaseSync("app.db")
+//const db = SQLite.openDatabaseSync("app.db")
+import { db } from "@/lib/db"
 
 type CaseItem = {
   id: string

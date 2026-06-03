@@ -13,7 +13,6 @@ import {
   View,
 } from "react-native"
 
-import * as SQLite from "expo-sqlite"
 
 import ChatSheet from "@/components/chat"
 
@@ -34,7 +33,11 @@ import BottomSheet from "@/components/sheet"
 
 import { ThemedView } from "@/components/themed-view"
 
-const db = SQLite.openDatabaseSync("app.db")
+import { db } from "@/lib/db"
+
+//const db = SQLite.openDatabaseSync("app.db")
+
+
 
 const floorPlan = require("../../assets/images/LGSUniFloorPlan.png")
 const logo = require("../../assets/images/LGS-logo.png")

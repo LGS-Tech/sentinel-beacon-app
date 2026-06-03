@@ -11,11 +11,12 @@ import {
   View,
 } from "react-native"
 
-import * as SQLite from "expo-sqlite"
+//import * as SQLite from "expo-sqlite"
 
 import { Ionicons } from "@expo/vector-icons"
 
-const db = SQLite.openDatabaseSync("app.db")
+import { db } from "@/lib/db"
+//const db = SQLite.openDatabaseSync("app.db")
 
 type Message = {
   id: string

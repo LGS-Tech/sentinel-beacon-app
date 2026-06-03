@@ -22,11 +22,11 @@ import {
   useFocusEffect,
 } from "@react-navigation/native"
 
-import * as SQLite from "expo-sqlite"
 import { ThemedText } from "../../components/themed-text"
 import { ThemedView } from "../../components/themed-view"
 
-const db = SQLite.openDatabaseSync("app.db")
+import { db } from "@/lib/db"
+//const db = SQLite.openDatabaseSync("app.db")
 
 type FileItem = {
   id: string
