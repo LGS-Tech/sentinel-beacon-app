@@ -274,7 +274,7 @@ useEffect(() => {
   `${type} Case`,
   Date.now(),
   Date.now(),
-  "OPEN",
+  "ACTIVE",
   "",
   "",
   ]
@@ -419,7 +419,7 @@ if (result?.id) {
     const rows = db.getAllSync(`
       SELECT *
       FROM vault_cases
-      WHERE status = 'OPEN'
+      WHERE status = 'ACTIVE'
       ORDER BY lastUpdatedAt DESC
   ` ) as any[]
 
@@ -452,7 +452,7 @@ if (result?.id) {
       UPDATE vault_cases
       SET
         feed = ?,
-        lastUpdatedAt = ?,
+        lastUpdatedAt = ?
       WHERE id = ?
     `,
     [
@@ -613,7 +613,7 @@ function ensureLastUpdatedColumn() {
         {openCases.length === 0 ? (
 
           <Text style={styles.emptyText}>
-            There are no open cases
+            There are no active cases
           </Text>
 
         ) : (

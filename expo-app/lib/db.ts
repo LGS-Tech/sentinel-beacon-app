@@ -1,17 +1,24 @@
-// this protects web run from crashing
-// exposqlite only for mobile, so web is mainly for testing ui, until proper backend created
+// manages the temp database, stops from loading in the web as its not supported
 import { Platform } from "react-native";
 
+
+
 const isWeb = Platform.OS === "web";
+
 let sqlite: any = null;
-
-
 
 if (!isWeb) {
 
-  const SQLite = require("expo-sqlite");
-  sqlite = SQLite.openDatabaseSync("app.db") ;
+  try {
+    const SQLite = eval("require")("expo-sqlite");
+    sqlite = SQLite.openDatabaseSync("app.db");
+  } catch (error) {
+    
+    console.log("SQLite unavailable", error);
+  }
 }
+
+
 
 export const db = {
   execSync: (...args: any[]) => {
@@ -27,10 +34,7 @@ export const db = {
   getFirstSync: (...args: any[]) => {
     if (!sqlite) return null;
     return sqlite.getFirstSync(...args);
-
   },
-
-  
 
   getAllSync: (...args: any[]) => {
     if (!sqlite) return [];
@@ -38,5 +42,6 @@ export const db = {
   },
 
 
-  
+
+
 };

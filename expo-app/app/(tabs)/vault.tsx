@@ -360,7 +360,7 @@ const PREVIEW_COUNT = GRID_COLUMNS * PREVIEW_ROWS
   }, [vaultData, search])
 
   const openCases = filteredCases.filter(
-  c => c.status === "OPEN"
+  c => c.status === "ACTIVE"
 )
 
 const closedCases = filteredCases.filter(
@@ -481,7 +481,7 @@ const closedCases = filteredCases.filter(
           <View
             style={[
               styles.statusBadge,
-              item.status === "OPEN"
+              item.status === "ACTIVE"
               ? styles.openBadge
               : styles.closedBadge,
             ]}
@@ -647,7 +647,7 @@ const closedCases = filteredCases.filter(
 
   {openCases.length === 0 ? (
     <ThemedText style={styles.emptySectionText}>
-      There are no open cases
+      There are no active cases
     </ThemedText>
   ) : (
     openCases.map((item) => (
@@ -1171,17 +1171,17 @@ emptySectionText: {
 fileGrid: {
   flexDirection: "row",
   flexWrap: "wrap",
-  gap: 15,
+  gap: 50,
 },
 
 gridFile: {
   width: "30%",
   aspectRatio: 1,
   backgroundColor: "#F9FAFB",
-  borderRadius: 12,
+  borderRadius: 22,
   justifyContent: "center",
   alignItems: "center",
-  padding: 8,
+  padding: 10,
   marginBottom: 10,
 },
 

@@ -157,7 +157,7 @@ const newLine =
       UPDATE vault_cases
       SET 
         chat = ?,
-        lastUpdatedAt = ?,
+        lastUpdatedAt = ?
       WHERE id = ?
     `,
     [
@@ -200,13 +200,13 @@ const newLine =
 
   const visibleCases = showAllCases
   ? [
-      ...cases.filter(c => c.status === "OPEN"),
+      ...cases.filter(c => c.status === "ACTIVE"),
       ...cases.filter(c => c.status === "CLOSED"),
     ]
-  : cases.filter(c => c.status === "OPEN")
+  : cases.filter(c => c.status === "ACTIVE")
 
   const openCases = cases.filter(
-  c => c.status === "OPEN"
+  c => c.status === "ACTIVE"
 )
 
 
@@ -217,7 +217,7 @@ const newLine =
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyTitle}>No Cases</Text>
           <Text style={styles.emptyText}>
-            There are currently no active or archived cases.
+            There are currently no active cases.
           </Text>
         </View>
       )
@@ -232,7 +232,7 @@ const newLine =
       >
         <Text style={styles.toggleLink}>
           {showAllCases
-          ? "Show Open"
+          ? "Show Active"
           : "Show All"}
         </Text>
       </Pressable>
@@ -261,7 +261,7 @@ const newLine =
         <View
           style={[
             styles.statusBadge,
-            item.status === "OPEN"
+            item.status === "ACTIVE"
               ? styles.openBadge
               : styles.closedBadge,
           ]}
@@ -284,7 +284,7 @@ const newLine =
       <Text
         style={styles.noOpenCasesText}
       >
-        There are no open conversations
+        There are no active conversations
       </Text>
 
     ) : null
@@ -365,7 +365,7 @@ const newLine =
   )}
 />
 
-    {selectedCase?.status === "OPEN" && (
+    {selectedCase?.status === "ACTIVE" && (
 
       <View style={styles.inputBar}>
 
