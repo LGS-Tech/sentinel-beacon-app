@@ -35,6 +35,8 @@ import { ThemedView } from "@/components/themed-view"
 
 import { db } from "@/lib/db"
 
+
+
 //const db = SQLite.openDatabaseSync("app.db")
 
 
@@ -51,28 +53,33 @@ const defaultCoords = {
 
 const caseQuestions: Record<string, string[]> = {
   Fire: [
-    "Rate the fire severity (Red / Amber / Green)",
-    "Have there been any injuries or casualties?",
+    "Has everyone present been evacuated?",
+    "Have the fire department been contacted?",
   ],
 
   Intruder: [
     "Describe the intruder",
-    "Are they carrying anything suspicious?",
+    "Are they carrying out anti-social behaviour?",
+    "Have the police been contacted?",
   ],
 
   Injury: [
-    "What type of injury has occurred?",
-    "Is medical assistance required immediately?",
+    "Who was injured?",
+    "Describe the injury",
+    "Have the emergency services contacted?",
+    "What medical assistance has been provided?",
   ],
 
   Missing: [
-    "Who is missing?",
-    "When were they last seen?",
+    "Who/what is missing?",
+    "Where and when was the last known location?",
+    "Have the police been contacted?",
   ],
 
-  Maintenence: [
+  Maintenance: [
     "Describe the maintenance issue",
-    "Is the area dangerous or inaccessible?",
+    "Does/did it pose a danger to anyone?",
+    "Have the maintenance team been contacted?",
   ],
 }
 
@@ -127,8 +134,8 @@ export default function HomeScreen() {
 
   const [movementStatus] = useState("Stationary")
 
-  const [policeStatus, setPoliceStatus] =
-    useState("Not notified")
+  const [serviceStatus, setServiceStatus] =
+  useState("Not notified")
 
   const [confirmedCoords, setConfirmedCoords] =
     useState(defaultCoords)
@@ -161,17 +168,21 @@ export default function HomeScreen() {
   const [mapRefreshKey, setMapRefreshKey] =
     useState(0)
 
-  const [showQuestionModal, setShowQuestionModal] =
-    useState(false)
+  const [showQuestionModal, setShowQuestionModal] =useState(false)
 
-  const [selectedCaseType, setSelectedCaseType] =
-    useState("")
+  const [selectedCaseType, setSelectedCaseType] = useState("")
 
-  const [questionAnswers, setQuestionAnswers] =
-     useState<string[]>(["", ""])
+  const [questionAnswers, setQuestionAnswers] = useState<string[]>(["", ""])
 
-  const [currentVaultCaseId, setCurrentVaultCaseId] =
-  useState<number | null>(null)
+  const [currentVaultCaseId, setCurrentVaultCaseId] = useState<number | null>(null)
+
+
+  const [showMap, setShowMap] = useState(false)
+
+  const [openCases, setOpenCases] =  useState<any[]>([])
+  const [showDashboard, setShowDashboard] = useState(false)
+
+
 
   useEffect(() => {
 
@@ -181,7 +192,33 @@ export default function HomeScreen() {
 
     ensureFeedTable()
 
+    ensureLastUpdatedColumn()
+
+    loadOpenCases()
+
   }, [])
+
+  useEffect(() => {
+
+  if (!caseActive) {
+    loadOpenCases()
+  }
+
+}, [caseActive])
+
+useEffect(() => {
+
+  const interval = setInterval(() => {
+
+    if (!caseActive) {
+      loadOpenCases()
+    }
+
+  }, 1000)
+
+  return () => clearInterval(interval)
+
+}, [caseActive])
 
   function openCase(type: string) {
 
@@ -195,6 +232,7 @@ export default function HomeScreen() {
     setUpdatingLocation(true)
     setLocationConfirmed(false)
     setSelectedCoords(null)
+    setShowDashboard(false)
 
     addFeedItem(
       `Mr C Wallace started a new ${type.toLowerCase()} case`
@@ -225,18 +263,20 @@ export default function HomeScreen() {
     (
       title,
       createdAt,
+      lastUpdatedAt,
       status,
       chat,
       feed
     )
-    VALUES (?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?)
   `,
   [
-    `${type} Case`,
-    Date.now(),
-    "OPEN",
-    "",
-    "",
+  `${type} Case`,
+  Date.now(),
+  Date.now(),
+  "OPEN",
+  "",
+  "",
   ]
 )
 
@@ -252,6 +292,8 @@ const result = db.getFirstSync(
 if (result?.id) {
 
   setCurrentVaultCaseId(result.id)
+
+  loadOpenCases()
 
   db.runSync(
     `
@@ -361,23 +403,38 @@ if (result?.id) {
 
   function createActiveCaseTable() {
 
-  db.execSync(`
-    CREATE TABLE IF NOT EXISTS active_case (
-      id INTEGER PRIMARY KEY,
-      vaultCaseId INTEGER
-    );
-  `)
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS active_case (
+        id INTEGER PRIMARY KEY,
+       vaultCaseId INTEGER
+      );
+  ` )
 
 }
 
+  
+
+  function loadOpenCases() {
+
+    const rows = db.getAllSync(`
+      SELECT *
+      FROM vault_cases
+      WHERE status = 'OPEN'
+      ORDER BY lastUpdatedAt DESC
+  ` ) as any[]
+
+    setOpenCases(rows)  
+  } 
+
   function updateVaultCaseData() {
 
-  if (!currentVaultCaseId) {
-    return
-  }
+      
+    if (!currentVaultCaseId) {
+      return
+    }
 
 
-  const feedItems = getAllFeedItems()
+    const feedItems = getAllFeedItems()
 
 
   const feedHistory = feedItems
@@ -394,15 +451,93 @@ if (result?.id) {
     `
       UPDATE vault_cases
       SET
-        feed = ?
+        feed = ?,
+        lastUpdatedAt = ?,
       WHERE id = ?
     `,
     [
       feedHistory,
+      Date.now(),
       currentVaultCaseId,
     ]
   )
 }
+
+function ensureLastUpdatedColumn() {
+
+  try {
+
+    db.execSync(`
+      ALTER TABLE vault_cases
+      ADD COLUMN lastUpdatedAt INTEGER
+    `)
+
+  } catch {}
+
+  db.execSync(`
+    UPDATE vault_cases
+    SET lastUpdatedAt = createdAt
+    WHERE lastUpdatedAt IS NULL
+  `)
+
+}
+
+
+
+
+  function formatDate(
+  timestamp: number
+) {
+
+  const date = new Date(timestamp)
+
+  const today = new Date()
+
+  const yesterday = new Date()
+
+  yesterday.setDate(
+    yesterday.getDate() - 1
+  )
+
+  const time = date.toLocaleTimeString(
+    "en-GB",
+    {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }
+  )
+
+  const sameDay =
+    date.toDateString() ===
+    today.toDateString()
+
+  const sameYesterday =
+    date.toDateString() ===
+    yesterday.toDateString()
+
+  if (sameDay) {
+    return `Today, ${time}`
+  }
+
+  if (sameYesterday) {
+    return `Yesterday, ${time}`
+  }
+
+  return `${date.toLocaleDateString(
+    "en-GB"
+  )}, ${time}`
+}
+
+
+  function getServicesLabel() {
+
+    return incidentType === "Maintenance"
+      ? "Maintenance Services"
+      : "Emergency Services"
+
+  }
+
 
   return (
 
@@ -417,6 +552,8 @@ if (result?.id) {
         />
 
       </View>
+
+      {caseActive && (
 
       <ThemedView style={styles.alertBox}>
 
@@ -442,7 +579,7 @@ if (result?.id) {
             <View style={styles.row}>
 
               <Text style={styles.smallText}>
-                Emergency Services
+                {getServicesLabel()}
               </Text>
 
               <Text style={styles.smallText}>
@@ -450,7 +587,7 @@ if (result?.id) {
               </Text>
 
               <Text style={styles.blueText}>
-                {policeStatus}
+                {serviceStatus}
               </Text>
 
             </View>
@@ -459,190 +596,400 @@ if (result?.id) {
 
       </ThemedView>
 
+      )}
+
       <View style={styles.content}>
 
-        <View style={styles.mapContainer}>
+  {(!caseActive || showDashboard) && !showMap && (
 
-          <IntruderMap
-            key={mapRefreshKey}
-            floorPlan={floorPlan}
-            updateMode={updatingLocation}
-            selectedCoords={
-              selectedCoords || confirmedCoords
+    <View style={styles.dashboardContainer}>
+
+      <Text style={styles.sectionTitle}>
+        Active Cases
+      </Text>
+
+      <ScrollView>
+
+        {openCases.length === 0 ? (
+
+          <Text style={styles.emptyText}>
+            There are no open cases
+          </Text>
+
+        ) : (
+
+          openCases.map((item) => (
+
+            <View
+  key={item.id}
+  style={styles.caseCard}
+>
+
+  <View style={styles.caseHeaderRow}>
+
+    <View style={{ flex: 1 }}>
+
+      <Text style={styles.caseTitleCard}>
+        {item.title}
+      </Text>
+
+      <Text style={styles.caseDateCard}>
+        Last Updated:{" "}
+        {formatDate(
+          item.lastUpdatedAt ||
+          item.createdAt
+        )}
+      </Text>
+
+      <Text style={styles.caseDateCard}>
+        Created:{" "}
+        {formatDate(
+          item.createdAt
+        )}
+      </Text>
+
+    </View>
+
+    <Pressable
+      style={styles.closeCaseBtn}
+      onPress={() => {
+
+        db.runSync(
+          `
+            UPDATE vault_cases
+            SET status = 'CLOSED'
+            WHERE id = ?
+          `,
+          [item.id]
+        )
+
+        loadOpenCases()
+
+      }}
+    >
+
+      <Text style={styles.closeCaseBtnText}>
+        Close
+      </Text>
+
+    </Pressable>
+
+  </View>
+
+</View>
+
+          ))
+
+        )}
+
+      </ScrollView>
+
+      <View style={styles.bottomButtons}>
+
+        <Pressable
+          style={[
+            styles.actionBottomButton,
+            {
+              backgroundColor: "#2563EB",
+            },
+          ]}
+          onPress={() =>
+            setShowMap(true)
+          }
+        >
+
+          <Text style={styles.buttonText}>
+            See Map
+          </Text>
+
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.actionBottomButton,
+            {
+              backgroundColor: "#DC2626",
+            },
+          ]}
+          onPress={handleStartCase}
+        >
+
+          <Text style={styles.buttonText}>
+            Start Case
+          </Text>
+
+        </Pressable>
+
+      </View>
+
+    </View>
+
+  )}
+
+  {(!caseActive || showDashboard) && showMap && (
+
+    <View style={{ flex: 1 }}>
+
+      <Pressable
+        style={styles.mapBackBtn}
+        onPress={() =>
+          setShowMap(false)
+        }
+      >
+
+        <Text>
+          ← Back
+        </Text>
+
+      </Pressable>
+
+      <IntruderMap
+        key={mapRefreshKey}
+        floorPlan={floorPlan}
+        updateMode={false}
+        selectedCoords={confirmedCoords}
+        showMarker={false}
+      />
+
+    </View>
+
+  )}
+
+  {caseActive && !showDashboard && (
+
+    <>
+
+      <View style={styles.mapContainer}>
+
+        <IntruderMap
+          key={mapRefreshKey}
+          floorPlan={floorPlan}
+          updateMode={updatingLocation}
+          selectedCoords={
+            selectedCoords || confirmedCoords
+          }
+          showMarker={
+            selectedCoords !== null ||
+            (
+              caseActive &&
+              intruderLocation.length > 0
+            )
+          }
+          onMapPress={(coords) => {
+
+            if (updatingLocation) {
+
+              setSelectedCoords(coords)
+
             }
-            showMarker={
-              selectedCoords !== null ||
-              (caseActive &&
-                intruderLocation.length > 0)
-            }
-            onMapPress={(coords) => {
 
-              if (updatingLocation) {
+          }}
+        />
 
-                setSelectedCoords(coords)
+      </View>
 
-              }
+      {updatingLocation && (
 
-            }}
-          />
-
-        </View>
-
-        {updatingLocation && (
-
-          <Pressable
-            style={[
-              styles.confirmButton,
-              {
-                backgroundColor: selectedCoords
+        <Pressable
+          style={[
+            styles.confirmButton,
+            {
+              backgroundColor:
+                selectedCoords
                   ? "#16A34A"
                   : "#6B7280",
 
-                opacity: selectedCoords ? 1 : 0.4,
-              },
-            ]}
-            disabled={!selectedCoords}
+              opacity:
+                selectedCoords
+                  ? 1
+                  : 0.4,
+            },
+          ]}
+          disabled={!selectedCoords}
+          onPress={() => {
+
+            if (selectedCoords) {
+              setShowLabelModal(true)
+            }
+
+          }}
+        >
+
+          <Text style={styles.buttonText}>
+            Confirm Location
+          </Text>
+
+        </Pressable>
+
+      )}
+
+      {!updatingLocation && (
+
+        <View style={styles.actionsWrap}>
+
+          <Pressable
+            style={styles.handle}
             onPress={() => {
 
-              if (selectedCoords) {
-                setShowLabelModal(true)
-              }
+              setActionsOpen(
+                !actionsOpen
+              )
 
             }}
           >
 
-            <Text style={styles.buttonText}>
-              Confirm Location
+            <View
+              style={styles.handleLine}
+            />
+
+            <Text
+              style={styles.handleLabel}
+            >
+              {actionsOpen
+                ? "Hide Actions"
+                : "Show Actions"}
             </Text>
 
           </Pressable>
-        )}
 
-        {!caseActive && (
+          {actionsOpen && (
 
-          <View style={styles.startButtonWrap}>
-
-            <Pressable
-              style={styles.redButton}
-              onPress={handleStartCase}
+            <View
+              style={styles.actionsBox}
             >
 
-              <Text style={styles.buttonText}>
-                Start Case
-              </Text>
+              <View
+                style={
+                  styles.actionButtonsRow
+                }
+              >
 
-            </Pressable>
+                <Pressable
+                  style={[
+                    styles.actionButton,
+                    styles.feedButton,
+                  ]}
+                  onPress={() =>
+                    setFeedVisible(true)
+                  }
+                >
 
-          </View>
-        )}
-
-        {caseActive && !updatingLocation && (
-
-          <View style={styles.actionsWrap}>
-
-            <Pressable
-              style={styles.handle}
-              onPress={() => {
-                setActionsOpen(!actionsOpen)
-              }}
-            >
-
-              <View style={styles.handleLine} />
-
-              <Text style={styles.handleLabel}>
-                {actionsOpen
-                  ? "Hide Actions"
-                  : "Show Actions"}
-              </Text>
-
-            </Pressable>
-
-            {actionsOpen && (
-
-              <View style={styles.actionsBox}>
-
-                <View style={styles.actionButtonsRow}>
-
-                  
-
-                  <Pressable
-                    style={[
-                      styles.actionButton,
-                      styles.feedButton,
-                    ]}
-                    onPress={() => {
-                      setFeedVisible(true)
-                    }}
+                  <Text
+                    style={
+                      styles.actionButtonText
+                    }
                   >
-
-                    <Text style={styles.actionButtonText}>
-                      Live Feed
-                    </Text>
-
-                  </Pressable>
-
-                </View>
-
-                <Pressable
-                  style={styles.redButton}
-                  onPress={() => {
-                    setPoliceModalVisible(true)
-                  }}
-                >
-
-                  <Text style={styles.buttonText}>
-                    Emergency Services
-                  </Text>
-
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.redButton,
-                    {
-                      backgroundColor: "#2563EB",
-                      marginTop: 10,
-                    },
-                  ]}
-                  onPress={() => {
-
-                    setUpdatingLocation(true)
-
-                    setSelectedCoords(null)
-
-                  }}
-                >
-
-                  <Text style={styles.buttonText}>
-                    Update Location
-                  </Text>
-
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.redButton,
-                    {
-                      backgroundColor: "#6B7280",
-                      marginTop: 10,
-                    },
-                  ]}
-                  onPress={handleCloseCase}
-                >
-
-                  <Text style={styles.buttonText}>
-                    Close Case
+                    Live Feed
                   </Text>
 
                 </Pressable>
 
               </View>
-            )}
 
-          </View>
-        )}
+              <Pressable
+                style={styles.redButton}
+                onPress={() => {
 
-      </View>
+                  setPoliceModalVisible(
+                    true
+                  )
+
+                }}
+              >
+
+                <Text
+                  style={styles.buttonText}
+                >
+                  {getServicesLabel()}
+                </Text>
+
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.redButton,
+                  {
+                    backgroundColor:
+                      "#2563EB",
+                    marginTop: 10,
+                  },
+                ]}
+                onPress={() => {
+
+                  setUpdatingLocation(
+                    true
+                  )
+
+                  setSelectedCoords(
+                    null
+                  )
+
+                }}
+              >
+
+                <Text
+                  style={styles.buttonText}
+                >
+                  Update Location
+                </Text>
+
+              </Pressable>
+
+              <View style={styles.caseBottomRow}>
+
+  <Pressable
+    style={[
+      styles.caseBottomButton,
+      {
+        backgroundColor: "#4c6186",
+      },
+    ]}
+    onPress={() => {
+
+      loadOpenCases()
+
+      setShowDashboard(true)
+
+    }}
+  >
+
+    <Text style={styles.buttonText}>
+      Home
+    </Text>
+
+  </Pressable>
+
+  <Pressable
+    style={[
+      styles.caseBottomButton,
+      {
+        backgroundColor: "#6B7280",
+      },
+    ]}
+    onPress={handleCloseCase}
+  >
+
+    <Text style={styles.buttonText}>
+      Close Case
+    </Text>
+
+  </Pressable>
+
+</View>
+
+            </View>
+
+          )}
+
+        </View>
+
+      )}
+
+    </>
+
+  )}
+
+</View>
 
       <BottomSheet
         visible={chatVisible}
@@ -668,20 +1015,31 @@ if (result?.id) {
       >
 
         <PoliceConfirmation
+          serviceType={
+            incidentType === "Maintenance"
+              ? "Maintenance"
+              : "Emergency"
+          }
           onCancel={() => {
             setPoliceModalVisible(false)
           }}
           onConfirm={() => {
 
-            setPoliceStatus("Police notified")
+          setServiceStatus(
+            incidentType === "Maintenance"
+              ? "Maintenance notified"
+              : "Emergency services notified"
+          )
 
-            addFeedItem(
-              "Police have been notified"
-            )
+          addFeedItem(
+            incidentType === "Maintenance"
+              ? "Maintenance services have been notified"
+              : "Emergency services have been notified"
+          )
 
-            updateVaultCaseData()
+          updateVaultCaseData()
 
-            setPoliceModalVisible(false)
+          setPoliceModalVisible(false)
           }}
         />
 
@@ -918,12 +1276,15 @@ if (result?.id) {
                   db.runSync(
     `
                     UPDATE vault_cases
-                    SET title = ?
+                    SET 
+                      title = ?,
+                      lastUpdatedAt = ?
                     WHERE id = ?
                     `,
                     [
                       `${incidentType} Case in ${cleanLabel}`,
-                        currentVaultCaseId,
+                      Date.now(),
+                      currentVaultCaseId,
                     ]
                   )
 
@@ -1189,7 +1550,103 @@ const styles = StyleSheet.create({
   },
 
 
+  dashboardContainer: {
+  flex: 1,
+  backgroundColor: "#FFFFFF",
+  padding: 16,
+},
 
+sectionTitle: {
+  fontSize: 24,
+  fontWeight: "700",
+  color: "#111827",
+  marginBottom: 14,
+  marginTop: 25,
+},
+
+emptyText: {
+  color: "#6B7280",
+  fontSize: 16,
+},
+
+caseCard: {
+  backgroundColor: "#F9FAFB",
+  padding: 16,
+  borderRadius: 12,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: "#E5E7EB",
+},
+
+bottomButtons: {
+  position: "absolute",
+  bottom: 25,
+  left: 16,
+  right: 16,
+  flexDirection: "row",
+  gap: 12,
+},
+
+actionBottomButton: {
+  flex: 1,
+  borderRadius: 12,
+  paddingVertical: 14,
+  alignItems: "center",
+},
+
+mapBackBtn: {
+  padding: 16,
+},
+
+caseDate: {
+  color: "#6B7280",
+  marginTop: 4,
+},
+
+
+caseTitleCard: {
+  fontSize: 16,
+  fontWeight: "700",
+  color: "#111827",
+  marginBottom: 5,
+},
+
+caseDateCard: {
+  marginTop: 4,
+  fontSize: 12,
+  color: "#6B7280",
+},
+
+caseHeaderRow: {
+  flexDirection: "row",
+  alignItems: "center",
+},
+
+closeCaseBtn: {
+  backgroundColor: "#DC2626",
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 8,
+},
+
+closeCaseBtnText: {
+  color: "#FFFFFF",
+  fontWeight: "600",
+},
+
+
+caseBottomRow: {
+  flexDirection: "row",
+  marginTop: 10,
+  gap: 10,
+},
+
+caseBottomButton: {
+  flex: 1,
+  paddingVertical: 10,
+  borderRadius: 12,
+  alignItems: "center",
+},
 
 
 }

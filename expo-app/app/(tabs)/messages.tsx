@@ -57,11 +57,11 @@ function loadCases(): CaseItem[] {
 export default function ChatTab() {
   const [cases, setCases] = useState<CaseItem[]>([])
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
-  const [selectedCaseChat, setSelectedCaseChat] =
-  useState("")
+  const [selectedCaseChat, setSelectedCaseChat] =useState("")
   const [messages, setMessages] = useState<any[]>([])
-const [inputText, setInputText] = useState("")
+  const [inputText, setInputText] = useState("")
   const [caseChat, setCaseChat] = useState("")
+  const [showAllCases, setShowAllCases] = useState(false)
 
 
   function refreshCases() {
@@ -126,8 +126,17 @@ function handleSend() {
     return
   }
 
-  const newLine =
-    `[${new Date().toLocaleTimeString()}] Mr C Wallace: ${inputText.trim()}`
+  const timestamp = new Date().toLocaleTimeString(
+  "en-GB",
+  {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }
+)
+
+const newLine =
+  `[${timestamp}] Mr C Wallace: ${inputText.trim()}`
 
   const row = db.getFirstSync(
     `
@@ -146,11 +155,14 @@ function handleSend() {
   db.runSync(
     `
       UPDATE vault_cases
-      SET chat = ?
+      SET 
+        chat = ?,
+        lastUpdatedAt = ?,
       WHERE id = ?
     `,
     [
       updatedChat,
+      Date.now(),
       selectedCaseId,
     ]
   )
@@ -186,6 +198,17 @@ function handleSend() {
     }, [])
   )
 
+  const visibleCases = showAllCases
+  ? [
+      ...cases.filter(c => c.status === "OPEN"),
+      ...cases.filter(c => c.status === "CLOSED"),
+    ]
+  : cases.filter(c => c.status === "OPEN")
+
+  const openCases = cases.filter(
+  c => c.status === "OPEN"
+)
+
 
   // list of the conversations before specific one  picked
   if (!selectedCaseId) {
@@ -204,43 +227,70 @@ function handleSend() {
       <View style={styles.container}>
         <Text style={styles.title}>Conversations</Text>
 
+        <Pressable
+        onPress={() =>setShowAllCases(!showAllCases)}
+      >
+        <Text style={styles.toggleLink}>
+          {showAllCases
+          ? "Show Open"
+          : "Show All"}
+        </Text>
+      </Pressable>
+
         <FlatList
-          data={cases}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <Pressable
-              style={[
-                styles.caseCard,
-                item.status === "CLOSED" && { opacity: 0.5 },
-              ]}
-              onPress={() => {
-                loadCaseChat(item.id)
-                setSelectedCaseId(item.id)
-              }}
-            >
-              <View style={styles.row}>
-                <Text style={styles.caseTitle}>
-                  {item.title}
-                </Text>
+  data={visibleCases}
+  keyExtractor={(item) => item.id}
+  renderItem={({ item }) => (
+    <Pressable
+      style={[
+        styles.caseCard,
+        item.status === "CLOSED" && {
+          opacity: 0.5,
+        },
+      ]}
+      onPress={() => {
+        loadCaseChat(item.id)
+        setSelectedCaseId(item.id)
+      }}
+    >
+      <View style={styles.row}>
+        <Text style={styles.caseTitle}>
+          {item.title}
+        </Text>
 
-                <View
-                  style={[
-                    styles.statusBadge,
-                    item.status === "OPEN"
-                      ? styles.openBadge
-                      : styles.closedBadge,
-                  ]}
-                >
-                  <Text style={styles.statusText}>
-                    {item.status}
-                  </Text>
-                </View>
-              </View>
+        <View
+          style={[
+            styles.statusBadge,
+            item.status === "OPEN"
+              ? styles.openBadge
+              : styles.closedBadge,
+          ]}
+        >
+          <Text style={styles.statusText}>
+            {item.status}
+          </Text>
+        </View>
+      </View>
 
-              <Text style={styles.date}>{item.date}</Text>
-            </Pressable>
-          )}
-        />
+      <Text style={styles.date}>
+        {item.date}
+      </Text>
+    </Pressable>
+  )}
+  ListEmptyComponent={() => (
+
+    !showAllCases ? (
+
+      <Text
+        style={styles.noOpenCasesText}
+      >
+        There are no open conversations
+      </Text>
+
+    ) : null
+
+  )}
+/>
       </View>
     )
   }
@@ -262,6 +312,12 @@ function handleSend() {
       <Text style={styles.backText}>
         ← Conversations
       </Text>
+
+      
+
+
+
+
     </Pressable>
 
     <Text style={styles.chatTitle}>
@@ -490,6 +546,20 @@ input: {
   backgroundColor: "#ffffff",
   paddingHorizontal: 16,
   color: "#000",
+},
+
+toggleLink: {
+  color: "#2563EB",
+  fontSize: 15,
+  fontWeight: "600",
+  marginBottom: 16,
+},
+
+noOpenCasesText: {
+  textAlign: "center",
+  color: "#6B7280",
+  marginTop: 20,
+  fontSize: 15,
 },
 
 

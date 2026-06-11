@@ -39,7 +39,7 @@ type CaseItem = {
   id: string
   title: string
   createdAt: string
-  status: "OPEN" | "CLOSED"
+  status: "ACTIVE" | "CLOSED"
   files: FileItem[]
 }
 
@@ -52,6 +52,7 @@ const setupVaultDb = () => {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT,
     createdAt INTEGER,
+    lastUpdatedAt INTEGER
     status TEXT DEFAULT 'CLOSED'
   );
 `)
@@ -102,7 +103,7 @@ const loadCases = (): CaseItem[] => {
     `
       SELECT *
       FROM vault_cases
-      ORDER BY createdAt DESC
+      ORDER BY lastUpdatedAt DESC
     `
   ) as any[]
 
@@ -163,6 +164,18 @@ export default function VaultScreen() {
   const [renameType, setRenameType] =
     useState<"file" | "folder">("file")
 
+
+
+  const [expandedCase, setExpandedCase] =
+  useState<CaseItem | null>(null)
+
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null)
+  
+const GRID_COLUMNS = 1
+const PREVIEW_ROWS = 2
+const PREVIEW_COUNT = GRID_COLUMNS * PREVIEW_ROWS
+    
+
   useEffect(() => {
     setupVaultDb()
 
@@ -174,6 +187,9 @@ export default function VaultScreen() {
       setVaultData(loadCases())
     }, [])
   )
+
+
+  
 
   const refreshVault = () => {
     setVaultData(loadCases())
@@ -243,6 +259,9 @@ export default function VaultScreen() {
         }),
       }
     })
+
+    
+    
 
     setVaultData(updatedCases)
 
@@ -340,6 +359,14 @@ export default function VaultScreen() {
 
   }, [vaultData, search])
 
+  const openCases = filteredCases.filter(
+  c => c.status === "OPEN"
+)
+
+const closedCases = filteredCases.filter(
+  c => c.status === "CLOSED"
+)
+
   const renderFile = ({
     item,
     caseId,
@@ -416,6 +443,9 @@ export default function VaultScreen() {
 
     </Pressable>
   )
+
+
+  
 
   const renderCase = ({
     item,
@@ -508,19 +538,47 @@ export default function VaultScreen() {
 
       <View style={styles.filesContainer}>
 
-        <FlatList
-          data={item.files}
-          keyExtractor={(f) => f.id}
-          renderItem={({ item: file }) =>
-            renderFile({
-              item: file,
-              caseId: item.id,
-            })
-          }
-          scrollEnabled={false}
+  
+  <View style={styles.fileGrid}>
+  {item.files
+    .slice(0, PREVIEW_COUNT)
+    .map((file) => (
+      <View key={file.id} style={styles.gridFile}>
+        <Ionicons
+          name="reader-outline"
+          size={22}
+          color="#059669"
         />
 
+        <ThemedText
+          numberOfLines={1}
+          style={styles.gridFileName}
+        >
+          {file.name}
+        </ThemedText>
       </View>
+    ))}
+</View>
+
+  {item.files.length > PREVIEW_COUNT && (
+    <ThemedText style={styles.moreFilesText}>
+    ...
+    </ThemedText>
+  )}
+
+  <Pressable
+    onPress={() =>
+      setExpandedCase(item)
+    }
+  >
+
+    <ThemedText style={styles.showAllLink}>
+      View
+    </ThemedText>
+
+  </Pressable>
+
+</View>
 
     </ThemedView>
   )
@@ -578,67 +636,50 @@ export default function VaultScreen() {
 
       </View>
 
-      <FlatList
-        data={filteredCases}
-        keyExtractor={(item) => item.id}
-        renderItem={renderCase}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.list}
-      />
+      <ScrollView
+  showsVerticalScrollIndicator={false}
+  contentContainerStyle={styles.list}
+>
 
-      {/* file viewer */}
-      <Modal
-        visible={!!selectedText}
-        transparent
-        animationType="fade"
-      >
+  <ThemedText style={styles.sectionHeader}>
+    Active Cases
+  </ThemedText>
 
-        <View style={styles.modal}>
+  {openCases.length === 0 ? (
+    <ThemedText style={styles.emptySectionText}>
+      There are no open cases
+    </ThemedText>
+  ) : (
+    openCases.map((item) => (
+      <View key={item.id}>
+        {renderCase({ item })}
+      </View>
+    ))
+  )}
 
-          <Pressable
-            style={styles.overlay}
-            onPress={() =>
-              setSelectedText(null)
-            }
-          />
+  <ThemedText
+    style={[
+      styles.sectionHeader,
+      { marginTop: 24 }
+    ]}
+  >
+    Closed Cases
+  </ThemedText>
 
-          <View style={styles.textBox}>
+  {closedCases.length === 0 ? (
+    <ThemedText style={styles.emptySectionText}>
+      There are no closed cases
+    </ThemedText>
+  ) : (
+    closedCases.map((item) => (
+      <View key={item.id}>
+        {renderCase({ item })}
+      </View>
+    ))
+  )}
 
-            <View style={styles.modalHeader}>
+</ScrollView>
 
-              <ThemedText style={styles.modalTitle}>
-                File Content
-              </ThemedText>
-
-              <Pressable
-                onPress={() =>
-                  setSelectedText(null)
-                }
-              >
-
-                <Ionicons
-                  name="close"
-                  size={22}
-                  color="#111827"
-                />
-
-              </Pressable>
-
-            </View>
-
-            <ScrollView>
-
-              <ThemedText style={styles.textContent}>
-                {selectedText}
-              </ThemedText>
-
-            </ScrollView>
-
-          </View>
-
-        </View>
-
-      </Modal>
 
       {/* rename modal */}
       <Modal
@@ -704,6 +745,129 @@ export default function VaultScreen() {
         </View>
 
       </Modal>
+
+
+      <Modal
+  visible={!!expandedCase}
+  animationType="slide"
+>
+
+  <View style={styles.fullFolderContainer}>
+
+    <Pressable
+      onPress={() =>
+        setExpandedCase(null)
+      }
+      style={styles.folderBackBtn}
+    >
+      <ThemedText>
+        ← Back
+      </ThemedText>
+    </Pressable>
+
+    <ThemedText
+      style={styles.folderTitle}
+    >
+      {expandedCase?.title}
+    </ThemedText>
+
+    <FlatList
+      data={expandedCase?.files || []}
+      keyExtractor={(f) => f.id}
+      numColumns={3}
+      contentContainerStyle={{
+        paddingBottom: 40,
+      }}
+      renderItem={({ item }) => (
+
+        <Pressable
+          style={styles.gridFile}
+          onPress={() => setSelectedFile(item)}
+        >
+
+          <Ionicons
+            name="reader-outline"
+            size={22}
+            color="#059669"
+          />
+
+          <ThemedText
+            numberOfLines={1}
+            style={styles.gridFileName}
+          >
+            {item.name}
+          </ThemedText>
+
+        </Pressable>
+
+      )}
+    />
+
+    <Pressable
+  style={styles.addFileBtn}
+  onPress={() => {}}
+>
+  <Ionicons
+    name="add"
+    size={18}
+    color="#fff"
+  />
+
+  <ThemedText
+    style={styles.addFileBtnText}
+  >
+    Add File
+  </ThemedText>
+</Pressable>
+
+<Modal
+  visible={!!selectedFile}
+  transparent
+  animationType="fade"
+>
+  <View style={styles.modal}>
+
+    <Pressable
+      style={styles.overlay}
+      onPress={() =>
+        setSelectedText(null)
+      }
+    />
+
+    <View style={styles.textBox}>
+
+      <View style={styles.modalHeader}>
+
+        <ThemedText style={styles.modalTitle}>
+          {selectedFile?.name}
+        </ThemedText>
+
+        <Pressable
+          onPress={() => setSelectedFile(null)}
+        >
+          <Ionicons
+            name="close"
+            size={22}
+            color="#111827"
+          />
+        </Pressable>
+
+      </View>
+
+      <ScrollView>
+        <ThemedText style={styles.textContent}>
+          {selectedFile?.content}
+        </ThemedText>
+      </ScrollView>
+
+    </View>
+
+  </View>
+</Modal>
+
+  </View>
+
+</Modal>
 
     </ThemedView>
   )
@@ -987,6 +1151,101 @@ statusBadgeText: {
   fontWeight: "700",
   color: "#111827",
 },
+
+sectionHeader: {
+  fontSize: 22,
+  fontWeight: "700",
+  color: "#111827",
+  marginBottom: 12,
+  marginTop: 20,
+},
+
+
+emptySectionText: {
+  color: "#6B7280",
+  marginBottom: 20,
+  fontSize: 14,
+},
+
+
+fileGrid: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 15,
+},
+
+gridFile: {
+  width: "30%",
+  aspectRatio: 1,
+  backgroundColor: "#F9FAFB",
+  borderRadius: 12,
+  justifyContent: "center",
+  alignItems: "center",
+  padding: 8,
+  marginBottom: 10,
+},
+
+gridPlaceholder: {
+  width: "30%",
+  aspectRatio: 1,
+  opacity: 0,
+},
+
+gridFileName: {
+  fontSize: 11,
+  textAlign: "center",
+  marginTop: 6,
+},
+
+showAllLink: {
+  color: "#2563EB",
+  fontWeight: "600",
+  marginTop: 5,
+},
+
+fullFolderContainer: {
+  flex: 1,
+  backgroundColor: "#F3F6FB",
+  paddingTop: 60,
+  paddingHorizontal: 16,
+},
+
+folderBackBtn: {
+  marginBottom: 16,
+},
+
+folderTitle: {
+  fontSize: 24,
+  fontWeight: "700",
+  marginBottom: 20,
+},
+
+
+moreFilesText: {
+  textAlign: "center",
+  fontSize: 24,
+  color: "#9CA3AF",
+  marginTop: -4,
+  marginBottom: 8,
+},
+
+addFileBtn: {
+  backgroundColor: "#2563EB",
+  borderRadius: 14,
+  paddingVertical: 14,
+  justifyContent: "center",
+  alignItems: "center",
+  flexDirection: "row",
+  marginTop: 20,
+  marginBottom: 40,
+},
+
+addFileBtnText: {
+  color: "#fff",
+  fontWeight: "700",
+  marginLeft: 6,
+},
+
 
 
 
