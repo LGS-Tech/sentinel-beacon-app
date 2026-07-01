@@ -1,50 +1,21 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Stack } from 'expo-router';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
+export default function SettingsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="messages"
-        options={{
-          title: 'Chat',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="message.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="vault"
-        options={{
-          title: 'Vault',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="lock.shield.fill" color={color} />,
-        }}
-      />
-      {/* Aponta para o diretório de configurações */}
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gear.circle.fill" color={color} />,
-        }}
-      />
-    </Tabs>
+    <Stack>
+      {/* A tela principal não exibe o cabeçalho superior nativo */}
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      
+      {/* Títulos configurados individualmente para cada tela secundária */}
+      <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+      <Stack.Screen name="change-password" options={{ title: 'Change Password' }} />
+      <Stack.Screen name="sign-out" options={{ title: 'Sign Out' }} />
+      <Stack.Screen name="theme" options={{ title: 'Theme' }} />
+      <Stack.Screen name="text-size" options={{ title: 'Text Size' }} />
+      <Stack.Screen name="storage" options={{ title: 'Storage Usage' }} />
+      <Stack.Screen name="cache" options={{ title: 'Clear Cache' }} />
+      <Stack.Screen name="version" options={{ title: 'App Version' }} />
+      <Stack.Screen name="privacy" options={{ title: 'Privacy Policy' }} />
+    </Stack>
   );
 }
