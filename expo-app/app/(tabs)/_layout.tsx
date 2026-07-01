@@ -37,6 +37,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="lock.shield.fill" color={color} />,
         }}
       />
+      {/* ALTERADO: name mudou de "settings" para "settings" para carregar a pasta inteira */}
       <Tabs.Screen
         name="settings"
         options={{
