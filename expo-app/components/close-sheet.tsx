@@ -1,3 +1,4 @@
+//presented when user closes case from dashboard
 import React from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
 
@@ -13,11 +14,14 @@ export default function CaseClosedSheet({ onClose }: Props) {
 
       <Text style={styles.text}>
         This case has now been closed.
+
       </Text>
 
       <Text style={styles.subText}>
         You can view all details and files in the Vault tab.
       </Text>
+
+
 
       <Pressable style={styles.btn} onPress={onClose}>
         <Text style={styles.btnText}>Done</Text>
@@ -27,16 +31,31 @@ export default function CaseClosedSheet({ onClose }: Props) {
   )
 }
 
+
+
+
+
+
 const styles = StyleSheet.create({
 
   container: {
     padding: 20,
   },
 
-  title: {
+
+
+  title:  {
     fontSize: 24,
-    fontWeight: "700",
+    fontWeight:  "700",
     marginBottom: 20,
+  },
+
+
+
+  subText: {
+    fontSize: 13,
+    color: "#666",
+    marginBottom: 30,
   },
 
   text: {
@@ -45,11 +64,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
 
-  subText: {
-    fontSize: 13,
-    color: "#666",
-    marginBottom: 30,
-  },
+  
 
   btn: {
     backgroundColor: "#2563EB",
@@ -61,6 +76,9 @@ const styles = StyleSheet.create({
   btnText: {
     color: "#fff",
     fontWeight: "600",
-  },
+  } ,
 
-})
+
+
+}
+)

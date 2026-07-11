@@ -1,3 +1,5 @@
+// services page for contact of the maintenance or emergency when needed
+
 import React from "react"
 import {
   Pressable,
@@ -6,27 +8,39 @@ import {
   View,
 } from "react-native"
 
+
+
+
 type PoliceConfirmationProps = {
   serviceType?: "Emergency" | "Maintenance"
+  servicesAlreadyNotified?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
 
 export default function PoliceConfirmation({
   serviceType = "Emergency",
+  servicesAlreadyNotified = false,
   onConfirm,
   onCancel,
 }: PoliceConfirmationProps) {
 
-  const title =
-    serviceType === "Maintenance"
-      ? "Notify Maintenance Services"
-      : "Notify Emergency Services"
+  
 
   const message =
     serviceType === "Maintenance"
-      ? "Are you sure you want to notify the maintenance services?"
-      : "Are you sure you want to notify the emergency services?"
+      ? "Do you wish to notify maintenance services?"
+      : "Do you wish to notify the emergency services?"
+
+
+
+
+  const title =
+    serviceType === "Maintenance"
+      ? "Maintenance Services"
+      : "Emergency Services"    
+
+
 
   return (
 
@@ -34,11 +48,56 @@ export default function PoliceConfirmation({
 
       <Text style={styles.title}>
         {title}
+
       </Text>
+
+
+
+
+      <Text style={styles.statusQuestion}>
+  Have the {serviceType.toLowerCase()} services been notified?
+</Text>
+
+<View style={styles.yesNoRow}>
+
+  <Pressable
+    style={[
+
+      styles.yesNoButton,
+      servicesAlreadyNotified && {
+        backgroundColor:  "#16A34A",
+      },
+    ]}
+  >
+    <Text style={styles.yesNoText}>
+      Yes
+    </Text>
+  </Pressable>
+
+
+
+  <Pressable
+    style={[
+      styles.yesNoButton,
+      !servicesAlreadyNotified && {
+        backgroundColor: "#DC2626" ,
+      },
+    ]}
+  >
+    <Text style={styles.yesNoText}>
+      No
+    </Text>
+  </Pressable>
+
+</View>
+
+
+
 
       <Text style={styles.message}>
         {message}
       </Text>
+
 
       <View style={styles.actions}>
 
@@ -84,11 +143,13 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
 
+
+
   message: {
     fontSize: 15,
+    fontWeight: "600",
     textAlign: "center",
-    marginBottom: 100,
-    color: "#374151",
+    marginBottom: 15,
   },
 
   actions: {
@@ -123,5 +184,34 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#fff",
   },
+
+
+  statusQuestion: {
+  fontSize: 15,
+  fontWeight: "600",
+  marginBottom: 12,
+  marginTop: 30,
+  textAlign: "center",
+},
+
+yesNoRow: {
+  flexDirection: "row",
+  width: "100%",
+  marginBottom: 65,
+  gap: 10,
+},
+
+yesNoButton: {
+  flex: 1,
+  paddingVertical: 12,
+  borderRadius: 10,
+  backgroundColor: "#f2f3f6",
+  alignItems: "center",
+},
+
+yesNoText: {
+  fontWeight: "600",
+  color: "#111827",
+},
 
 })

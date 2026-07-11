@@ -18,6 +18,8 @@ import {
   View,
 } from "react-native"
 
+
+
 import {
   useFocusEffect,
 } from "@react-navigation/native"
@@ -40,10 +42,14 @@ type CaseItem = {
   title: string
   createdAt: string
   status: "ACTIVE" | "CLOSED"
+  locationX?: number
+  locationY?: number
+  locationLabel?: string
   files: FileItem[]
 }
 
 const setupVaultDb = () => {
+
 
 
 
@@ -90,6 +96,33 @@ const setupVaultDb = () => {
     ADD COLUMN status TEXT DEFAULT 'CLOSED';
   `)
 
+  }
+
+  if (!columnNames.includes("locationX")) {
+
+  db.execSync(`
+    ALTER TABLE vault_cases
+    ADD COLUMN locationX REAL;
+  `)
+
+}
+
+if (!columnNames.includes("locationY")) {
+
+  db.execSync(`
+    ALTER TABLE vault_cases
+    ADD COLUMN locationY REAL;
+  `)
+
+}
+
+if (!columnNames.includes("locationLabel")) {
+
+  db.execSync(`
+    ALTER TABLE vault_cases
+    ADD COLUMN locationLabel TEXT;
+  `)
+
 }
 
 
@@ -127,13 +160,13 @@ const loadCases = (): CaseItem[] => {
     ]
 
     return {
-
   id: row.id.toString(),
   title: row.title,
-  createdAt: new Date(
-    row.createdAt
-  ).toISOString(),
+  createdAt: new Date(row.createdAt).toISOString(),
   status: row.status || "CLOSED",
+  locationX: row.locationX,
+  locationY: row.locationY,
+  locationLabel: row.locationLabel,
   files,
 }
   })
@@ -171,9 +204,11 @@ export default function VaultScreen() {
 
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null)
   
-const GRID_COLUMNS = 1
-const PREVIEW_ROWS = 2
-const PREVIEW_COUNT = GRID_COLUMNS * PREVIEW_ROWS
+
+
+  const GRID_COLUMNS = 1
+  const PREVIEW_ROWS = 2
+  const PREVIEW_COUNT = GRID_COLUMNS * PREVIEW_ROWS
     
 
   useEffect(() => {
@@ -231,6 +266,7 @@ const PREVIEW_COUNT = GRID_COLUMNS * PREVIEW_ROWS
   }
 
   const renameFile = () => {
+
 
     if (
       !selectedFileId ||
@@ -453,6 +489,14 @@ const closedCases = filteredCases.filter(
     item: CaseItem
   }) => (
 
+
+
+    <Pressable
+      onPress={() => setExpandedCase(item)}
+      style={({ pressed }) => ({
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
     <ThemedView style={styles.card}>
 
       <LinearGradient
@@ -497,6 +541,8 @@ const closedCases = filteredCases.filter(
             Created {formatDate(item.createdAt)}
           </ThemedText>
 
+          
+
         </View>
 
         <Pressable
@@ -534,53 +580,16 @@ const closedCases = filteredCases.filter(
 
         </Pressable>
 
+        
+
+
+
       </LinearGradient>
 
-      <View style={styles.filesContainer}>
-
-  
-  <View style={styles.fileGrid}>
-  {item.files
-    .slice(0, PREVIEW_COUNT)
-    .map((file) => (
-      <View key={file.id} style={styles.gridFile}>
-        <Ionicons
-          name="reader-outline"
-          size={22}
-          color="#059669"
-        />
-
-        <ThemedText
-          numberOfLines={1}
-          style={styles.gridFileName}
-        >
-          {file.name}
-        </ThemedText>
-      </View>
-    ))}
-</View>
-
-  {item.files.length > PREVIEW_COUNT && (
-    <ThemedText style={styles.moreFilesText}>
-    ...
-    </ThemedText>
-  )}
-
-  <Pressable
-    onPress={() =>
-      setExpandedCase(item)
-    }
-  >
-
-    <ThemedText style={styles.showAllLink}>
-      View
-    </ThemedText>
-
-  </Pressable>
-
-</View>
+      
 
     </ThemedView>
+    </Pressable>
   )
 
   return (
@@ -771,6 +780,14 @@ const closedCases = filteredCases.filter(
       {expandedCase?.title}
     </ThemedText>
 
+    {expandedCase?.locationLabel && (
+
+  <ThemedText>
+    Location: {expandedCase.locationLabel}
+  </ThemedText>
+
+)}
+
     <FlatList
       data={expandedCase?.files || []}
       keyExtractor={(f) => f.id}
@@ -925,12 +942,15 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
 
+
+
   searchInput: {
     flex: 1,
     marginLeft: 10,
     color: "#111827",
     fontSize: 15,
   },
+
 
 
 
@@ -965,8 +985,7 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 24,
+   borderRadius: 24,
     overflow: "hidden",
     marginBottom: 18,
   },
@@ -993,7 +1012,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  caseDate: {
+  caseDate:{
     color: "rgba(255,255,255,0.8)",
     marginTop: 4,
     fontSize: 12,
@@ -1009,10 +1028,12 @@ const styles = StyleSheet.create({
     marginLeft:  10 ,
   },
 
+
+
   renameFolderBtn: {
     width: 35,
     height: 35,
-    borderRadius: 12,
+    borderRadius: 12 ,
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
@@ -1021,7 +1042,7 @@ const styles = StyleSheet.create({
 
 
   filesContainer: {
-    padding: 16,
+    padding: 16 ,
   },
 
   fileItem: {
@@ -1029,9 +1050,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#F9FAFB",
     borderRadius: 16,
-    padding: 14,
+    padding:  14,
     marginBottom: 12 ,
   },
+
+
 
   fileIconBox: {
     width: 42,
@@ -1047,6 +1070,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#111827",
   },
+
+
 
   fileType: {
     fontSize: 11,
@@ -1071,6 +1096,8 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+
+
 
   textBox: {
     width: "88%",
@@ -1106,13 +1133,15 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
 
+
+
   saveRenameText: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 15,
   },
 
-  modalHeader: {
+  modalHeader:{
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -1130,6 +1159,7 @@ const styles = StyleSheet.create({
     color: "#374151",
   },
 
+
   statusBadge: {
   alignSelf: "flex-start",
   paddingHorizontal: 10,
@@ -1146,7 +1176,7 @@ closedBadge: {
   backgroundColor: "#E5E7EB",
 },
 
-statusBadgeText: {
+statusBadgeText:  {
   fontSize: 11,
   fontWeight: "700",
   color: "#111827",
@@ -1158,6 +1188,12 @@ sectionHeader: {
   color: "#111827",
   marginBottom: 12,
   marginTop: 20,
+},
+
+viewButtonText: {
+  color: "#FFFFFF",
+  fontSize: 15,
+  fontWeight: "700",
 },
 
 
@@ -1174,7 +1210,7 @@ fileGrid: {
   gap: 50,
 },
 
-gridFile: {
+gridFile:{
   width: "30%",
   aspectRatio: 1,
   backgroundColor: "#F9FAFB",
@@ -1245,6 +1281,29 @@ addFileBtnText: {
   fontWeight: "700",
   marginLeft: 6,
 },
+
+
+
+
+folderFooter: {
+  marginTop: 18,
+  alignItems: "center",
+},
+
+viewButton: {
+  backgroundColor: "rgba(255,255,255,0.15)",
+  borderRadius: 12,
+  padding: 10,
+  marginLeft: 6,
+  alignItems: "center",
+},
+
+buttonText:  {
+  color: "white",
+  fontSize: 14,
+  
+  fontWeight: "600",
+}
 
 
 

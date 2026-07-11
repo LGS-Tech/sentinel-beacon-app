@@ -1,4 +1,5 @@
-//dashboard - specialised prompts added for each case type
+//dashboard - specialised prompts to be added for each case type
+//the continue button needs to be inactivated until prompts have been selecteed
 import React, { useEffect, useState } from "react"
 
 import {
@@ -14,9 +15,12 @@ import {
 } from "react-native"
 
 
+
+
+
 import ChatSheet from "@/components/chat"
 
-
+import DashboardMap from "@/components/dashboard-map"
 
 import IntruderMap from "@/components/intruder-map"
 
@@ -37,6 +41,7 @@ import { db } from "@/lib/db"
 
 
 
+
 //const db = SQLite.openDatabaseSync("app.db")
 
 
@@ -51,35 +56,71 @@ const defaultCoords = {
 }
 
 
-const caseQuestions: Record<string, string[]> = {
+
+
+const caseQuestions: Record<
+  string,
+  {
+    question: string
+    type: "text" | "yesno"
+  }[]
+> = {
   Fire: [
-    "Has everyone present been evacuated?",
-    "Have the fire department been contacted?",
+    {
+      question: "Has everyone present been evacuated?",
+      type: "yesno",
+    },
+    {
+      question: "Have the fire department been contacted?",
+      type: "yesno",
+    },
   ],
 
   Intruder: [
-    "Describe the intruder",
-    "Are they carrying out anti-social behaviour?",
-    "Have the police been contacted?",
+    {
+      question: "Describe the intruder",
+      type: "text",
+    },
+    {
+      question: "Are they carrying out anti-social behaviour?",
+      type: "yesno",
+    },
+    {
+      question: "Have the police been contacted?",
+      type: "yesno",
+    },
   ],
 
   Injury: [
-    "Who was injured?",
-    "Describe the injury",
-    "Have the emergency services contacted?",
-    "What medical assistance has been provided?",
+    {
+      question: "Describe the injury",
+      type: "text",
+    },
+    {
+      question: "Have the emergency services been contacted?",
+      type: "yesno",
+    },
+    {
+      question: "What medical assistance has been provided?",
+      type: "text",
+    },
   ],
 
-  Missing: [
-    "Who/what is missing?",
-    "Where and when was the last known location?",
-    "Have the police been contacted?",
-  ],
+
 
   Maintenance: [
-    "Describe the maintenance issue",
-    "Does/did it pose a danger to anyone?",
-    "Have the maintenance team been contacted?",
+    {
+      question: "Describe the maintenance issue",
+      type: "text",
+    },
+    {
+      question: "Does it pose a danger to anyone?",
+      type: "yesno",
+    },
+    {
+      question: "Have the maintenance team been contacted?",
+      type: "yesno",
+    },
   ],
 }
 
@@ -183,6 +224,52 @@ export default function HomeScreen() {
   const [showDashboard, setShowDashboard] = useState(false)
 
 
+  const [sheetExpanded, setSheetExpanded] = useState(false)
+  const [selectedMapCase, setSelectedMapCase] = useState<any | null>(null)
+
+
+
+  
+
+
+  function updateServiceStatusFromAnswer(
+  question: string,
+  answer: string
+) {
+
+  const isEmergencyQuestion =
+    question.includes("emergency services") ||
+    question.includes("fire department") ||
+    question.includes("police")
+
+  const isMaintenanceQuestion =
+    question.includes("maintenance team")
+
+
+  if (!isEmergencyQuestion && !isMaintenanceQuestion) {
+    return
+  }
+
+
+  if (isMaintenanceQuestion) {
+
+    setServiceStatus(
+      answer === "Yes"
+        ? "Notified"
+        : "Not notified"
+    )
+
+    return
+  }
+
+
+  setServiceStatus(
+    answer === "Yes"
+      ? "Notified"
+      : "Not notified"
+  )
+}
+
 
   useEffect(() => {
 
@@ -239,6 +326,7 @@ useEffect(() => {
     )
 
     updateVaultCaseData()
+    loadOpenCases()
 
     const answers = questionAnswers.filter(
       answer => answer.trim().length > 0
@@ -246,14 +334,14 @@ useEffect(() => {
 
     answers.forEach((answer, index) => {
 
-      const question =
-        caseQuestions[type][index]
+      const question =  caseQuestions[type][index].question
 
       addFeedItem(
         `${question}: ${answer}`
       )
 
       updateVaultCaseData()
+      loadOpenCases()
 
     })
 
@@ -307,6 +395,62 @@ if (result?.id) {
 }
 
   }
+
+  function openExistingCase(caseData: any) {
+
+  setCurrentVaultCaseId(caseData.id)
+
+  setCaseActive(true)
+
+  setShowDashboard(false)
+
+  setLocationConfirmed(true)
+
+  setUpdatingLocation(false)
+
+  clearFeed()
+
+  if (caseData.feed) {
+
+  caseData.feed
+    .split("\n")
+    .filter(Boolean)
+    .forEach((line: string) => {
+
+      const message =
+        line.replace(
+          /^\[[^\]]+\]\s*/,
+          ""
+        )
+
+      addFeedItem(message)
+
+    })
+
+}
+
+
+  setIncidentType(
+    caseData.title.split(" Case")[0]
+  )
+
+  setIntruderLocation(
+  caseData.locationLabel ||
+  caseData.title.split(" in ")[1] ||
+  ""
+)
+
+  setConfirmedCoords({
+  x: Number(caseData.locationX ?? defaultCoords.x),
+  y: Number(caseData.locationY ?? defaultCoords.y),
+})
+
+console.log("CASE OPENED")
+console.log("locationX:", caseData.locationX)
+console.log("locationY:", caseData.locationY)
+
+}
+
 
   function handleCloseCase() {
 
@@ -385,6 +529,7 @@ if (result?.id) {
             )
 
             updateVaultCaseData()
+            loadOpenCases()
 
             setShowCaseClosed(true)
           },
@@ -553,7 +698,7 @@ function ensureLastUpdatedColumn() {
 
       </View>
 
-      {caseActive && (
+      {caseActive && !showDashboard && (
 
       <ThemedView style={styles.alertBox}>
 
@@ -571,8 +716,15 @@ function ensureLastUpdatedColumn() {
 
           <>
             <Text style={styles.infoText}>
-              {incidentType} last seen in{" "}
-              {intruderLocation}
+              {locationConfirmed
+                ? (
+                    incidentType === "Intruder" ||
+                    incidentType === "Missing"
+                  )
+                  ? `${incidentType} last seen in ${intruderLocation}`
+                  : `${incidentType} in ${intruderLocation}`
+                : incidentType
+              }
             </Text>
 
 
@@ -600,162 +752,151 @@ function ensureLastUpdatedColumn() {
 
       <View style={styles.content}>
 
-  {(!caseActive || showDashboard) && !showMap && (
+{!caseActive && (
 
-    <View style={styles.dashboardContainer}>
+    <View style={{ flex: 1 }}>
 
-      <Text style={styles.sectionTitle}>
-        Active Cases
-      </Text>
+        <DashboardMap
+          cases={openCases}
+          selectedCase={selectedMapCase}
+          onMarkerPress={setSelectedMapCase}
+          onView={openExistingCase}
+        />
 
-      <ScrollView>
+        <Pressable
+            style={styles.floatingStartCase}
+            onPress={handleStartCase}
+        >
+            <Text style={styles.floatingStartText}>
+                Start Case
+            </Text>
+        </Pressable>
 
-        {openCases.length === 0 ? (
+        {selectedMapCase ? (
 
-          <Text style={styles.emptyText}>
-            There are no active cases
-          </Text>
+            <View
+                style={styles.bottomSheet}
+            >
+
+                <Text style={styles.sheetHeading}>
+                    {selectedMapCase.title}
+                </Text>
+
+                <Text style={styles.sheetSubHeading}>
+                    Created:{" "}
+                    {formatDate(selectedMapCase.createdAt)}
+                </Text>
+
+                <Text style={styles.sheetSubHeading}>
+                    Updated:{" "}
+                    {formatDate(selectedMapCase.lastUpdatedAt)}
+                </Text>
+
+                <Pressable
+                    style={styles.viewButton}
+                    onPress={() =>
+                        openExistingCase(selectedMapCase)
+                    }
+                >
+                    <Text style={styles.buttonText}>
+                        View
+                    </Text>
+                </Pressable>
+
+            </View>
 
         ) : (
 
-          openCases.map((item) => (
+            <Pressable
+                style={[
+                    styles.bottomSheet,
+                    sheetExpanded &&
+                        styles.bottomSheetExpanded,
+                ]}
+                onPress={() =>
+                    setSheetExpanded(!sheetExpanded)
+                }
+            >
 
-            <View
-  key={item.id}
-  style={styles.caseCard}
+                <View style={styles.sheetHandle}>
+                    <View style={styles.handleBar} />
+                </View>
+
+                <Text style={styles.sheetHeading}>
+                    Home
+                </Text>
+
+                <ScrollView>
+
+                  <Pressable
+    style={{
+        backgroundColor: "#2563EB",
+        marginTop: 18,
+        marginBottom: 20,
+        borderRadius: 12,
+        paddingVertical: 15,
+        alignItems: "center",
+    }}
+    onPress={handleStartCase}
 >
 
-  <View style={styles.caseHeaderRow}>
-
-    <View style={{ flex: 1 }}>
-
-      <Text style={styles.caseTitleCard}>
-        {item.title}
-      </Text>
-
-      <Text style={styles.caseDateCard}>
-        Last Updated:{" "}
-        {formatDate(
-          item.lastUpdatedAt ||
-          item.createdAt
-        )}
-      </Text>
-
-      <Text style={styles.caseDateCard}>
-        Created:{" "}
-        {formatDate(
-          item.createdAt
-        )}
-      </Text>
-
-    </View>
-
-    <Pressable
-      style={styles.closeCaseBtn}
-      onPress={() => {
-
-        db.runSync(
-          `
-            UPDATE vault_cases
-            SET status = 'CLOSED'
-            WHERE id = ?
-          `,
-          [item.id]
-        )
-
-        loadOpenCases()
-
-      }}
+    <Text
+        style={{
+            color: "#FFF",
+            fontWeight: "700",
+            fontSize: 17,
+        }}
     >
+        Start Case
+    </Text>
 
-      <Text style={styles.closeCaseBtnText}>
-        Close
-      </Text>
+</Pressable>
 
-    </Pressable>
 
-  </View>
+                    {openCases.map((item) => (
 
-</View>
+                        <Pressable
+                            key={item.id}
+                            style={styles.caseCard}
+                            onPress={() =>
+                                openExistingCase(item)
+                            }
+                        >
 
-          ))
+                            <Text
+                                style={
+                                    styles.caseTitleCard
+                                }
+                            >
+                                {item.title}
+                            </Text>
+
+                            <Text
+                                style={
+                                    styles.caseDateCard
+                                }
+                            >
+                                Updated{" "}
+                                {formatDate(
+                                    item.lastUpdatedAt
+                                )}
+                            </Text>
+
+                        </Pressable>
+
+                    ))}
+
+                </ScrollView>
+
+            </Pressable>
 
         )}
 
-      </ScrollView>
-
-      <View style={styles.bottomButtons}>
-
-        <Pressable
-          style={[
-            styles.actionBottomButton,
-            {
-              backgroundColor: "#2563EB",
-            },
-          ]}
-          onPress={() =>
-            setShowMap(true)
-          }
-        >
-
-          <Text style={styles.buttonText}>
-            See Map
-          </Text>
-
-        </Pressable>
-
-        <Pressable
-          style={[
-            styles.actionBottomButton,
-            {
-              backgroundColor: "#DC2626",
-            },
-          ]}
-          onPress={handleStartCase}
-        >
-
-          <Text style={styles.buttonText}>
-            Start Case
-          </Text>
-
-        </Pressable>
-
-      </View>
-
     </View>
 
-  )}
+)}
 
-  {(!caseActive || showDashboard) && showMap && (
-
-    <View style={{ flex: 1 }}>
-
-      <Pressable
-        style={styles.mapBackBtn}
-        onPress={() =>
-          setShowMap(false)
-        }
-      >
-
-        <Text>
-          ← Back
-        </Text>
-
-      </Pressable>
-
-      <IntruderMap
-        key={mapRefreshKey}
-        floorPlan={floorPlan}
-        updateMode={false}
-        selectedCoords={confirmedCoords}
-        showMarker={false}
-      />
-
-    </View>
-
-  )}
-
-  {caseActive && !showDashboard && (
+{caseActive && (
 
     <>
 
@@ -769,12 +910,9 @@ function ensureLastUpdatedColumn() {
             selectedCoords || confirmedCoords
           }
           showMarker={
-            selectedCoords !== null ||
-            (
-              caseActive &&
-              intruderLocation.length > 0
-            )
-          }
+  selectedCoords !== null ||
+  locationConfirmed
+}
           onMapPress={(coords) => {
 
             if (updatingLocation) {
@@ -866,7 +1004,7 @@ function ensureLastUpdatedColumn() {
 
                 <Pressable
                   style={[
-                    styles.actionButton,
+                    styles.redButton,
                     styles.feedButton,
                   ]}
                   onPress={() =>
@@ -876,7 +1014,7 @@ function ensureLastUpdatedColumn() {
 
                   <Text
                     style={
-                      styles.actionButtonText
+                      styles.buttonText
                     }
                   >
                     Live Feed
@@ -910,7 +1048,7 @@ function ensureLastUpdatedColumn() {
                   styles.redButton,
                   {
                     backgroundColor:
-                      "#2563EB",
+                      "#ffffff",
                     marginTop: 10,
                   },
                 ]}
@@ -937,21 +1075,23 @@ function ensureLastUpdatedColumn() {
 
               <View style={styles.caseBottomRow}>
 
-  <Pressable
-    style={[
-      styles.caseBottomButton,
-      {
-        backgroundColor: "#4c6186",
-      },
-    ]}
-    onPress={() => {
+              <Pressable
+                style={[
+                  styles.caseBottomButton,
+                  {
+                    backgroundColor: "#ffffff",
+                  },
+                ]}
+                onPress={() => {
 
-      loadOpenCases()
+      
 
-      setShowDashboard(true)
+                  setCaseActive(false)
+                  setSelectedMapCase(null)
+                  loadOpenCases()
 
-    }}
-  >
+                }}
+              >
 
     <Text style={styles.buttonText}>
       Home
@@ -963,7 +1103,7 @@ function ensureLastUpdatedColumn() {
     style={[
       styles.caseBottomButton,
       {
-        backgroundColor: "#6B7280",
+        backgroundColor: "#ffffff",
       },
     ]}
     onPress={handleCloseCase}
@@ -1020,6 +1160,10 @@ function ensureLastUpdatedColumn() {
               ? "Maintenance"
               : "Emergency"
           }
+          servicesAlreadyNotified={
+            serviceStatus.includes("Notified") &&
+            !serviceStatus.includes("Not notified")
+          }
           onCancel={() => {
             setPoliceModalVisible(false)
           }}
@@ -1038,6 +1182,7 @@ function ensureLastUpdatedColumn() {
           )
 
           updateVaultCaseData()
+          loadOpenCases()
 
           setPoliceModalVisible(false)
           }}
@@ -1072,48 +1217,68 @@ function ensureLastUpdatedColumn() {
               What describes the situation?
             </Text>
 
+            <Text style={styles.modalSubtitle}>
+              Choose the option that best describes your report
+            </Text>
+
             {[
-              "Fire",
-              "Intruder",
-              "Injury",
-              "Missing",
-              "Maintenance",
-            ].map((type) => (
+              {
+                label: "Fire",
+                icon: "🔥",
+              },
+              {
+                label: "Intruder",
+                icon: "🚨",
+              },
+              {
+                label: "Injury",
+                icon: "🩹",
+              },
+              {
+                label: "Maintenance",
+                icon: "🔧",
+              },
+            ].map((item) => (
 
               <Pressable
-                key={type}
-                style={[
-                  styles.modalButton,
-                  {
-                    backgroundColor: "#2563EB",
-                    marginTop: 10,
-                  },
-                ]}
+                key={item.label}
+                style={styles.situationCard}
                 onPress={() => {
 
-                  setSelectedCaseType(type)
-
+                  setSelectedCaseType(item.label)
                   setQuestionAnswers(["", ""])
 
                   setShowSituationModal(false)
-
                   setShowQuestionModal(true)
 
                 }}
               >
 
-                <Text style={styles.modalButtonText}>
-                  {type}
+                <View style={styles.situationLeft}>
+
+                  <Text style={styles.situationEmoji}>
+                    {item.icon}
+                  </Text>
+
+                  <Text style={styles.situationText}>
+                    {item.label}
+                  </Text>
+
+                </View>
+
+                <Text style={styles.chevron}>
+                  ›
                 </Text>
 
               </Pressable>
+
             ))}
 
             <Pressable
               style={[
                 styles.modalButton,
                 {
-                  backgroundColor: "#6B7280",
+                  backgroundColor: "#d9dbdd",
                   marginTop: 16,
                 },
               ]}
@@ -1153,41 +1318,112 @@ function ensureLastUpdatedColumn() {
               </Text>
 
               {(caseQuestions[selectedCaseType] || [])
-                .map((question, index) => (
+                .map((item, index) => (
 
                   <View
-                    key={question}
+                    key={item.question}
                     style={{ marginBottom: 16 }}
                   >
 
                     <Text style={styles.questionLabel}>
-                      {question}
+                      {item.question}
                     </Text>
 
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter response..."
-                      placeholderTextColor="#999"
-                      value={questionAnswers[index] || ""}
-                      onChangeText={(text) => {
+                    {item.type === "yesno" ? (
 
-                        const updated = [...questionAnswers]
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 10,
+                        }}
+                      >
 
-                        updated[index] = text
+                        <Pressable
+                          style={[
+                            styles.yesNoButton,
+                            questionAnswers[index] === "Yes" && {
+                              backgroundColor: "#34b864",
+                            },
+                          ]}
+                          onPress={() => {
 
-                        setQuestionAnswers(updated)
+                            const updated = [...questionAnswers]
 
-                      }}
-                    />
+                            updated[index] = "Yes"
 
-                  </View>
-                ))}
+                            setQuestionAnswers(updated)
+
+                            updateServiceStatusFromAnswer(
+                              item.question,
+                              "Yes"
+                            )
+                          }}
+                        >
+      <Text style={styles.modalButtonText}>
+        Yes
+      </Text>
+    </Pressable>
+
+    <Pressable
+      style={[
+        styles.yesNoButton,
+        questionAnswers[index] === "No" && {
+          backgroundColor: "#e13f3f",
+        },
+      ]}
+      onPress={() => {
+
+        const updated = [...questionAnswers]
+
+        updated[index] = "No"
+
+        setQuestionAnswers(updated)
+
+        updateServiceStatusFromAnswer(
+          item.question,
+          "No"
+        )
+
+      }}
+    >
+        <Text style={styles.modalButtonText}>
+          No
+        </Text>
+    </Pressable>
+
+  </View>
+
+) : (
+
+  <TextInput
+    style={styles.input}
+    placeholder="Enter response..."
+    placeholderTextColor="#999"
+    value={questionAnswers[index] || ""}
+    onChangeText={(text) => {
+
+      const updated = [...questionAnswers]
+
+      updated[index] = text
+
+      setQuestionAnswers(updated)
+
+    }}
+  />
+
+)}
+
+              </View>
+              )
+              )}
+
+              
 
               <Pressable
                 style={[
                   styles.modalButton,
                   {
-                    backgroundColor: "#16A34A",
+                    backgroundColor: "#64c982",
                     marginTop: 10,
                   },
                 ]}
@@ -1204,6 +1440,20 @@ function ensureLastUpdatedColumn() {
                   Continue
                 </Text>
 
+              </Pressable>
+
+              <Pressable
+                style={styles.backButton}
+                onPress={() => {
+
+                  setShowQuestionModal(false)
+                  setShowSituationModal(true)
+
+                }}
+              >
+                <Text style={styles.backButtonText}>
+                  Back
+                </Text>
               </Pressable>
 
             </ScrollView>
@@ -1247,7 +1497,7 @@ function ensureLastUpdatedColumn() {
               style={[
                 styles.modalButton,
                 {
-                  backgroundColor: "#16A34A",
+                  backgroundColor: "#71d795",
                   marginTop: 15,
                 },
               ]}
@@ -1271,30 +1521,49 @@ function ensureLastUpdatedColumn() {
 
                 setIntruderLocation(cleanLabel)
 
-                if (currentVaultCaseId) {
-
-                  db.runSync(
-    `
-                    UPDATE vault_cases
-                    SET 
-                      title = ?,
-                      lastUpdatedAt = ?
-                    WHERE id = ?
-                    `,
-                    [
-                      `${incidentType} Case in ${cleanLabel}`,
-                      Date.now(),
-                      currentVaultCaseId,
-                    ]
-                  )
-
-                }
+                
 
                 saveLocation(
                   coords.x,
                   coords.y,
                   cleanLabel
                 )
+
+                const activeCase = db.getFirstSync(
+  `
+                  SELECT vaultCaseId
+                  FROM active_case
+                  WHERE id = 1
+  `
+                ) as { vaultCaseId: number } | null
+
+
+                if (activeCase) {
+
+                  db.runSync(
+    `
+                    UPDATE vault_cases
+                      SET
+                        title = ?,
+                        locationX = ?,
+                        locationY = ?,
+                        locationLabel = ?,
+                        lastUpdatedAt = ?
+                      WHERE id = ?
+    `                 ,
+                      [
+      `                 ${incidentType} Case in ${cleanLabel}`,
+                        coords.x,
+                        coords.y,
+                        cleanLabel,
+                        Date.now(),
+                        activeCase.vaultCaseId,
+                      ]
+                  )
+
+                  loadOpenCases()
+                  setCurrentVaultCaseId(activeCase.vaultCaseId)
+                }
 
                 addFeedItem(
                   intruderLocation
@@ -1303,6 +1572,7 @@ function ensureLastUpdatedColumn() {
                 )
 
                 updateVaultCaseData()
+                loadOpenCases()
 
                 setMapRefreshKey(
                   prev => prev + 1
@@ -1363,20 +1633,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 14,
-    backgroundColor: "#1F2937",
+    backgroundColor: "#e3e3e3",
     borderLeftWidth: 8,
-    borderLeftColor: "#DC2626",
+    borderLeftColor: "#b6b6b6",
     alignItems: "center",
   },
 
   alertText: {
-    color: "#FCA5A5",
-    fontSize: 16,
+    color: "#c41313",
+    fontSize: 18,
     fontWeight: "700",
   },
 
   infoText: {
-    color: "#fff",
+    color: "#000000",
     fontSize: 16,
     fontWeight: "600",
   },
@@ -1387,7 +1657,7 @@ const styles = StyleSheet.create({
   },
 
   smallText: {
-    color: "#fff",
+    color: "#000000",
     fontSize: 15,
     fontWeight: "600",
   },
@@ -1398,7 +1668,7 @@ const styles = StyleSheet.create({
   },
 
   blueText: {
-    color: "#60A5FA",
+    color: "#000000",
     fontSize: 15,
   },
 
@@ -1425,7 +1695,7 @@ const styles = StyleSheet.create({
   },
 
   handle: {
-    backgroundColor: "#111827",
+    backgroundColor: "#e3e3e3",
     alignItems: "center",
     paddingVertical: 8,
     borderTopLeftRadius: 18,
@@ -1441,7 +1711,7 @@ const styles = StyleSheet.create({
   },
 
   handleLabel: {
-    color: "#D1D5DB",
+    color: "#000000",
     fontSize: 12,
     fontWeight: "600",
   },
@@ -1449,7 +1719,7 @@ const styles = StyleSheet.create({
 
 
   actionsBox: {
-    backgroundColor: "#111827",
+    backgroundColor: "#ebeaea",
     padding: 12 ,
   },
 
@@ -1468,16 +1738,25 @@ const styles = StyleSheet.create({
   },
 
   feedButton: {
-    backgroundColor: "#075B44",
+    backgroundColor: "#ffffff",
   },
 
   actionButtonText: {
-    color: "#fff",
+    color: "#000000",
     fontWeight: "600",
   },
 
   redButton: {
     width: "100%",
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+  },
+
+  viewButton: {
+    width: "100%",
+    marginTop: 30,
     paddingVertical: 10,
     borderRadius: 12,
     backgroundColor: "#DC2626",
@@ -1495,7 +1774,7 @@ const styles = StyleSheet.create({
   },
 
   buttonText: {
-    color: "#fff",
+    color: "#000000",
     fontWeight: "700",
     fontSize: 20,
   },
@@ -1508,34 +1787,33 @@ const styles = StyleSheet.create({
   },
 
   modalBox: {
-    width: "85%",
-    maxHeight: "75%",
-    backgroundColor: "#1F2937",
-    padding: 20,
-    borderRadius: 16,
+    width: "90%",
+    backgroundColor: "#F5F5F5",
+    borderRadius: 28,
+    padding: 24,
   },
 
   modalTitle: {
-    color: "#fff",
+    color: "#000000",
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 10,
   },
 
   questionLabel: {
-    color: "#D1D5DB",
+    color: "#545454",
     fontSize: 14,
     marginBottom: 6,
     fontWeight: "600",
   },
 
   input: {
-    backgroundColor: "#111827",
-    color: "#fff",
+    backgroundColor: "#e2e0e0",
+    color: "#000000",
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#374151",
+    borderColor: "#d4d4d4",
   },
 
   modalButton: {
@@ -1545,7 +1823,7 @@ const styles = StyleSheet.create({
   },
 
   modalButtonText: {
-    color: "#fff",
+    color: "#000000",
     fontWeight: "600",
   },
 
@@ -1646,6 +1924,163 @@ caseBottomButton: {
   paddingVertical: 10,
   borderRadius: 12,
   alignItems: "center",
+},
+
+
+yesNoButton: {
+  flex: 1,
+  paddingVertical: 12,
+  borderRadius: 10,
+  backgroundColor: "#d8d8d8",
+  alignItems: "center",
+},
+
+floatingStartCase: {
+    position: "absolute",
+
+    bottom: 120,
+    right: 24,
+
+    backgroundColor: "#2563EB",
+
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+
+    borderRadius: 28,
+
+    elevation: 8,
+},
+
+floatingStartText: {
+    color: "#FFF",
+    fontWeight: "700",
+    fontSize: 16,
+},
+
+bottomSheet: {
+    position: "absolute",
+
+    left: 0,
+    right: 0,
+    bottom: 0,
+
+    height: 220,
+
+    backgroundColor: "#f8f8f8",
+
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+
+    padding: 18,
+},
+
+bottomSheetExpanded: {
+    height: "60%",
+},
+
+sheetHandle: {
+    alignItems: "center",
+    marginBottom: 12,
+},
+
+handleBar: {
+    width: 48,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#C8C8C8",
+},
+
+sheetHeading: {
+    fontSize: 23,
+    fontWeight: "700",
+    marginBottom: 16,
+    marginTop: 16,
+    color: "#070707",
+},
+
+sheetSubHeading: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#5a5959",
+},
+
+
+
+situationCard: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 18,
+
+  paddingHorizontal: 18,
+  paddingVertical: 18,
+
+  marginBottom: 14,
+
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+
+  borderWidth: 1,
+  borderColor: "#E5E7EB",
+},
+
+situationLeft: {
+  flexDirection: "row",
+  alignItems: "center",
+},
+
+situationEmoji: {
+  fontSize: 24,
+  marginRight: 14,
+},
+
+situationText: {
+  fontSize: 17,
+  fontWeight: "600",
+  color: "#111827",
+},
+
+chevron: {
+  fontSize: 28,
+  color: "#9CA3AF",
+  fontWeight: "300",
+},
+
+modalSubtitle: {
+  color: "#000000",
+  fontSize: 14,
+  marginTop: 6,
+  marginBottom: 24,
+},
+
+cancelButton: {
+  marginTop: 10,
+  backgroundColor: "#E5E7EB",
+  borderRadius: 16,
+  alignItems: "center",
+  paddingVertical: 15,
+},
+
+cancelButtonText: {
+  color: "#374151",
+  fontWeight: "700",
+  fontSize: 16,
+},
+
+
+
+
+backButton: {
+  marginTop: 12,
+  paddingVertical: 12,
+  borderRadius: 12,
+  backgroundColor: "#E5E7EB",
+  alignItems: "center",
+},
+
+backButtonText: {
+  color: "#374151",
+  fontWeight: "700",
+  fontSize: 16,
 },
 
 

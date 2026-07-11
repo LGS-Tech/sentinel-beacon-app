@@ -1,3 +1,5 @@
+// OLD FILE - KEEPING FOR REFERENCE
+
 export type VaultFile = {
   id: string
   name: string

@@ -1,6 +1,8 @@
-// Chat panel used by staff to coordinate in real time
+//  NOW OBSOLETE - KEEPING FOR JST IN CASE
 
-import React, { useEffect, useRef, useState } from "react"
+
+//chat - gotta make it differentiate a bit more from vault UI, also need to get rid of the seconds timestamp
+import React, { useCallback, useEffect, useState } from "react"
 
 import {
   FlatList,
@@ -8,198 +10,386 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
+  View
 } from "react-native"
 
-//import * as SQLite from "expo-sqlite"
+
+
+
 
 import { Ionicons } from "@expo/vector-icons"
+import { useFocusEffect } from "@react-navigation/native"
 
-import { db } from "@/lib/db"
 //const db = SQLite.openDatabaseSync("app.db")
+import { db } from "@/lib/db"
 
-type Message = {
+
+type CaseItem = {
   id: string
-  name: string
-  text: string
-  time: string
+  title: string
+  status: string
+  date: string
 }
 
-// ensure table exists
-const ensureChatTable = () => {
-  db.execSync(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT,
-      text TEXT,
-      createdAt INTEGER
-    );
-  `)
-}
 
-// clear all messages
-export const clearMessages = () => {
-  db.runSync("DELETE FROM messages")
-}
 
-// load messages (oldest → newest)
-const loadMessages = (): Message[] => {
+
+
+function loadCases(): CaseItem[] {
+
+
   const rows = db.getAllSync(
-    "SELECT * FROM messages ORDER BY createdAt ASC"
+    `
+      SELECT *
+      FROM vault_cases
+      ORDER BY createdAt DESC
+    `
+
   ) as any[]
 
-  return rows.map((row) => {
-
-    const date = new Date(row.createdAt)
-
-    const hours =
-      String(date.getHours()).padStart(2, "0")
-
-    const mins =
-      String(date.getMinutes()).padStart(2, "0")
-
-    return {
-      id: row.id.toString(),
-      name: row.name,
-      text: row.text,
-      time: `${hours}:${mins}`,
-    }
-
-  })
+  return rows.map((row) => ({
+    id: row.id.toString(),
+    title: row.title,
+    status: row.status,
+    date: new Date(
+      row.createdAt
+    ).toLocaleDateString(
+      "en-GB",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    ),
+  }))
 }
 
-// export all chat messages for vault saving
-export const getAllMessages = () => {
-  const rows = db.getAllSync(
-    "SELECT * FROM messages ORDER BY createdAt ASC"
-  ) as any[]
 
-  return rows
+
+
+export default function ChatTab() {
+
+  const [cases, setCases] = useState<CaseItem[]>([])
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
+  const [selectedCaseChat, setSelectedCaseChat] =useState("")
+  const [messages, setMessages] = useState<any[]>([])
+  const [inputText, setInputText] = useState("")
+  const [caseChat, setCaseChat] = useState("")
+
+
+  const [showAllCases, setShowAllCases] = useState(false)
+
+
+  function refreshCases() {
+    setCases(loadCases())
+  }
+
+  function loadCaseChat(caseId: string) {
+
+  const row = db.getFirstSync(
+    `
+      SELECT chat
+      FROM vault_cases
+      WHERE id = ?
+    `,
+    [caseId]
+  ) as any
+
+  setCaseChat(row?.chat || "")
 }
 
-// add message
-export const addMessageToDb = (
-  name: string,
-  text: string
-) => {
+
+function loadCaseMessages(caseId: string) {
+
+  const row = db.getFirstSync(
+    `
+      SELECT chat
+      FROM vault_cases
+      WHERE id = ?
+    `,
+    [caseId]
+  ) as any
+
+  if (!row?.chat) {
+    return []
+  }
+
+  return row.chat
+    .split("\n")
+    .filter(Boolean)
+    .map((line: string, index: number) => ({
+
+      id: index.toString(),
+
+      text: line,
+
+    }))
+}
+
+function handleSend() {
+  if (!inputText.trim()) {
+    return
+  }
+
+  const selectedCase = cases.find(
+    c => c.id === selectedCaseId
+  )
+
+  if (
+    !selectedCase ||
+    selectedCase.status === "CLOSED"
+  ) {
+    return
+  }
+
+  const timestamp = new Date().toLocaleTimeString(
+  "en-GB",
+  {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }
+)
+
+
+
+const newLine =
+  `[${timestamp}] Mr C Wallace: ${inputText.trim()}`
+
+  const row = db.getFirstSync(
+    `
+      SELECT chat
+      FROM vault_cases
+      WHERE id = ?
+    `,
+    [selectedCaseId]
+  ) as any
+
+  const updatedChat =
+    row?.chat
+      ? `${row.chat}\n${newLine}`
+      : newLine
 
   db.runSync(
     `
-      INSERT INTO messages
-      (name, text, createdAt)
-      VALUES (?, ?, ?)
+      UPDATE vault_cases
+      SET 
+        chat = ?,
+        lastUpdatedAt = ?
+      WHERE id = ?
     `,
-    [name, text, Date.now()]
+    [
+      updatedChat,
+      Date.now(),
+      selectedCaseId,
+    ]
   )
 
+  setMessages(
+    loadCaseMessages(selectedCaseId!)
+  )
+
+  setInputText("")
 }
 
-export default function ChatSheet() {
 
-  const [messages, setMessages] =
-    useState<Message[]>([])
 
-  const [inputText, setInputText] =
-    useState("")
-
-  const listRef =
-    useRef<FlatList>(null)
-
-  const inputRef =
-    useRef<TextInput>(null)
+  // initial load
+  useEffect(() => {
+    refreshCases()
+  }, [])
 
   useEffect(() => {
 
-    ensureChatTable()
+  if (selectedCaseId) {
 
-    setMessages(loadMessages())
-
-    // auto focus input when sheet opens
-    setTimeout(() => {
-      inputRef.current?.focus()
-    }, 250)
-
-  }, [])
-
-  const refreshMessages = () => {
-
-    const data = loadMessages()
-
-    setMessages(data)
-
-  }
-
-  const handleSend = () => {
-
-    if (!inputText.trim()) return
-
-    const text = inputText.trim()
-
-    addMessageToDb(
-      "Mr C Wallace",
-      text
+    setMessages(
+      loadCaseMessages(selectedCaseId)
     )
-    
-
-    refreshMessages()
-
-    setInputText("")
-
-    // keep keyboard + focus active
-    setTimeout(() => {
-      inputRef.current?.focus()
-    }, 50)
 
   }
 
-  return (
-    <View style={styles.container}>
+}, [selectedCaseId])
 
-      <Text style={styles.title}>
-        Team Chat
-      </Text>
+  // IMPORTANT: refresh every time you come back to this tab
+  useFocusEffect(
+    useCallback(() => {
+      refreshCases()
+    }, [])
+  )
 
-      <FlatList
-        ref={listRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.messages}
-        renderItem={({ item }) => (
+  const visibleCases = showAllCases
+  ? [
+      ...cases.filter(c => c.status === "ACTIVE"),
+      ...cases.filter(c => c.status === "CLOSED"),
+    ]
+  : cases.filter(c => c.status === "ACTIVE")
 
-          <View style={styles.messageBlk}>
+  const openCases = cases.filter(
+  c => c.status === "ACTIVE"
+)
 
-            <Text style={styles.name}>
-              {item.name}
-            </Text>
 
-            <View style={styles.messageRow}>
+  // list of the conversations before specific one  picked
+  if (!selectedCaseId) {
+    if (cases.length === 0) {
+      return (
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyTitle}>No Cases</Text>
+          <Text style={styles.emptyText}>
+            There are currently no active cases.
+          </Text>
+        </View>
+      )
+    }
 
-              <Text style={styles.messageTxt}>
-                {item.text}
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Conversations</Text>
+
+        <Pressable
+        onPress={() =>setShowAllCases(!showAllCases)}
+      >
+        <Text style={styles.toggleLink}>
+          {showAllCases
+          ? "Show Active"
+          : "Show All"}
+
+        </Text>
+      </Pressable>
+
+        <FlatList
+          data={visibleCases}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <Pressable
+              style={[
+                styles.caseCard,
+                item.status === "CLOSED" && {
+                  opacity: 0.5,
+                },
+              ]}
+              onPress={() => {
+                loadCaseChat(item.id)
+                setSelectedCaseId(item.id)
+              }}
+            >
+            <View style={styles.row}>
+              <Text style={styles.caseTitle}>
+                {item.title}
               </Text>
 
-              <Text style={styles.time}>
-                {item.time}
-              </Text>
-
+              <View
+                style={[
+                  styles.statusBadge,
+                  item.status === "ACTIVE"
+                  ? styles.openBadge
+                  : styles.closedBadge,
+                ]}
+              >
+                <Text style={styles.statusText}>
+                  {item.status}
+                </Text>
+              </View>
             </View>
 
-          </View>
-
+            <Text style={styles.date}>
+              {item.date}
+            </Text>
+          </Pressable>
         )}
-        style={{ flex: 1 }}
-        onContentSizeChange={() => {
+        ListEmptyComponent={() => (
 
-          listRef.current?.scrollToEnd({
-            animated: true,
-          })
+          !showAllCases ? (
 
+          <Text
+            style={styles.noOpenCasesText}
+          >
+            There are no active conversations
+          </Text>
+
+        ) : null
+
+      )}
+    />
+      </View>
+    )
+  }
+
+
+
+  // the actual chat view
+  const selectedCase = cases.find(
+    (c) => c.id === selectedCaseId
+  )
+
+  return (
+  <View style={styles.chatContainer}>
+
+    <Pressable
+      onPress={() => setSelectedCaseId(null)}
+      style={styles.backButton}
+    >
+      <Text style={styles.backText}>
+        ← Conversations
+      </Text>
+
+      
+
+
+
+
+    </Pressable>
+
+    <Text style={styles.chatTitle}>
+      {selectedCase?.title}
+    </Text>
+
+    <FlatList
+      data={messages}
+      keyExtractor={(item) => item.id}
+      renderItem={({ item }) => (
+
+        <View style={styles.messageBlk}>
+
+          <Text style={styles.messageTxt}>
+            {item.text}
+          </Text>
+
+        </View>
+
+      )}
+      style={{ flex: 1 }}
+      ListEmptyComponent={() => (
+
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          marginTop: 120,
         }}
-      />
+      >
+
+        <Text
+          style={{
+            color: "#9CA3AF",
+            fontSize: 16,
+            fontWeight: "600",
+          }}
+        >
+          No chat history
+        </Text>
+
+      </View>
+
+    )}
+  />
+
+    {selectedCase?.status === "ACTIVE" && (
 
       <View style={styles.inputBar}>
 
-        {/* camera button */}
         <Pressable style={styles.cameraBtn}>
 
           <Ionicons
@@ -210,97 +400,204 @@ export default function ChatSheet() {
 
         </Pressable>
 
-        {/* message input */}
         <TextInput
-          ref={inputRef}
-          placeholder="Type a message…"
+          placeholder="Type a message..."
           style={styles.input}
           placeholderTextColor="#888"
           value={inputText}
           onChangeText={setInputText}
           onSubmitEditing={handleSend}
           returnKeyType="send"
-          blurOnSubmit={false}
         />
 
       </View>
 
-    </View>
-  )
+    )}
+
+  </View>
+)
 }
 
-const styles = StyleSheet.create({
 
+
+
+const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: 60,
+    backgroundColor: "#F5F7FA",
   },
 
-  title: {
-    fontSize: 22,
+  title:  {
+    fontSize: 24,
     fontWeight: "700",
+    marginBottom: 16,
+  },
+
+  caseCard: {
+    backgroundColor: "#FFF",
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 12,
+    elevation: 2,
+  },
+
+
+
+  row:  {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  caseTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    flex: 1,
+  },
+
+  date: {
+    marginTop: 8,
+    color: "#6B7280",
+    fontSize: 13,
+  },
+
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+
+  openBadge: {
+    backgroundColor: "#DCFCE7",
+  },
+
+  closedBadge: {
+    backgroundColor: "#E5E7EB",
+  },
+
+  statusText: {
+    fontWeight: "700",
+    fontSize: 11,
+  },
+
+
+
+
+
+  emptyWrap: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 30,
+  },
+
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+
+  emptyText: {
+    textAlign: "center",
+    color: "#6B7280",
+    fontSize: 15,
+  },
+
+
+  chatContainer: {
+    flex: 1,
+    backgroundColor: "#f0efef",
+    paddingTop: 60,
+    paddingHorizontal: 16,
+  },
+
+  backButton: {
     marginBottom: 12,
   },
 
-  messages: {
-    paddingBottom: 12,
+  backText: {
+    color: "#60A5FA",
+    fontSize: 14 ,
+    fontWeight: "600",
+  },
+
+
+
+
+  chatTitle: {
+    color: "#000000",
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
+
+  chatHint: {
+    color: "#9CA3AF",
+    fontSize: 14,
   },
 
   messageBlk: {
-    marginBottom: 14,
-  },
+  marginBottom: 12,
+  backgroundColor: "#dedede",
+  padding: 12,
+  borderRadius: 10 ,
+},
 
-  name: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#444",
-    marginBottom: 4,
-  },
 
-  messageRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-  },
+messageTxt: {
+  color: " #181818",
+  fontSize: 14,
+},
 
-  messageTxt: {
-    flex: 1,
-    fontSize: 15,
-    color: "#222",
-    marginRight: 8,
-  },
 
-  time: {
-    fontSize: 12,
-    color: "#999",
-  },
 
-  inputBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#E1E5EA",
-    paddingTop: 10,
-  },
+inputBar: {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingTop: 10,
+  paddingBottom: 10,
+  borderTopWidth: 1,
+  borderTopColor: "#374151",
+},
 
-  cameraBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#F1F3F6",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
+cameraBtn: {
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  backgroundColor: "#ffffff",
+  justifyContent: "center",
+  alignItems: "center",
+  marginRight: 10,
+},
 
-  input: {
-    flex: 1,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#F1F3F6",
-    paddingHorizontal: 16,
-    fontSize: 15,
-    color: "#000",
-  },
+input: {
+  flex: 1,
+  height: 44,
+  borderRadius: 22 ,
+  backgroundColor: "#ffffff",
+  paddingHorizontal: 16,
+  color: "#000",
+},
 
-})
+toggleLink: {
+  color: "#2563EB",
+  fontSize: 15,
+  fontWeight: "600",
+  marginBottom: 16,
+},
+
+noOpenCasesText:{
+  textAlign: "center",
+  color: "#6B7280",
+  marginTop: 20,
+  fontSize: 15,
+  
+},
+
+
+
+
+}
+)

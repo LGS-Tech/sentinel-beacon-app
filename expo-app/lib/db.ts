@@ -10,10 +10,11 @@ let sqlite: any = null;
 if (!isWeb) {
 
   try {
-    const SQLite = eval("require")("expo-sqlite");
+    //const SQLite = eval("require")("expo-sqlite");
+    const SQLite = require("expo-sqlite");
     sqlite = SQLite.openDatabaseSync("app.db");
   } catch (error) {
-    
+
     console.log("SQLite unavailable", error);
   }
 }
@@ -27,7 +28,7 @@ export const db = {
   },
 
   runSync: (...args: any[]) => {
-    if (!sqlite) return;
+    if (!sqlite) return ;
     return sqlite.runSync(...args);
   },
 
@@ -37,7 +38,7 @@ export const db = {
   },
 
   getAllSync: (...args: any[]) => {
-    if (!sqlite) return [];
+    if (!sqlite) return [] ;
     return sqlite.getAllSync(...args);
   },
 

@@ -1,4 +1,4 @@
-// actually usable bottom sheet (clean + draggable)
+// a reusable  bottom sheet for dashboard purposes
 
 import React, { useEffect, useRef } from "react"
 import {
@@ -11,13 +11,19 @@ import {
   View,
 } from "react-native"
 
+
+
+
+
 const SCREEN_HEIGHT = Dimensions.get("window").height
 
 type BottomSheetProps = {
   visible: boolean
-  onClose: () => void
+  onClose: () =>  void
   children: React.ReactNode
 }
+
+
 
 export default function BottomSheet({
   visible,
@@ -27,7 +33,7 @@ export default function BottomSheet({
 
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current
 
-  // open / close animation
+   //opening and closing ani
   useEffect(() => {
     if (visible) {
       Animated.timing(translateY, {
@@ -38,14 +44,14 @@ export default function BottomSheet({
     } else {
       Animated.timing(translateY, {
         toValue: SCREEN_HEIGHT,
-        duration: 200,
+        duration: 200 ,
         useNativeDriver: true,
       }).start()
     }
   }, [visible])
 
 
-  // drag handling
+  // dragging
   const panResponder = useRef(
     PanResponder.create({
 
@@ -54,15 +60,20 @@ export default function BottomSheet({
       },
 
       onPanResponderMove: (_, gesture) => {
-        if (gesture.dy > 0) {
+        if (gesture.dy  > 0 ) {
           translateY.setValue(gesture.dy)
         }
       },
 
+
+
+
       onPanResponderRelease: (_, gesture) => {
+
 
         if (gesture.dy > 120) {
           onClose()
+
         } else {
           Animated.spring(translateY, {
             toValue: 0,
@@ -71,11 +82,18 @@ export default function BottomSheet({
         }
 
       },
-    })
+
+    }
+  )
   ).current
 
 
+
+
+
+
   return (
+
     <Modal
       visible={visible}
       transparent
@@ -94,7 +112,7 @@ export default function BottomSheet({
         ]}
       >
 
-        {/* drag zone */}
+        {/*drag zone*/ }
         <View {...panResponder.panHandlers} style={styles.dragZone}>
           <View style={styles.handle} />
         </View>
@@ -111,12 +129,15 @@ export default function BottomSheet({
 }
 
 
-const styles = StyleSheet.create({
 
+
+
+const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
   },
+
 
   sheet: {
     position: "absolute",
@@ -133,8 +154,9 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
 
+
   dragZone: {
-    height: 50,
+    height: 50 ,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -147,7 +169,14 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    flex: 1,
+    flex: 1 , 
+
   },
 
-})
+
+
+
+
+}
+
+)
