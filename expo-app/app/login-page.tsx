@@ -1,5 +1,7 @@
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  Image,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -9,49 +11,71 @@ import {
 } from "react-native";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("");
+  const router = useRouter();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.logoText}>Name</Text>
-        <Text style={styles.subtitle}>Fire & Intrusion Detection System</Text>
-      </View>
+      <Image
+        source={require("../assets/LGS-logo.png")}
+        style={styles.logo}
+        resizeMode="contain"
+      />
 
-      {/* Card */}
-      <View style={styles.card}>
-        <Text style={styles.title}>Login</Text>
+      <Text style={styles.appTitle}>LGS Tech</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Username"
-          placeholderTextColor="#9CA3AF"
-          value={username}
-          onChangeText={setUsername}
-        />
+      {/* Email */}
+      <TextInput
+        style={styles.input}
+        placeholder="University Email"
+        placeholderTextColor="#999"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+      />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#9CA3AF"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+      {/* Password */}
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        placeholderTextColor="#999"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+      />
 
-        <Pressable style={styles.button}>
-          <Text style={styles.buttonText}>Sign In</Text>
+      {/* Remember + Forgot */}
+      <View style={styles.optionsRow}>
+        <Pressable
+          style={styles.rememberContainer}
+          onPress={() => setRemember(!remember)}
+        >
+          <View style={[styles.checkbox, remember && styles.checkboxChecked]} />
+          <Text style={styles.rememberText}>Remember Me</Text>
         </Pressable>
 
         <Pressable>
-          <Text style={styles.forgot}>Forgot password?</Text>
+          <Text style={styles.forgotText}>Forgot Password?</Text>
         </Pressable>
       </View>
 
-      {/* Footer */}
-      <Text style={styles.footer}>Secure access only</Text>
+      {/* Login */}
+      <Pressable style={styles.loginButton}>
+        <Text style={styles.loginText}>Login</Text>
+      </Pressable>
+
+      {/* Create Account */}
+      <Pressable
+        style={styles.createButton}
+        onPress={() => router.push("/registerPage")}
+      >
+        <Text style={styles.createText}>Create Account</Text>
+      </Pressable>
+
+      {/* Version */}
+      <Text style={styles.version}>v1.0.0</Text>
     </SafeAreaView>
   );
 }
@@ -59,81 +83,108 @@ export default function LoginPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0B0B0F",
-    padding: 20,
+    backgroundColor: "#F8F8F8",
+    paddingHorizontal: 25,
     justifyContent: "center",
   },
 
-  header: {
-    alignItems: "center",
-    marginBottom: 30,
+  logo: {
+    width: 90,
+    height: 90,
+    alignSelf: "center",
+    marginBottom: 15,
   },
 
-  logoText: {
+  appTitle: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#EF4444",
-    letterSpacing: 1,
-  },
-
-  subtitle: {
-    color: "#9CA3AF",
-    fontSize: 13,
-    marginTop: 6,
+    color: "#D71920",
     textAlign: "center",
-  },
-
-  card: {
-    backgroundColor: "#111827",
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 20,
-    textAlign: "center",
+    marginBottom: 35,
   },
 
   input: {
-    backgroundColor: "#1F2937",
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 12,
-    color: "#fff",
+    height: 55,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#374151",
+    borderColor: "#DDDDDD",
+    paddingHorizontal: 18,
+    fontSize: 16,
+    marginBottom: 15,
   },
 
-  button: {
-    backgroundColor: "#EF4444",
-    padding: 14,
-    borderRadius: 10,
+  optionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 10,
+    marginBottom: 25,
   },
 
-  buttonText: {
-    color: "#fff",
-    fontWeight: "700",
+  rememberContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 
-  forgot: {
-    color: "#FCA5A5",
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderWidth: 1,
+    borderColor: "#888",
+    marginRight: 8,
+    borderRadius: 3,
+  },
+
+  checkboxChecked: {
+    backgroundColor: "#D71920",
+    borderColor: "#D71920",
+  },
+
+  rememberText: {
+    fontSize: 14,
+    color: "#333",
+  },
+
+  forgotText: {
+    color: "#C62828",
+    fontWeight: "500",
+  },
+
+  loginButton: {
+    backgroundColor: "#D71920",
+    height: 55,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+
+  loginText: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "600",
+  },
+
+  createButton: {
+    height: 55,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DDDDDD",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  createText: {
+    color: "#222",
+    fontSize: 17,
+    fontWeight: "600",
+  },
+
+  version: {
     textAlign: "center",
-    marginTop: 15,
-  },
-
-  footer: {
-    textAlign: "center",
-    color: "#6B7280",
-    marginTop: 20,
+    marginTop: 40,
+    color: "#999",
     fontSize: 12,
   },
 });
