@@ -6,6 +6,33 @@ This is an Expo project, which uses TypeScript markup. All of the tabs have been
 
 This project follows a feature-branch workflow to keep `main` stable and reduce merge conflicts. We should be able to work efficiently and know see all changes made to the code more clearly:
 
+
+### Linking backend
+
+The changes to backend are inside backend/new. In your terminal, 
+
+'''bash
+cd backend/new
+cp .env.example .env
+npm install
+node server.js
+'''
+
+Then in your .env file, paste in the MONGO_URI string that has been shared on the main chat. Then in a separate window (to keep your server running), 
+
+'''bash
+cd ..
+cd expo-app
+cd .env.example .env
+'''
+
+Then in your .env file, put your local IP address into the string which you can find using your terminal (e.g., 192.161.1.80).
+MAKE SURE YOU PUT BOTH .env FILES IN YOUR .gitignore.
+DO NOT PUSH WITHOUT DOING THIS, I WILL PROVIDE SUPPORT IF NEEDED
+Let me know if there's any issues!
+
+
+
 ### 1. Sync With Main
 Firstly ensure your local `main` branch is up to date:
 
