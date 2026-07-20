@@ -2,6 +2,8 @@
 
 
 //chat - gotta make it differentiate a bit more from vault UI, also need to get rid of the seconds timestamp
+
+
 import React, { useCallback, useEffect, useState } from "react"
 
 import {
@@ -21,7 +23,8 @@ import { Ionicons } from "@expo/vector-icons"
 import { useFocusEffect } from "@react-navigation/native"
 
 //const db = SQLite.openDatabaseSync("app.db")
-import { db } from "@/lib/db"
+//import { db } from "@/lib/db"
+
 
 
 type CaseItem = {

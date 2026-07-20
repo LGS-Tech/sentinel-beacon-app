@@ -27,7 +27,6 @@ import IntruderMap from "@/components/intruder-map"
 import LiveFeedSheet, {
   addFeedItem,
   clearFeed,
-  ensureFeedTable,
   getAllFeedItems,
 } from "@/components/live-feed"
 
@@ -37,7 +36,13 @@ import BottomSheet from "@/components/sheet"
 
 import { ThemedView } from "@/components/themed-view"
 
-import { db } from "@/lib/db"
+//import { db } from "@/lib/db"
+
+import {
+  createCase,
+  getCases,
+  updateCase
+} from "@/lib/db"
 
 
 
@@ -124,33 +129,9 @@ const caseQuestions: Record<
   ],
 }
 
-function createLocationTable() {
 
-  db.execSync(`
-    CREATE TABLE IF NOT EXISTS intruder_location (
-      id INTEGER PRIMARY KEY NOT NULL,
-      x REAL,
-      y REAL,
-      label TEXT
-    );
-  `)
-}
 
-function saveLocation(
-  x: number,
-  y: number,
-  label: string
-) {
 
-  db.runSync(
-    `
-      INSERT OR REPLACE INTO intruder_location
-      (id, x, y, label)
-      VALUES (1, ?, ?, ?)
-    `,
-    [x, y, label]
-  )
-}
 
 
 
@@ -211,11 +192,10 @@ export default function HomeScreen() {
 
   const [showQuestionModal, setShowQuestionModal] =useState(false)
 
-  const [selectedCaseType, setSelectedCaseType] = useState("")
+  const [selectedCaseType, setSelectedCaseType] = useState("" )
 
   const [questionAnswers, setQuestionAnswers] = useState<string[]>(["", ""])
-
-  const [currentVaultCaseId, setCurrentVaultCaseId] = useState<number | null>(null)
+  const [currentVaultCaseId, setCurrentVaultCaseId] =  useState<number | null>(null)
 
 
   const [showMap, setShowMap] = useState(false)
@@ -229,6 +209,44 @@ export default function HomeScreen() {
 
 
 
+
+
+
+
+
+  async function saveLocation(
+    x: number,
+    y: number,
+    label: string
+  ) {
+
+  const newCase =
+await createCase({
+
+    title:`${incidentType} Case`,
+
+    createdAt:Date.now(),
+
+    lastUpdatedAt:Date.now(),
+
+    status:"ACTIVE",
+
+    locationX:x,
+
+    locationY:y,
+
+    locationLabel:label,
+
+    feed:"",
+
+    chat:""
+
+});
+
+setCurrentVaultCaseId(newCase._id ?? newCase.id)
+
+await loadOpenCases();
+}
   
 
 
@@ -273,13 +291,8 @@ export default function HomeScreen() {
 
   useEffect(() => {
 
-    createLocationTable()
 
-    createActiveCaseTable()
 
-    ensureFeedTable()
-
-    ensureLastUpdatedColumn()
 
     loadOpenCases()
 
@@ -307,7 +320,7 @@ useEffect(() => {
 
 }, [caseActive])
 
-  function openCase(type: string) {
+  async function openCase(type: string) {
 
 
     clearFeed()
@@ -345,60 +358,41 @@ useEffect(() => {
 
     })
 
-    db.runSync(
-  `
-    INSERT INTO vault_cases
-    (
-      title,
-      createdAt,
-      lastUpdatedAt,
-      status,
-      chat,
-      feed
-    )
-    VALUES (?, ?, ?, ?, ?, ?)
-  `,
-  [
-  `${type} Case`,
-  Date.now(),
-  Date.now(),
-  "ACTIVE",
-  "",
-  "",
-  ]
+   const newCase = await createCase({
+
+    title:`${type} Case`,
+
+    createdAt:Date.now(),
+
+    lastUpdatedAt:Date.now(),
+
+    status:"ACTIVE",
+
+    locationX:defaultCoords.x,
+
+    locationY:defaultCoords.y,
+
+    locationLabel:"",
+
+    chat:"",
+
+    feed:""
+
+})
+
+
+setCurrentVaultCaseId(
+    newCase._id ?? newCase.id
 )
 
-const result = db.getFirstSync(
-  `
-    SELECT id
-    FROM vault_cases
-    ORDER BY id DESC
-    LIMIT 1
-  `
-) as any
 
-if (result?.id) {
-
-  setCurrentVaultCaseId(result.id)
-
-  loadOpenCases()
-
-  db.runSync(
-    `
-      INSERT OR REPLACE INTO active_case
-      (id, vaultCaseId)
-      VALUES (1, ?)
-    `,
-    [result.id]
-  )
+await loadOpenCases()
 
 }
 
-  }
-
   function openExistingCase(caseData: any) {
 
-  setCurrentVaultCaseId(caseData.id)
+  setCurrentVaultCaseId( caseData._id ?? caseData.id)
 
   setCaseActive(true)
 
@@ -452,7 +446,7 @@ console.log("locationY:", caseData.locationY)
 }
 
 
-  function handleCloseCase() {
+  async function handleCloseCase() {
 
     Alert.alert(
       "Close Case",
@@ -467,11 +461,12 @@ console.log("locationY:", caseData.locationY)
           text: "Yes",
           style: "destructive",
 
-          onPress: () => {
+          onPress: async () => {
 
             
 
-            const feedItems = getAllFeedItems()
+            //backend now handles feed items directly, no longer need to update db from live-feed.tsx
+            const feedItems = getAllFeedItems() 
 
             
 
@@ -485,33 +480,26 @@ console.log("locationY:", caseData.locationY)
               })
               .join("\n")
 
-            if (currentVaultCaseId) {
+            if(currentVaultCaseId){
 
-              db.runSync(
-    `
-                UPDATE vault_cases
-                SET
-                  feed = ?,
-                  status = 'CLOSED'
-                  WHERE id = ?
-    `           ,
-                [
-                  feedHistory,
-                  currentVaultCaseId,
-                ]
+              
+              await updateCase(
+                currentVaultCaseId.toString(),
+
+              {
+                status:"CLOSED",
+                feed:feedHistory,
+                lastUpdatedAt:Date.now()
+              }
+
               )
 
-}
+            }
 
             setCaseActive(false)
             setCurrentVaultCaseId(null)
 
-            db.runSync(
-  `
-    DELETE FROM active_case
-    WHERE id = 1
-  `
-)
+           
 
             setLocationConfirmed(false)
 
@@ -546,86 +534,70 @@ console.log("locationY:", caseData.locationY)
 
   }
 
-  function createActiveCaseTable() {
 
-    db.execSync(`
-      CREATE TABLE IF NOT EXISTS active_case (
-        id INTEGER PRIMARY KEY,
-       vaultCaseId INTEGER
-      );
-  ` )
-
-}
 
   
 
-  function loadOpenCases() {
+  async function loadOpenCases(){
 
-    const rows = db.getAllSync(`
-      SELECT *
-      FROM vault_cases
-      WHERE status = 'ACTIVE'
-      ORDER BY lastUpdatedAt DESC
-  ` ) as any[]
+    const rows =
+        await getCases();
 
-    setOpenCases(rows)  
-  } 
+    console.log(
+        rows.map((c: { id: any; _id: any; title: any }) => ({
+            id: c.id,
+            _id: c._id,
+            title: c.title,
+        }))
+    );
 
-  function updateVaultCaseData() {
+    setOpenCases(
 
-      
-    if (!currentVaultCaseId) {
-      return
-    }
+        rows.filter(
 
+            (c:any)=>
 
-    const feedItems = getAllFeedItems()
+            c.status==="ACTIVE"
 
+        )
 
-  const feedHistory = feedItems
-    .map(item => {
-
-      return `[${new Date(
-        item.createdAt
-      ).toLocaleTimeString()}] ${item.message}`
-
-    })
-    .join("\n")
-
-  db.runSync(
-    `
-      UPDATE vault_cases
-      SET
-        feed = ?,
-        lastUpdatedAt = ?
-      WHERE id = ?
-    `,
-    [
-      feedHistory,
-      Date.now(),
-      currentVaultCaseId,
-    ]
-  )
-}
-
-function ensureLastUpdatedColumn() {
-
-  try {
-
-    db.execSync(`
-      ALTER TABLE vault_cases
-      ADD COLUMN lastUpdatedAt INTEGER
-    `)
-
-  } catch {}
-
-  db.execSync(`
-    UPDATE vault_cases
-    SET lastUpdatedAt = createdAt
-    WHERE lastUpdatedAt IS NULL
-  `)
+    );
 
 }
+
+  async function updateVaultCaseData(){
+
+ if(!currentVaultCaseId){
+   return
+ }
+
+
+ const feedItems=getAllFeedItems()
+
+
+ const feedHistory =
+ feedItems
+ .map(item =>
+ `[${new Date(item.createdAt)
+ .toLocaleTimeString()}] ${item.message}`
+ )
+ .join("\n")
+
+
+ await updateCase(
+
+ currentVaultCaseId.toString(),
+
+ {
+   feed:feedHistory,
+   lastUpdatedAt:Date.now()
+ }
+
+ )
+
+}
+
+
 
 
 
@@ -1494,100 +1466,88 @@ function ensureLastUpdatedColumn() {
             />
 
             <Pressable
-              style={[
-                styles.modalButton,
-                {
-                  backgroundColor: "#71d795",
-                  marginTop: 15,
-                },
-              ]}
-              onPress={() => {
+  style={[
+    styles.modalButton,
+    {
+      backgroundColor:"#71d795",
+      marginTop:15,
+    },
+  ]}
 
-                if (
-                  !locationInput.trim() ||
-                  !selectedCoords
-                ) {
-                  return
-                }
+  onPress={async()=>{
 
-                const cleanLabel =
-                  locationInput.trim()
-
-                const coords = selectedCoords
-
-                setConfirmedCoords(coords)
-
-                setLocationConfirmed(true)
-
-                setIntruderLocation(cleanLabel)
-
-                
-
-                saveLocation(
-                  coords.x,
-                  coords.y,
-                  cleanLabel
-                )
-
-                const activeCase = db.getFirstSync(
-  `
-                  SELECT vaultCaseId
-                  FROM active_case
-                  WHERE id = 1
-  `
-                ) as { vaultCaseId: number } | null
+    if(
+      !locationInput.trim() ||
+      !selectedCoords
+    ){
+      return
+    }
 
 
-                if (activeCase) {
+    const cleanLabel =
+      locationInput.trim()
 
-                  db.runSync(
-    `
-                    UPDATE vault_cases
-                      SET
-                        title = ?,
-                        locationX = ?,
-                        locationY = ?,
-                        locationLabel = ?,
-                        lastUpdatedAt = ?
-                      WHERE id = ?
-    `                 ,
-                      [
-      `                 ${incidentType} Case in ${cleanLabel}`,
-                        coords.x,
-                        coords.y,
-                        cleanLabel,
-                        Date.now(),
-                        activeCase.vaultCaseId,
-                      ]
-                  )
 
-                  loadOpenCases()
-                  setCurrentVaultCaseId(activeCase.vaultCaseId)
-                }
+    const coords =
+      selectedCoords
 
-                addFeedItem(
-                  intruderLocation
-                    ? `UPDATE! ${incidentType} location is now ${cleanLabel}`
-                    : `CAUTION! ${incidentType} spotted in ${cleanLabel}`
-                )
 
-                updateVaultCaseData()
-                loadOpenCases()
+    setConfirmedCoords(coords)
 
-                setMapRefreshKey(
-                  prev => prev + 1
-                )
+    setLocationConfirmed(true)
 
-                setUpdatingLocation(false)
+    setIntruderLocation(cleanLabel)
 
-                setSelectedCoords(null)
 
-                setLocationInput("")
+    if(currentVaultCaseId){
 
-                setShowLabelModal(false)
+      await updateCase(
 
-              }}
-            >
+        currentVaultCaseId.toString(),
+
+        {
+          locationX:coords.x,
+          locationY:coords.y,
+          locationLabel:cleanLabel,
+          lastUpdatedAt:Date.now()
+        }
+
+      )
+
+    }
+
+
+    addFeedItem(
+
+      intruderLocation
+
+      ? `UPDATE! ${incidentType} location is now ${cleanLabel}`
+
+      : `CAUTION! ${incidentType} spotted in ${cleanLabel}`
+
+    )
+
+
+    await updateVaultCaseData()
+
+    await loadOpenCases()
+
+
+    setMapRefreshKey(
+      prev=>prev+1
+    )
+
+
+    setUpdatingLocation(false)
+
+    setSelectedCoords(null)
+
+    setLocationInput("")
+
+    setShowLabelModal(false)
+
+  }}
+>
 
               <Text style={styles.modalButtonText}>
                 Continue

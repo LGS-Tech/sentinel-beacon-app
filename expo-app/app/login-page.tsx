@@ -19,7 +19,7 @@ export default function LoginPage() {
   return (
     <SafeAreaView style={styles.container}>
       <Image
-        source={require("../assets/LGS-logo.png")}
+        source={require("../assets/images/LGS-logo.png")}
         style={styles.logo}
         resizeMode="contain"
       />

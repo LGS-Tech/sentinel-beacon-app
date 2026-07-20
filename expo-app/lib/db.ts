@@ -1,48 +1,77 @@
-// manages the temp database, stops from loading in the web as its not supported
-import { Platform } from "react-native";
+// manages the temp database,  loading in the web as its not supported
+
+const API = process.env.EXPO_PUBLIC_API_URL!;
 
 
+export async function getCases() {
+    const response = await fetch(`${API}/cases`);
 
-const isWeb = Platform.OS === "web";
+    const data = await response.json();
 
-let sqlite: any = null;
+    return data.map((c: any) => ({
+        ...c,
+        id: c._id,
+    }));
+}
 
-if (!isWeb) {
 
-  try {
-    //const SQLite = eval("require")("expo-sqlite");
-    const SQLite = require("expo-sqlite");
-    sqlite = SQLite.openDatabaseSync("app.db");
-  } catch (error) {
+export async function createCase(data:any){
 
-    console.log("SQLite unavailable", error);
-  }
+    const res =
+    await fetch(`${API}/cases`,{
+
+        method:"POST",
+
+        headers:{
+            "Content-Type":"application/json"
+        },
+
+        body:JSON.stringify(data)
+
+    });
+
+    return await res.json();
+
 }
 
 
 
-export const db = {
-  execSync: (...args: any[]) => {
-    if (!sqlite) return;
-    return sqlite.execSync(...args);
-  },
+export async function updateCase(   // used for when we update location or live feed in some way
 
-  runSync: (...args: any[]) => {
-    if (!sqlite) return ;
-    return sqlite.runSync(...args);
-  },
+    id:string,
 
-  getFirstSync: (...args: any[]) => {
-    if (!sqlite) return null;
-    return sqlite.getFirstSync(...args);
-  },
+    data:any
 
-  getAllSync: (...args: any[]) => {
-    if (!sqlite) return [] ;
-    return sqlite.getAllSync(...args);
-  },
+){
+    const res =
+    await fetch(`${API}/cases/${id}`,{
+
+        method:"PUT",
+
+        headers:{
+            "Content-Type":"application/json"
+        },
+
+        body:JSON.stringify(data)
+
+    });
+
+    return await res.json();
+
+}
 
 
 
 
-};
+export async function deleteCase(id:string){
+
+    await fetch(`${API}/cases/${id}`,{
+
+        method:"DELETE"
+
+    });
+
+
+
+
+}

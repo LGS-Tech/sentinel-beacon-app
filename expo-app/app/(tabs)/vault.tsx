@@ -18,6 +18,11 @@ import {
   View,
 } from "react-native"
 
+import {
+  deleteCase,
+  getCases,
+  updateCase
+} from "@/lib/db"
 
 
 import {
@@ -27,8 +32,7 @@ import {
 import { ThemedText } from "../../components/themed-text"
 import { ThemedView } from "../../components/themed-view"
 
-import { db } from "@/lib/db"
-//const db = SQLite.openDatabaseSync("app.db")
+
 
 type FileItem = {
   id: string
@@ -38,138 +42,91 @@ type FileItem = {
 }
 
 type CaseItem = {
-  id: string
-  title: string
-  createdAt: string
-  status: "ACTIVE" | "CLOSED"
-  locationX?: number
-  locationY?: number
-  locationLabel?: string
-  files: FileItem[]
-}
-
-const setupVaultDb = () => {
-
-
-
-
-  db.execSync(`
-  CREATE TABLE IF NOT EXISTS vault_cases (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT,
-    createdAt INTEGER,
-    lastUpdatedAt INTEGER
-    status TEXT DEFAULT 'CLOSED'
-  );
-`)
-
-  const columns = db.getAllSync(`
-    PRAGMA table_info(vault_cases)
-  `) as any[]
-
-  const columnNames = columns.map(
-    (col) => col.name
-  )
-
-  if (!columnNames.includes("chat")) {
-
-    db.execSync(`
-      ALTER TABLE vault_cases
-      ADD COLUMN chat TEXT;
-    `)
-
-  }
-
-  //need to sort out reading live-feed messages but think its a dashboard issue
-  if (!columnNames.includes("feed")) {
-    db.execSync(`
-      ALTER TABLE vault_cases
-      ADD COLUMN feed TEXT;
-    `)
-
-  }
-
-  if (!columnNames.includes("status")) {
-
-  db.execSync(`
-    ALTER TABLE vault_cases
-    ADD COLUMN status TEXT DEFAULT 'CLOSED';
-  `)
-
-  }
-
-  if (!columnNames.includes("locationX")) {
-
-  db.execSync(`
-    ALTER TABLE vault_cases
-    ADD COLUMN locationX REAL;
-  `)
-
-}
-
-if (!columnNames.includes("locationY")) {
-
-  db.execSync(`
-    ALTER TABLE vault_cases
-    ADD COLUMN locationY REAL;
-  `)
-
-}
-
-if (!columnNames.includes("locationLabel")) {
-
-  db.execSync(`
-    ALTER TABLE vault_cases
-    ADD COLUMN locationLabel TEXT;
-  `)
-
-}
-
 
   
+  id:string
+  title:string
+  createdAt:number
+  lastUpdatedAt:number
+  status:"ACTIVE" | "CLOSED"
+  locationX?:number
+  locationY?:number
+  locationLabel?:string
+  feed?:string
+  chat?:string
+  files:FileItem[]
+
 }
 
-// looks good, just needs proper backend now
-const loadCases = (): CaseItem[] => {
-
-  const rows = db.getAllSync(
-    `
-      SELECT *
-      FROM vault_cases
-      ORDER BY lastUpdatedAt DESC
-    `
-  ) as any[]
-
-  return rows.map((row) => {
 
 
+const loadCases = async():Promise<CaseItem[]>=>{
 
-    const files: FileItem[] = [
-      {
-        id: `chat-${row.id}`,
-        name: "team-chat.txt",
-        type: "text",
-        content: row.chat || "No chat data",
-      },
-      {
-        id: `feed-${row.id}`,
-        name: "live-feed.txt",
-        type: "text",
-        content: row.feed || "No live feed data",
-      },
-    ]
+ const rows =
+   await getCases()
 
-    return {
-  id: row.id.toString(),
-  title: row.title,
-  createdAt: new Date(row.createdAt).toISOString(),
-  status: row.status || "CLOSED",
-  locationX: row.locationX,
-  locationY: row.locationY,
-  locationLabel: row.locationLabel,
-  files,
-}
-  })
+
+ return rows.map((row:any)=>{
+
+
+   const files:FileItem[] = [
+
+    {
+      id:`chat-${row._id ?? row.id}`,
+      name:"team-chat.txt",
+      type:"text",
+      content:row.chat || "No chat data"
+    },
+
+
+    {
+      id:`feed-${row._id ?? row.id}`,
+      name:"live-feed.txt",
+      type:"text",
+      content:row.feed || "No live feed data"
+    }
+
+   ]
+
+
+   return {
+
+    id:
+      String(row._id ?? row.id),
+
+    title:
+      row.title,
+
+    createdAt:
+      row.createdAt,
+
+    lastUpdatedAt:
+      row.lastUpdatedAt,
+
+    status:
+      row.status ?? "CLOSED",
+
+    locationX:
+      row.locationX,
+
+    locationY:
+      row.locationY,
+
+    locationLabel:
+      row.locationLabel,
+
+    feed:
+      row.feed,
+
+    chat:
+      row.chat,
+
+    files
+
+   }
+
+ })
+
 }
 
 export default function VaultScreen() {
@@ -212,56 +169,71 @@ export default function VaultScreen() {
     
 
   useEffect(() => {
-    setupVaultDb()
+    refreshVault()
 
   }, [])
 
   useFocusEffect(
-    React.useCallback(() => {
+    React.useCallback(()=>{
 
-      setVaultData(loadCases())
-    }, [])
+
+    async function load(){
+
+      const cases = await loadCases()
+
+      setVaultData(cases)
+
+    }
+
+
+    load()
+  },[])
   )
 
 
   
 
-  const refreshVault = () => {
-    setVaultData(loadCases())
+  const refreshVault = async()=>{
+
+    const cases =
+      await loadCases()
+
+    setVaultData(cases)
+
   }
 
-  const deleteCase = (
-    caseId: string
-  ) => {
+  const handleDeleteCase = (
+    caseId:string
+  )=>{
 
     Alert.alert(
-      "Delete Folder",
-      "Are you sure you want to permanently delete this folder?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
+    "Delete Folder",
+    "Are you sure you want to permanently delete this folder?",
+    [
+    {
+      text:"Cancel",
+      style:"cancel"
+    },
 
-        },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
+    {
+      text:"Delete",
+      style:"destructive",
 
-            db.runSync(
-              `
-                DELETE FROM vault_cases
-                WHERE id = ?
-              `,
-              [caseId]
-            )
+      onPress:async()=>{
 
-            refreshVault()
-          },
-        },
-      ]
-    )
 
+        await deleteCase(
+          caseId
+        )
+
+
+        refreshVault()
+
+      }
+
+    }
+    ]
+  )
 
   }
 
@@ -306,29 +278,29 @@ export default function VaultScreen() {
   }
 
 
-  const renameFolder = () => {
-    if (
-      !selectedCaseId ||
-      !renameValue.trim()
-    ) return
+  const renameFolder = async()=>{
 
-    db.runSync(
-      `
-        UPDATE vault_cases
-        SET title = ?
-        WHERE id = ?
-      `,
-      [
-        renameValue.trim(),
-        selectedCaseId,
-      ]
+    if(!selectedCaseId ||  !renameValue.trim()) return
+
+
+    await updateCase(
+
+      selectedCaseId,
+      {
+        title:renameValue.trim(),
+        lastUpdatedAt:Date.now()
+      }
+
+
     )
 
-    refreshVault()
+
+    await refreshVault()
+
 
     setRenameModalOpen(false)
-
     setRenameValue("")
+
   }
 
   const openRenameFile = (
@@ -363,26 +335,29 @@ export default function VaultScreen() {
   }
 
   const formatDate = (
-    dateString: string
-  ) => {
+    timestamp:number
+  )=>{
 
-    const date = new Date(dateString)
+    const date = new Date(timestamp)
 
     const formattedDate =
       `${String(
         date.getDate()
-      ).padStart(2, "0")}/${String(
-        date.getMonth() + 1
-      ).padStart(2, "0")}/${date.getFullYear()}`
+      ).padStart(2,"0")}/${String(
+        date.getMonth()+1
+      ).padStart(2,"0")}/${date.getFullYear()}`
+
 
     const formattedTime =
-      date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
+      date.toLocaleTimeString([],{
+        hour:"2-digit",
+        minute:"2-digit",
+        hour12:true,
       })
 
+
     return `${formattedDate} • ${formattedTime}`
+
   }
 
   const filteredCases = useMemo(() => {
@@ -568,7 +543,7 @@ const closedCases = filteredCases.filter(
         <Pressable
           style={styles.deleteBtn}
           onPress={() => {
-            deleteCase(item.id)
+            handleDeleteCase(item.id)
           }}
         >
 
