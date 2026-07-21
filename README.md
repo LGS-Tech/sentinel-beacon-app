@@ -9,24 +9,42 @@ This project follows a feature-branch workflow to keep `main` stable and reduce 
 
 ### Linking backend
 
-The changes to backend are inside backend/new. In your terminal, 
+The backend is located inside backend/new. In your terminal, 
 
-'''bash
+```bash
 cd backend/new
 cp .env.example .env
 npm install
 node server.js
-'''
+```
 
-Then in your .env file, paste in the MONGO_URI string that has been shared on the main chat. Then in a separate window (to keep your server running), 
+Then in your .env file, paste in the MONGO_URI string that has been shared on the main chat. Then,
 
-'''bash
-cd ..
+```bash
+node server.js
+```
+
+
+Leave this terminal running. Then in a separate terminal window (to keep your server running), 
+
+```bash
 cd expo-app
 cd .env.example .env
-'''
+```
 
 Then in your .env file, put your local IP address into the string which you can find using your terminal (e.g., 192.161.1.80).
+You can find this out on Mac by running:
+
+```bash
+ifconfig
+```
+
+or on Windows by:
+
+```bash
+ipconfig
+```
+
 MAKE SURE YOU PUT BOTH .env FILES IN YOUR .gitignore.
 DO NOT PUSH WITHOUT DOING THIS, I WILL PROVIDE SUPPORT IF NEEDED
 Let me know if there's any issues!
