@@ -36,6 +36,16 @@ export default function RootLayout() {
           options={{ presentation: 'modal', title: 'Modal' }}
         />
 
+        <Stack.Screen
+          name="login-page"
+          options={{ headerShown: false, title: 'Login' }}
+        />
+
+        <Stack.Screen
+          name="registerPage"
+          options={{ headerShown: false, title: 'Register' }}
+        />
+
       </Stack>
 
       <StatusBar style="auto" />

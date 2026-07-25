@@ -1,0 +1,25 @@
+# Optional local PostgreSQL for LGS Tech (does NOT replace Mongo server.js yet)
+# Credentials come from backend/new/.env — never commit real passwords.
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: lgs-tech-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: LGS_Tech
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: lgs_tech
+    volumes:
+      - lgs_tech_pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U LGS_Tech -d lgs_tech"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  lgs_tech_pgdata:

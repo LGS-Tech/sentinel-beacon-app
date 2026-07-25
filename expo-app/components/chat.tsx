@@ -25,6 +25,13 @@ import { useFocusEffect } from "@react-navigation/native"
 //const db = SQLite.openDatabaseSync("app.db")
 //import { db } from "@/lib/db"
 
+/** Local stub — this chat module is obsolete; Dashboard/Vault use Cases API now */
+const db = {
+  getAllSync: (..._args: any[]) => [] as any[],
+  getFirstSync: (..._args: any[]) => null as any,
+  runSync: (..._args: any[]) => undefined,
+};
+
 
 
 type CaseItem = {

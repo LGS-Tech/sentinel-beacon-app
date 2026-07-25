@@ -539,31 +539,27 @@ console.log("locationY:", caseData.locationY)
   
 
   async function loadOpenCases(){
+    try {
+      const rows = await getCases();
 
-    const rows =
-        await getCases();
-
-    console.log(
+      console.log(
         rows.map((c: { id: any; _id: any; title: any }) => ({
-            id: c.id,
-            _id: c._id,
-            title: c.title,
+          id: c.id,
+          _id: c._id,
+          title: c.title,
         }))
-    );
+      );
 
-    setOpenCases(
-
-        rows.filter(
-
-            (c:any)=>
-
-            c.status==="ACTIVE"
-
-        )
-
-    );
-
-}
+      setOpenCases(
+        rows.filter((c: any) => c.status === "ACTIVE")
+      );
+    } catch (error) {
+      console.warn(
+        "loadOpenCases failed:",
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
 
   async function updateVaultCaseData(){
 

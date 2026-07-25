@@ -5,7 +5,11 @@
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:setup": "node scripts/setup-postgres.js",
+    "db:ping": "node scripts/ping-postgres.js"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +19,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "mongoose": "^9.7.4"
+    "mongoose": "^9.7.4",
+    "pg": "^8.22.0"
   }
 }

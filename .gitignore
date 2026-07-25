@@ -1,53 +1,88 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
-expo-app/node_modules/
+# ---------- dependencies ----------
+node_modules/
+**/node_modules/
 
-# Expo
-expo-app/.expo/
+# ---------- env / secrets (never commit) ----------
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+credentials.json
+**/secrets/
+
+# ---------- Expo / React Native ----------
+.expo/
+**/.expo/
 dist/
 **/web-build/
-expo-app/expo-env.d.ts
-expo-app/app/expo-env.d.ts
 expo-env.d.ts
+**/expo-env.d.ts
 **/*.expo-shared
+.metro-health-check*
 
-# Native
+# ---------- native build folders ----------
 .kotlin/
+/ios
+/android
+**/ios/Pods/
+**/android/.gradle/
+**/android/app/build/
+
+# ---------- logs / debug ----------
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+logs/
+
+# ---------- OS / editor ----------
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---------- TypeScript / coverage ----------
+*.tsbuildinfo
+coverage/
+.nyc_output/
+
+# ---------- Python (Flask backend) ----------
+**/__pycache__/
+*.py[cod]
+.venv/
+venv/
+backend/.venv/
+backend/venv/
+
+# ---------- databases / local runtime ----------
+*.db
+*.sqlite
+*.sqlite3
+backend/**/sentinel.db
+
+# ---------- Docker / Postgres local volumes (if ever mounted in-repo) ----------
+**/pgdata/
+**/*.sql.bak
+
+# ---------- local test / emulator dumps (do not push) ----------
+expo-app/.emu*
+expo-app/emu*.png
+expo-app/*.png.tmp
+.tmp-pptx/
+**/.tmp*/
+
+# ---------- misc ----------
+app-example
 *.orig.*
 *.jks
 *.p8
 *.p12
-*.key
 *.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-expo-app/.env
-backend/new/.env
-**/.env.*
-
-
-# typescript
-*.tsbuildinfo
-
-app-example
-
-# generated native folders
-/ios
-/android
-
-.expo/
-expo-app/.gitignore

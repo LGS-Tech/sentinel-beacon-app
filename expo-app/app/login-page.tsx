@@ -1,6 +1,8 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   SafeAreaView,
@@ -10,11 +12,36 @@ import {
   View,
 } from "react-native";
 
+import { loginWithEmailPassword } from "@/lib/api";
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function onLogin() {
+    if (!email.trim() || !password) {
+      Alert.alert("Missing details", "Enter email and password.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await loginWithEmailPassword(email, password);
+      router.replace("/(tabs)");
+    } catch (e) {
+      Alert.alert(
+        "Login failed",
+        e instanceof Error
+          ? e.message
+          : "Could not sign in. Is the Express server running?"
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -34,6 +61,8 @@ export default function LoginPage() {
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
+        autoCapitalize="none"
+        editable={!busy}
       />
 
       {/* Password */}
@@ -44,6 +73,7 @@ export default function LoginPage() {
         secureTextEntry
         value={password}
         onChangeText={setPassword}
+        editable={!busy}
       />
 
       {/* Remember + Forgot */}
@@ -51,19 +81,28 @@ export default function LoginPage() {
         <Pressable
           style={styles.rememberContainer}
           onPress={() => setRemember(!remember)}
+          disabled={busy}
         >
           <View style={[styles.checkbox, remember && styles.checkboxChecked]} />
           <Text style={styles.rememberText}>Remember Me</Text>
         </Pressable>
 
-        <Pressable>
+        <Pressable disabled={busy}>
           <Text style={styles.forgotText}>Forgot Password?</Text>
         </Pressable>
       </View>
 
       {/* Login */}
-      <Pressable style={styles.loginButton}>
-        <Text style={styles.loginText}>Login</Text>
+      <Pressable
+        style={[styles.loginButton, busy && { opacity: 0.7 }]}
+        onPress={onLogin}
+        disabled={busy}
+      >
+        {busy ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.loginText}>Login</Text>
+        )}
       </Pressable>
 
       {/* Create Account */}
