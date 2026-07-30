@@ -3,7 +3,6 @@
  */
 require("dotenv").config();
 const { ping } = require("../db/pool");
-
 ping()
   .then((row) => {
     console.log("PostgreSQL OK:", row.now);
