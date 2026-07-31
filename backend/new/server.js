@@ -7,11 +7,14 @@ const fs = require("fs");
 const path = require("path");
 
 const Case = require("./models/Case");
+const authRoutes = require('./routes/auth');
+const { authenticate, authorize } = require('./middleware/auth');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/auth', authRoutes);
 
 mongoose.connect(process.env.MONGO_URI);
 
