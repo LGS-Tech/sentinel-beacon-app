@@ -1,0 +1,25 @@
+# Render Blueprint — LGS Tech API (backend/new)
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploy from Render Dashboard → New → Blueprint
+# (or create a Web Service manually using the settings below)
+
+services:
+  - type: web
+    name: lgs-tech-api
+    runtime: node
+    plan: free
+    rootDir: backend/new
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # Optional — when Postgres routes are wired later
+      - key: DATABASE_URL
+        sync: false

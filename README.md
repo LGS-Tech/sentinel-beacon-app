@@ -121,6 +121,21 @@ npm run db:ping            # quick connectivity check
 #### Note before changing `server.js`
 If you plan to switch API routes from Mongo to Postgres, tell the team in the backend chat first so nobody’s local server breaks.
 
+### Hosting the backend on Render (demo)
+
+For a public demo (e.g. static site on GitHub Pages), host `backend/new` on [Render](https://render.com). Keep using local servers for day-to-day development.
+
+Full steps: [`backend/new/RENDER.md`](backend/new/RENDER.md)
+
+Quick version:
+1. Push the repo to GitHub (never commit `.env`).
+2. Render → **New Web Service** → connect repo → **Root Directory** = `backend/new`.
+3. Build: `npm install` · Start: `npm start` · Health: `/health`.
+4. Set env vars: `MONGO_URI`, `ALLOWED_ORIGINS` (your GitHub Pages URL).
+5. Point the demo app at `EXPO_PUBLIC_API_URL=https://YOUR-SERVICE.onrender.com`.
+
+There is also a root [`render.yaml`](render.yaml) Blueprint if you prefer one-click Blueprint deploy.
+
 
 ### 1. Sync With Main
 Firstly ensure your local `main` branch is up to date:
