@@ -37,6 +37,14 @@ function buildCorsOptions() {
 app.use(cors(buildCorsOptions()));
 app.use(express.json());
 
+app.get("/", (_req, res) => {
+  res.json({
+    service: "lgs-tech-api",
+    message: "LGS Tech API is running",
+    endpoints: ["/health", "/cases", "/users"],
+  });
+});
+
 app.get("/health", (_req, res) => {
   const mongoState = mongoose.connection.readyState;
   // 1 = connected
