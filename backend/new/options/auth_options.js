@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt');// For password hashing and comparison
 const jwt = require('jsonwebtoken');// For creating and verifying JWTs
 const pool = require('../db/pool');// Importing the database connection pool to interact with PostgreSQL
 const { authenticate } = require('../middleware/auth');// auth middleware import
-
+const secret = process.env.JWT_SECRET
 const router = express.Router();// Create a new router instance to define auth-related routes
 
 /**
@@ -23,13 +23,13 @@ router.post('/signup', async (req, res) => {
     //hash the plaintext password with bcrypt using 10 salt rounds for security
     const hash = await bcrypt.hash(password, 10);//not sure if we plan to do hashing but just going to keep this here for the time being
 
-    
+    console.log('Hashing password for user:', username, 'Hash:', hash);
     const queryText = `
       INSERT INTO users (username, password, email, name, phone, role, authorisation)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING id, username, email, name, phone, role, authorisation
     `;
-
+    
     const values = [
       username,
       hash,                           
@@ -39,7 +39,7 @@ router.post('/signup', async (req, res) => {
       role ,                
       authorisation   
     ];
-
+    console.log('Executing query:', queryText, 'with values:', values);
     //Execute an SQL INSERT query to add the new user to the users table, returning the new user's data for confirmation
     const result = await pool.query(queryText, values);
 
@@ -51,6 +51,7 @@ router.post('/signup', async (req, res) => {
   } catch (err) {
     // catch failures
     res.status(500).json({ error: 'Signup failed' });
+    console.log('Error during signup:', err);
   }
 });
 
@@ -61,8 +62,8 @@ router.post('/signup', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;// extract password and email
 
-  if (!loginInput || !password) {
-    return res.status(400).json({ error: 'Username/email and password are required.' });
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
   }
   try {
     // Search the PostgreSQL for a matching user account by email
@@ -71,7 +72,7 @@ router.post('/login', async (req, res) => {
 
     // Check if the user exists AND if the submitted password matches the stored hash.
     // Uses bcrypt.compare to securely check the hash.
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
     // Create a JWT signed with the server's secret key
@@ -81,13 +82,14 @@ router.post('/login', async (req, res) => {
     // - Options = Expiration set to 1 day ('1d')
     const token = jwt.sign(
       { userId: user.id },
-      process.env.JWT_SECRET,
+      secret,
       { expiresIn: '1d' }
     );
     // Send the signed JWT token back to the client
     res.json({ token });
   } catch (err) {
     res.status(500).json({ error: 'Login failed' });
+    console.log('Error during login:', err);
   }
 });
 

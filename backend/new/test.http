@@ -1,0 +1,22 @@
+### 1. Signup
+POST http://localhost:3000/auth/signup
+Content-Type: application/json
+
+{
+  "username": "testuser2",
+  "password": "Password123!",
+  "email": "test2@example.com",
+  "name": "Test User 2",
+  "phone": "1234567890",
+  "role": "user",
+  "authorisation": "2"
+}
+
+### 2. Login
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "email": "test2@example.com",
+  "password": "Password123!"
+}
