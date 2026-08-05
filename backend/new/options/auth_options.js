@@ -81,7 +81,7 @@ router.post('/login', async (req, res) => {
     // - Secret = process.env.JWT_SECRET ensures the token cannot be tampered with on the client side
     // - Options = Expiration set to 1 day ('1d')
     const token = jwt.sign(
-      { userId: user.id },
+      { userId: user.id , role: user.role, authorisation: user.authorisation }, // Payload
       secret,
       { expiresIn: '1d' }
     );
