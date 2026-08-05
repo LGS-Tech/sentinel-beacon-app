@@ -15,16 +15,54 @@ const {
 } = require("./middleware/errorHandler");
 
 const app = express();
-
 const port = Number(process.env.PORT) || 3000;
 
 app.disable("x-powered-by");
 
+function buildCorsOptions() {
+  const raw = process.env.ALLOWED_ORIGINS || "";
+
+  const origins = raw
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  // Allow local development, Expo and non-browser clients
+  // when ALLOWED_ORIGINS has not been configured.
+  if (origins.length === 0) {
+    return { origin: true };
+  }
+
+  return {
+    origin(origin, callback) {
+      const isAllowed =
+        !origin ||
+        origins.includes(origin) ||
+        origins.includes("*");
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+
+      const error = new Error(
+        `CORS blocked for origin: ${origin}`
+      );
+      error.statusCode = 403;
+
+      return callback(error);
+    },
+  };
+}
+
 app.use(requestLogger);
-app.use(cors());
+app.use(cors(buildCorsOptions()));
 app.use(express.json({ limit: "100kb" }));
 
-const USERS_FILE = path.join(__dirname, "data", "users.json");
+const USERS_FILE = path.join(
+  __dirname,
+  "data",
+  "users.json"
+);
 
 function readUsers() {
   const raw = fs.readFileSync(USERS_FILE, "utf-8");
@@ -39,20 +77,33 @@ function writeUsers(users) {
   );
 }
 
+/* Service information */
+app.get("/", (req, res) => {
+  res.json({
+    service: "lgs-tech-api",
+    message: "LGS Tech API is running",
+    endpoints: ["/health", "/cases", "/users"],
+    requestId: req.id,
+  });
+});
+
 /* Health check */
 app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    mongo:
-      mongoose.connection.readyState === 1
-        ? "connected"
-        : "disconnected",
+  const mongoConnected =
+    mongoose.connection.readyState === 1;
+
+  res.status(mongoConnected ? 200 : 503).json({
+    status: mongoConnected ? "ok" : "degraded",
+    service: "lgs-tech-api",
+    mongo: mongoConnected
+      ? "connected"
+      : "disconnected",
     timestamp: new Date().toISOString(),
     requestId: req.id,
   });
 });
 
-/* Cases (MongoDB) */
+/* Cases — currently stored in MongoDB */
 app.get("/cases", async (req, res) => {
   const cases = await Case.find();
 
@@ -103,11 +154,13 @@ app.put("/cases/:id", async (req, res) => {
     "Case updated"
   );
 
-  res.json(updated);
+  return res.json(updated);
 });
 
 app.delete("/cases/:id", async (req, res) => {
-  const deleted = await Case.findByIdAndDelete(req.params.id);
+  const deleted = await Case.findByIdAndDelete(
+    req.params.id
+  );
 
   if (!deleted) {
     return res.status(404).json({
@@ -123,10 +176,14 @@ app.delete("/cases/:id", async (req, res) => {
     "Case deleted"
   );
 
-  res.sendStatus(204);
+  return res.sendStatus(204);
 });
 
-/* Users (file JSON — Settings profile / login) */
+/*
+ * Users — currently stored in a JSON file.
+ * Render's filesystem is ephemeral, so this should later
+ * be replaced with persistent PostgreSQL storage.
+ */
 app.get("/users", (req, res) => {
   const users = readUsers();
 
@@ -172,7 +229,9 @@ app.put("/users/:id", (req, res) => {
   }
 
   const users = readUsers();
-  const index = users.findIndex((user) => user.id === id);
+  const index = users.findIndex(
+    (user) => user.id === id
+  );
 
   if (index === -1) {
     return res.status(404).json({
@@ -196,7 +255,7 @@ app.put("/users/:id", (req, res) => {
     "User updated"
   );
 
-  res.json(users[index]);
+  return res.json(users[index]);
 });
 
 app.delete("/users/:id", (req, res) => {
@@ -210,7 +269,9 @@ app.delete("/users/:id", (req, res) => {
   }
 
   const users = readUsers();
-  const userExists = users.some((user) => user.id === id);
+  const userExists = users.some(
+    (user) => user.id === id
+  );
 
   if (!userExists) {
     return res.status(404).json({
@@ -232,15 +293,20 @@ app.delete("/users/:id", (req, res) => {
     "User deleted"
   );
 
-  res.sendStatus(204);
+  return res.sendStatus(204);
 });
 
+/*
+ * These middlewares must remain after every route.
+ */
 app.use(notFoundHandler);
 app.use(errorHandler);
 
 async function startServer() {
   if (!process.env.MONGO_URI) {
-    throw new Error("MONGO_URI is missing");
+    throw new Error(
+      "MONGO_URI is missing. Set it in .env or the Render environment."
+    );
   }
 
   await mongoose.connect(process.env.MONGO_URI);
@@ -251,7 +317,8 @@ async function startServer() {
     logger.info(
       {
         port,
-        environment: process.env.NODE_ENV || "development",
+        environment:
+          process.env.NODE_ENV || "development",
       },
       "Server running"
     );
