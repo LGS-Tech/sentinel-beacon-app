@@ -1,6 +1,6 @@
 //dashboard - specialised prompts to be added for each case type
 //the continue button needs to be inactivated until prompts have been selecteed
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState } from 'react';
 
 import {
   Alert,
@@ -11,534 +11,390 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
-} from "react-native"
+} from 'react-native';
 
+import ChatSheet from '@/components/chat';
 
+import DashboardMap from '@/components/dashboard-map';
 
-
-
-import ChatSheet from "@/components/chat"
-
-import DashboardMap from "@/components/dashboard-map"
-
-import IntruderMap from "@/components/intruder-map"
+import IntruderMap from '@/components/intruder-map';
 
 import LiveFeedSheet, {
   addFeedItem,
   clearFeed,
   getAllFeedItems,
-} from "@/components/live-feed"
+} from '@/components/live-feed';
 
-import CaseClosedSheet from "@/components/close-sheet"
-import PoliceConfirmation from "@/components/police-confirmation"
-import BottomSheet from "@/components/sheet"
-
-import { ThemedView } from "@/components/themed-view"
+import CaseClosedSheet from '@/components/close-sheet';
+import PoliceConfirmation from '@/components/police-confirmation';
+import BottomSheet from '@/components/sheet';
 
 //import { db } from "@/lib/db"
 
-import {
-  createCase,
-  getCases,
-  updateCase
-} from "@/lib/db"
-
-
-
+import { createCase, getCases, updateCase } from '@/lib/db';
 
 //const db = SQLite.openDatabaseSync("app.db")
 
-
-
-const floorPlan = require("../../assets/images/LGSUniFloorPlan.png")
-const logo = require("../../assets/images/LGS-logo.png")
+const floorPlan = require('../../assets/images/LGSUniFloorPlan.png');
+const logo = require('../../assets/images/LGS-logo.png');
 
 const defaultCoords = {
-
   x: 0.52,
   y: 0.79,
-}
-
-
-
+};
 
 const caseQuestions: Record<
   string,
   {
-    question: string
-    type: "text" | "yesno"
+    question: string;
+    type: 'text' | 'yesno';
   }[]
 > = {
   Fire: [
     {
-      question: "Has everyone present been evacuated?",
-      type: "yesno",
+      question: 'Has everyone present been evacuated?',
+      type: 'yesno',
     },
     {
-      question: "Have the fire department been contacted?",
-      type: "yesno",
+      question: 'Have the fire department been contacted?',
+      type: 'yesno',
     },
   ],
 
   Intruder: [
     {
-      question: "Describe the intruder",
-      type: "text",
+      question: 'Describe the intruder',
+      type: 'text',
     },
     {
-      question: "Are they carrying out anti-social behaviour?",
-      type: "yesno",
+      question: 'Are they carrying out anti-social behaviour?',
+      type: 'yesno',
     },
     {
-      question: "Have the police been contacted?",
-      type: "yesno",
+      question: 'Have the police been contacted?',
+      type: 'yesno',
     },
   ],
 
   Injury: [
     {
-      question: "Describe the injury",
-      type: "text",
+      question: 'Describe the injury',
+      type: 'text',
     },
     {
-      question: "Have the emergency services been contacted?",
-      type: "yesno",
+      question: 'Have the emergency services been contacted?',
+      type: 'yesno',
     },
     {
-      question: "What medical assistance has been provided?",
-      type: "text",
+      question: 'What medical assistance has been provided?',
+      type: 'text',
     },
   ],
-
-
 
   Maintenance: [
     {
-      question: "Describe the maintenance issue",
-      type: "text",
+      question: 'Describe the maintenance issue',
+      type: 'text',
     },
     {
-      question: "Does it pose a danger to anyone?",
-      type: "yesno",
+      question: 'Does it pose a danger to anyone?',
+      type: 'yesno',
     },
     {
-      question: "Have the maintenance team been contacted?",
-      type: "yesno",
+      question: 'Have the maintenance team been contacted?',
+      type: 'yesno',
     },
   ],
-}
-
-
-
-
-
-
+};
 
 export default function HomeScreen() {
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 768;
 
-  const [caseActive, setCaseActive] = useState(false)
+  const [caseActive, setCaseActive] = useState(false);
 
-  const [incidentType, setIncidentType] =
-    useState("Intruder")
+  const [incidentType, setIncidentType] = useState('Intruder');
 
-  const [showSituationModal, setShowSituationModal] =
-    useState(false)
+  const [showSituationModal, setShowSituationModal] = useState(false);
 
-  const [locationConfirmed, setLocationConfirmed] =
-    useState(false)
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
 
-  const [showCaseClosed, setShowCaseClosed] =
-    useState(false)
+  const [showCaseClosed, setShowCaseClosed] = useState(false);
 
-  const [intruderLocation, setIntruderLocation] =
-    useState("")
+  const [intruderLocation, setIntruderLocation] = useState('');
 
-  const [movementStatus] = useState("Stationary")
+  const [movementStatus] = useState('Stationary');
 
-  const [serviceStatus, setServiceStatus] =
-  useState("Not notified")
+  const [serviceStatus, setServiceStatus] = useState('Not notified');
 
-  const [confirmedCoords, setConfirmedCoords] =
-    useState(defaultCoords)
+  const [confirmedCoords, setConfirmedCoords] = useState(defaultCoords);
 
-  const [updatingLocation, setUpdatingLocation] =
-    useState(false)
+  const [updatingLocation, setUpdatingLocation] = useState(false);
 
-  const [selectedCoords, setSelectedCoords] =
-    useState<{ x: number; y: number } | null>(null)
+  const [selectedCoords, setSelectedCoords] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
-  const [showLabelModal, setShowLabelModal] =
-    useState(false)
+  const [showLabelModal, setShowLabelModal] = useState(false);
 
+  const [locationInput, setLocationInput] = useState('');
 
-  const [locationInput, setLocationInput] =
-    useState("")
+  const [chatVisible, setChatVisible] = useState(false);
 
-  const [chatVisible, setChatVisible] =
-    useState(false)
+  const [feedVisible, setFeedVisible] = useState(false);
 
-  const [feedVisible, setFeedVisible] =
-    useState(false)
+  const [policeModalVisible, setPoliceModalVisible] = useState(false);
 
-  const [policeModalVisible, setPoliceModalVisible] =
-    useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false);
 
-  const [actionsOpen, setActionsOpen] =
-    useState(false)
+  const [mapRefreshKey, setMapRefreshKey] = useState(0);
 
-  const [mapRefreshKey, setMapRefreshKey] =
-    useState(0)
+  const [showQuestionModal, setShowQuestionModal] = useState(false);
 
-  const [showQuestionModal, setShowQuestionModal] =useState(false)
+  const [selectedCaseType, setSelectedCaseType] = useState('');
 
-  const [selectedCaseType, setSelectedCaseType] = useState("" )
+  const [questionAnswers, setQuestionAnswers] = useState<string[]>(['', '']);
+  const [currentVaultCaseId, setCurrentVaultCaseId] = useState<number | null>(
+    null,
+  );
 
-  const [questionAnswers, setQuestionAnswers] = useState<string[]>(["", ""])
-  const [currentVaultCaseId, setCurrentVaultCaseId] =  useState<number | null>(null)
+  const [showMap, setShowMap] = useState(false);
 
+  const [openCases, setOpenCases] = useState<any[]>([]);
+  const [showDashboard, setShowDashboard] = useState(false);
 
-  const [showMap, setShowMap] = useState(false)
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [selectedMapCase, setSelectedMapCase] = useState<any | null>(null);
 
-  const [openCases, setOpenCases] =  useState<any[]>([])
-  const [showDashboard, setShowDashboard] = useState(false)
+  async function saveLocation(x: number, y: number, label: string) {
+    const newCase = await createCase({
+      title: `${incidentType} Case`,
 
+      createdAt: Date.now(),
 
-  const [sheetExpanded, setSheetExpanded] = useState(false)
-  const [selectedMapCase, setSelectedMapCase] = useState<any | null>(null)
+      lastUpdatedAt: Date.now(),
 
+      status: 'ACTIVE',
 
+      locationX: x,
 
+      locationY: y,
 
+      locationLabel: label,
 
+      feed: '',
 
+      chat: '',
+    });
 
+    setCurrentVaultCaseId(newCase._id ?? newCase.id);
 
-  async function saveLocation(
-    x: number,
-    y: number,
-    label: string
-  ) {
-
-  const newCase =
-await createCase({
-
-    title:`${incidentType} Case`,
-
-    createdAt:Date.now(),
-
-    lastUpdatedAt:Date.now(),
-
-    status:"ACTIVE",
-
-    locationX:x,
-
-    locationY:y,
-
-    locationLabel:label,
-
-    feed:"",
-
-    chat:""
-
-});
-
-setCurrentVaultCaseId(newCase._id ?? newCase.id)
-
-await loadOpenCases();
-}
-  
-
-
-  function updateServiceStatusFromAnswer(
-  question: string,
-  answer: string
-) {
-
-  const isEmergencyQuestion =
-    question.includes("emergency services") ||
-    question.includes("fire department") ||
-    question.includes("police")
-
-  const isMaintenanceQuestion =
-    question.includes("maintenance team")
-
-
-  if (!isEmergencyQuestion && !isMaintenanceQuestion) {
-    return
+    await loadOpenCases();
   }
 
+  function updateServiceStatusFromAnswer(question: string, answer: string) {
+    const isEmergencyQuestion =
+      question.includes('emergency services') ||
+      question.includes('fire department') ||
+      question.includes('police');
 
-  if (isMaintenanceQuestion) {
+    const isMaintenanceQuestion = question.includes('maintenance team');
 
-    setServiceStatus(
-      answer === "Yes"
-        ? "Notified"
-        : "Not notified"
-    )
-
-    return
-  }
-
-
-  setServiceStatus(
-    answer === "Yes"
-      ? "Notified"
-      : "Not notified"
-  )
-}
-
-
-  useEffect(() => {
-
-
-
-
-    loadOpenCases()
-
-  }, [])
-
-  useEffect(() => {
-
-  if (!caseActive) {
-    loadOpenCases()
-  }
-
-}, [caseActive])
-
-useEffect(() => {
-
-  const interval = setInterval(() => {
-
-    if (!caseActive) {
-      loadOpenCases()
+    if (!isEmergencyQuestion && !isMaintenanceQuestion) {
+      return;
     }
 
-  }, 1000)
+    if (isMaintenanceQuestion) {
+      setServiceStatus(answer === 'Yes' ? 'Notified' : 'Not notified');
 
-  return () => clearInterval(interval)
+      return;
+    }
 
-}, [caseActive])
+    setServiceStatus(answer === 'Yes' ? 'Notified' : 'Not notified');
+  }
+
+  useEffect(() => {
+    loadOpenCases();
+  }, []);
+
+  useEffect(() => {
+    if (!caseActive) {
+      loadOpenCases();
+    }
+  }, [caseActive]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!caseActive) {
+        loadOpenCases();
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [caseActive]);
 
   async function openCase(type: string) {
+    clearFeed();
 
+    setIncidentType(type);
 
-    clearFeed()
+    setCaseActive(true);
 
-    setIncidentType(type)
+    setUpdatingLocation(true);
+    setLocationConfirmed(false);
+    setSelectedCoords(null);
+    setShowDashboard(false);
 
-    setCaseActive(true)
+    addFeedItem(`Mr C Wallace started a new ${type.toLowerCase()} case`);
 
-    setUpdatingLocation(true)
-    setLocationConfirmed(false)
-    setSelectedCoords(null)
-    setShowDashboard(false)
-
-    addFeedItem(
-      `Mr C Wallace started a new ${type.toLowerCase()} case`
-    )
-
-    updateVaultCaseData()
-    loadOpenCases()
+    updateVaultCaseData();
+    loadOpenCases();
 
     const answers = questionAnswers.filter(
-      answer => answer.trim().length > 0
-    )
+      (answer) => answer.trim().length > 0,
+    );
 
     answers.forEach((answer, index) => {
+      const question = caseQuestions[type][index].question;
 
-      const question =  caseQuestions[type][index].question
+      addFeedItem(`${question}: ${answer}`);
 
-      addFeedItem(
-        `${question}: ${answer}`
-      )
+      updateVaultCaseData();
+      loadOpenCases();
+    });
 
-      updateVaultCaseData()
-      loadOpenCases()
+    const newCase = await createCase({
+      title: `${type} Case`,
 
-    })
+      createdAt: Date.now(),
 
-   const newCase = await createCase({
+      lastUpdatedAt: Date.now(),
 
-    title:`${type} Case`,
+      status: 'ACTIVE',
 
-    createdAt:Date.now(),
+      locationX: defaultCoords.x,
 
-    lastUpdatedAt:Date.now(),
+      locationY: defaultCoords.y,
 
-    status:"ACTIVE",
+      locationLabel: '',
 
-    locationX:defaultCoords.x,
+      chat: '',
 
-    locationY:defaultCoords.y,
+      feed: '',
+    });
 
-    locationLabel:"",
+    setCurrentVaultCaseId(newCase._id ?? newCase.id);
 
-    chat:"",
-
-    feed:""
-
-})
-
-
-setCurrentVaultCaseId(
-    newCase._id ?? newCase.id
-)
-
-
-await loadOpenCases()
-
-}
+    await loadOpenCases();
+  }
 
   function openExistingCase(caseData: any) {
+    setCurrentVaultCaseId(caseData._id ?? caseData.id);
 
-  setCurrentVaultCaseId( caseData._id ?? caseData.id)
+    setCaseActive(true);
 
-  setCaseActive(true)
+    setShowDashboard(false);
 
-  setShowDashboard(false)
+    setLocationConfirmed(true);
 
-  setLocationConfirmed(true)
+    setUpdatingLocation(false);
 
-  setUpdatingLocation(false)
+    clearFeed();
 
-  clearFeed()
+    if (caseData.feed) {
+      caseData.feed
+        .split('\n')
+        .filter(Boolean)
+        .forEach((line: string) => {
+          const message = line.replace(/^\[[^\]]+\]\s*/, '');
 
-  if (caseData.feed) {
+          addFeedItem(message);
+        });
+    }
 
-  caseData.feed
-    .split("\n")
-    .filter(Boolean)
-    .forEach((line: string) => {
+    setIncidentType(caseData.title.split(' Case')[0]);
 
-      const message =
-        line.replace(
-          /^\[[^\]]+\]\s*/,
-          ""
-        )
+    setIntruderLocation(
+      caseData.locationLabel || caseData.title.split(' in ')[1] || '',
+    );
 
-      addFeedItem(message)
+    setConfirmedCoords({
+      x: Number(caseData.locationX ?? defaultCoords.x),
+      y: Number(caseData.locationY ?? defaultCoords.y),
+    });
 
-    })
-
-}
-
-
-  setIncidentType(
-    caseData.title.split(" Case")[0]
-  )
-
-  setIntruderLocation(
-  caseData.locationLabel ||
-  caseData.title.split(" in ")[1] ||
-  ""
-)
-
-  setConfirmedCoords({
-  x: Number(caseData.locationX ?? defaultCoords.x),
-  y: Number(caseData.locationY ?? defaultCoords.y),
-})
-
-console.log("CASE OPENED")
-console.log("locationX:", caseData.locationX)
-console.log("locationY:", caseData.locationY)
-
-}
-
+    console.log('CASE OPENED');
+    console.log('locationX:', caseData.locationX);
+    console.log('locationY:', caseData.locationY);
+  }
 
   async function handleCloseCase() {
+    Alert.alert('Close Case', 'Are you sure you want to close this case?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
 
-    Alert.alert(
-      "Close Case",
-      "Are you sure you want to close this case?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
+      {
+        text: 'Yes',
+        style: 'destructive',
 
-        {
-          text: "Yes",
-          style: "destructive",
+        onPress: async () => {
+          //backend now handles feed items directly, no longer need to update db from live-feed.tsx
+          const feedItems = getAllFeedItems();
 
-          onPress: async () => {
+          const feedHistory = feedItems
+            .map((item) => {
+              return `[${new Date(
+                item.createdAt,
+              ).toLocaleTimeString()}] ${item.message}`;
+            })
+            .join('\n');
 
-            
-
-            //backend now handles feed items directly, no longer need to update db from live-feed.tsx
-            const feedItems = getAllFeedItems() 
-
-            
-
-            const feedHistory = feedItems
-              .map((item) => {
-
-                return `[${new Date(
-                  item.createdAt
-                ).toLocaleTimeString()}] ${item.message}`
-
-              })
-              .join("\n")
-
-            if(currentVaultCaseId){
-
-              
-              await updateCase(
-                currentVaultCaseId.toString(),
+          if (currentVaultCaseId) {
+            await updateCase(
+              currentVaultCaseId.toString(),
 
               {
-                status:"CLOSED",
-                feed:feedHistory,
-                lastUpdatedAt:Date.now()
-              }
+                status: 'CLOSED',
+                feed: feedHistory,
+                lastUpdatedAt: Date.now(),
+              },
+            );
+          }
 
-              )
+          setCaseActive(false);
+          setCurrentVaultCaseId(null);
 
-            }
+          setLocationConfirmed(false);
 
-            setCaseActive(false)
-            setCurrentVaultCaseId(null)
+          setUpdatingLocation(false);
 
-           
+          setSelectedCoords(null);
 
-            setLocationConfirmed(false)
+          setIntruderLocation('');
 
-            setUpdatingLocation(false)
+          setLocationInput('');
 
-            setSelectedCoords(null)
+          addFeedItem('Mr C Wallace closed the case');
 
-            setIntruderLocation("")
+          updateVaultCaseData();
+          loadOpenCases();
 
-            setLocationInput("")
-
-
-            addFeedItem(
-              "Mr C Wallace closed the case"
-            )
-
-            updateVaultCaseData()
-            loadOpenCases()
-
-            setShowCaseClosed(true)
-          },
+          setShowCaseClosed(true);
         },
-      ]
-    )
+      },
+    ]);
   }
 
-
-  
   function handleStartCase() {
-
-    setShowSituationModal(true)
-
+    setShowSituationModal(true);
   }
 
-
-
-  
-
-  async function loadOpenCases(){
+  async function loadOpenCases() {
     try {
       const rows = await getCases();
 
@@ -547,643 +403,490 @@ console.log("locationY:", caseData.locationY)
           id: c.id,
           _id: c._id,
           title: c.title,
-        }))
+        })),
       );
 
-      setOpenCases(
-        rows.filter((c: any) => c.status === "ACTIVE")
-      );
+      setOpenCases(rows.filter((c: any) => c.status === 'ACTIVE'));
     } catch (error) {
       console.warn(
-        "loadOpenCases failed:",
-        error instanceof Error ? error.message : error
+        'loadOpenCases failed:',
+        error instanceof Error ? error.message : error,
       );
     }
   }
 
-  async function updateVaultCaseData(){
-
- if(!currentVaultCaseId){
-   return
- }
-
-
- const feedItems=getAllFeedItems()
-
-
- const feedHistory =
- feedItems
- .map(item =>
- `[${new Date(item.createdAt)
- .toLocaleTimeString()}] ${item.message}`
- )
- .join("\n")
-
-
- await updateCase(
-
- currentVaultCaseId.toString(),
-
- {
-   feed:feedHistory,
-   lastUpdatedAt:Date.now()
- }
-
- )
-
-}
-
-
-
-
-
-
-  function formatDate(
-  timestamp: number
-) {
-
-  const date = new Date(timestamp)
-
-  const today = new Date()
-
-  const yesterday = new Date()
-
-  yesterday.setDate(
-    yesterday.getDate() - 1
-  )
-
-  const time = date.toLocaleTimeString(
-    "en-GB",
-    {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
+  async function updateVaultCaseData() {
+    if (!currentVaultCaseId) {
+      return;
     }
-  )
 
-  const sameDay =
-    date.toDateString() ===
-    today.toDateString()
+    const feedItems = getAllFeedItems();
 
-  const sameYesterday =
-    date.toDateString() ===
-    yesterday.toDateString()
+    const feedHistory = feedItems
+      .map(
+        (item) =>
+          `[${new Date(item.createdAt).toLocaleTimeString()}] ${item.message}`,
+      )
+      .join('\n');
 
-  if (sameDay) {
-    return `Today, ${time}`
+    await updateCase(
+      currentVaultCaseId.toString(),
+
+      {
+        feed: feedHistory,
+        lastUpdatedAt: Date.now(),
+      },
+    );
   }
 
-  if (sameYesterday) {
-    return `Yesterday, ${time}`
+  function formatDate(timestamp: number) {
+    const date = new Date(timestamp);
+
+    const today = new Date();
+
+    const yesterday = new Date();
+
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const time = date.toLocaleTimeString('en-GB', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    const sameDay = date.toDateString() === today.toDateString();
+
+    const sameYesterday = date.toDateString() === yesterday.toDateString();
+
+    if (sameDay) {
+      return `Today, ${time}`;
+    }
+
+    if (sameYesterday) {
+      return `Yesterday, ${time}`;
+    }
+
+    return `${date.toLocaleDateString('en-GB')}, ${time}`;
   }
-
-  return `${date.toLocaleDateString(
-    "en-GB"
-  )}, ${time}`
-}
-
 
   function getServicesLabel() {
-
-    return incidentType === "Maintenance"
-      ? "Maintenance Services"
-      : "Emergency Services"
-
+    return incidentType === 'Maintenance'
+      ? 'Maintenance Services'
+      : 'Emergency Services';
   }
 
-
   return (
-
     <View style={styles.container}>
-
       <View style={styles.header}>
-
-        <Image
-          source={logo}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-
+        <Image source={logo} style={styles.logo} resizeMode="contain" />
       </View>
 
       {caseActive && !showDashboard && (
-
-      <ThemedView style={styles.alertBox}>
-
-        <Text style={styles.alertText}>
-          ALERT
-        </Text>
-
-        {!caseActive ? (
-
-          <Text style={styles.infoText}>
-            No current developments
-          </Text>
-
-        ) : (
-
-          <>
-            <Text style={styles.infoText}>
+        <View style={styles.statusBar}>
+          <View style={styles.statusDot} />
+          <View style={styles.statusBody}>
+            <Text style={styles.statusLabel}>ACTIVE INCIDENT</Text>
+            <Text style={styles.statusTitle} numberOfLines={1}>
               {locationConfirmed
-                ? (
-                    incidentType === "Intruder" ||
-                    incidentType === "Missing"
-                  )
-                  ? `${incidentType} last seen in ${intruderLocation}`
-                  : `${incidentType} in ${intruderLocation}`
-                : incidentType
-              }
+                ? incidentType === 'Intruder' || incidentType === 'Missing'
+                  ? `${incidentType} — last seen in ${intruderLocation}`
+                  : `${incidentType} — ${intruderLocation}`
+                : incidentType}
             </Text>
-
-
-            <View style={styles.row}>
-
-              <Text style={styles.smallText}>
-                {getServicesLabel()}
-              </Text>
-
-              <Text style={styles.smallText}>
-                  
-              </Text>
-
-              <Text style={styles.blueText}>
-                {serviceStatus}
-              </Text>
-
-            </View>
-          </>
-        )}
-
-      </ThemedView>
-
+          </View>
+          <View
+            style={[
+              styles.serviceBadge,
+              serviceStatus !== 'Not notified' && styles.serviceBadgeActive,
+            ]}
+          >
+            <Text style={styles.serviceBadgeLabel}>{getServicesLabel()}</Text>
+            <Text style={styles.serviceBadgeStatus}>{serviceStatus}</Text>
+          </View>
+        </View>
       )}
 
       <View style={styles.content}>
+        {!caseActive && (
+          <View style={[{ flex: 1 }, isDesktop && styles.desktopRow]}>
+            <View style={[{ flex: 1 }, isDesktop && { flex: 3 }]}>
+              <DashboardMap
+                cases={openCases}
+                selectedCase={selectedMapCase}
+                onMarkerPress={setSelectedMapCase}
+                onView={openExistingCase}
+              />
+            </View>
 
-{!caseActive && (
+            {!isDesktop && (
+              <Pressable
+                style={styles.floatingStartCase}
+                onPress={handleStartCase}
+              >
+                <Text style={styles.floatingStartText}>Start Case</Text>
+              </Pressable>
+            )}
 
-    <View style={{ flex: 1 }}>
+            {selectedMapCase ? (
+              <View
+                style={[
+                  styles.bottomSheet,
+                  isDesktop && styles.desktopSidePanel,
+                ]}
+              >
+                <Text style={styles.sheetHeading}>{selectedMapCase.title}</Text>
 
-        <DashboardMap
-          cases={openCases}
-          selectedCase={selectedMapCase}
-          onMarkerPress={setSelectedMapCase}
-          onView={openExistingCase}
-        />
-
-        <Pressable
-            style={styles.floatingStartCase}
-            onPress={handleStartCase}
-        >
-            <Text style={styles.floatingStartText}>
-                Start Case
-            </Text>
-        </Pressable>
-
-        {selectedMapCase ? (
-
-            <View
-                style={styles.bottomSheet}
-            >
-
-                <Text style={styles.sheetHeading}>
-                    {selectedMapCase.title}
+                <Text style={styles.sheetSubHeading}>
+                  Created: {formatDate(selectedMapCase.createdAt)}
                 </Text>
 
                 <Text style={styles.sheetSubHeading}>
-                    Created:{" "}
-                    {formatDate(selectedMapCase.createdAt)}
-                </Text>
-
-                <Text style={styles.sheetSubHeading}>
-                    Updated:{" "}
-                    {formatDate(selectedMapCase.lastUpdatedAt)}
+                  Updated: {formatDate(selectedMapCase.lastUpdatedAt)}
                 </Text>
 
                 <Pressable
-                    style={styles.viewButton}
-                    onPress={() =>
-                        openExistingCase(selectedMapCase)
-                    }
+                  style={styles.viewButton}
+                  onPress={() => openExistingCase(selectedMapCase)}
                 >
-                    <Text style={styles.buttonText}>
-                        View
-                    </Text>
+                  <Text style={styles.buttonText}>View</Text>
                 </Pressable>
-
-            </View>
-
-        ) : (
-
-            <Pressable
+              </View>
+            ) : (
+              <Pressable
                 style={[
-                    styles.bottomSheet,
-                    sheetExpanded &&
-                        styles.bottomSheetExpanded,
+                  styles.bottomSheet,
+                  isDesktop && styles.desktopSidePanel,
+                  !isDesktop && sheetExpanded && styles.bottomSheetExpanded,
                 ]}
-                onPress={() =>
-                    setSheetExpanded(!sheetExpanded)
-                }
-            >
-
-                <View style={styles.sheetHandle}>
+                onPress={() => !isDesktop && setSheetExpanded(!sheetExpanded)}
+              >
+                {!isDesktop && (
+                  <View style={styles.sheetHandle}>
                     <View style={styles.handleBar} />
-                </View>
+                  </View>
+                )}
 
-                <Text style={styles.sheetHeading}>
-                    Home
-                </Text>
+                <Text style={styles.sheetHeading}>Home</Text>
 
                 <ScrollView>
-
                   <Pressable
-    style={{
-        backgroundColor: "#2563EB",
-        marginTop: 18,
-        marginBottom: 20,
-        borderRadius: 12,
-        paddingVertical: 15,
-        alignItems: "center",
-    }}
-    onPress={handleStartCase}
->
+                    style={{
+                      backgroundColor: '#2563EB',
+                      marginTop: 18,
+                      marginBottom: 20,
+                      borderRadius: 12,
+                      paddingVertical: 15,
+                      alignItems: 'center',
+                    }}
+                    onPress={handleStartCase}
+                  >
+                    <Text
+                      style={{
+                        color: '#FFF',
+                        fontWeight: '700',
+                        fontSize: 17,
+                      }}
+                    >
+                      Start Case
+                    </Text>
+                  </Pressable>
 
-    <Text
-        style={{
-            color: "#FFF",
-            fontWeight: "700",
-            fontSize: 17,
-        }}
-    >
-        Start Case
-    </Text>
+                  {openCases.map((item) => (
+                    <Pressable
+                      key={item.id}
+                      style={styles.caseCard}
+                      onPress={() => openExistingCase(item)}
+                    >
+                      <Text style={styles.caseTitleCard}>{item.title}</Text>
 
-</Pressable>
-
-
-                    {openCases.map((item) => (
-
-                        <Pressable
-                            key={item.id}
-                            style={styles.caseCard}
-                            onPress={() =>
-                                openExistingCase(item)
-                            }
-                        >
-
-                            <Text
-                                style={
-                                    styles.caseTitleCard
-                                }
-                            >
-                                {item.title}
-                            </Text>
-
-                            <Text
-                                style={
-                                    styles.caseDateCard
-                                }
-                            >
-                                Updated{" "}
-                                {formatDate(
-                                    item.lastUpdatedAt
-                                )}
-                            </Text>
-
-                        </Pressable>
-
-                    ))}
-
+                      <Text style={styles.caseDateCard}>
+                        Updated {formatDate(item.lastUpdatedAt)}
+                      </Text>
+                    </Pressable>
+                  ))}
                 </ScrollView>
-
-            </Pressable>
-
+              </Pressable>
+            )}
+          </View>
         )}
 
-    </View>
-
-)}
-
-{caseActive && (
-
-    <>
-
-      <View style={styles.mapContainer}>
-
-        <IntruderMap
-          key={mapRefreshKey}
-          floorPlan={floorPlan}
-          updateMode={updatingLocation}
-          selectedCoords={
-            selectedCoords || confirmedCoords
-          }
-          showMarker={
-  selectedCoords !== null ||
-  locationConfirmed
-}
-          onMapPress={(coords) => {
-
-            if (updatingLocation) {
-
-              setSelectedCoords(coords)
-
-            }
-
-          }}
-        />
-
-      </View>
-
-      {updatingLocation && (
-
-        <Pressable
-          style={[
-            styles.confirmButton,
-            {
-              backgroundColor:
-                selectedCoords
-                  ? "#16A34A"
-                  : "#6B7280",
-
-              opacity:
-                selectedCoords
-                  ? 1
-                  : 0.4,
-            },
-          ]}
-          disabled={!selectedCoords}
-          onPress={() => {
-
-            if (selectedCoords) {
-              setShowLabelModal(true)
-            }
-
-          }}
-        >
-
-          <Text style={styles.buttonText}>
-            Confirm Location
-          </Text>
-
-        </Pressable>
-
-      )}
-
-      {!updatingLocation && (
-
-        <View style={styles.actionsWrap}>
-
-          <Pressable
-            style={styles.handle}
-            onPress={() => {
-
-              setActionsOpen(
-                !actionsOpen
-              )
-
-            }}
-          >
-
+        {caseActive && (
+          <>
             <View
-              style={styles.handleLine}
-            />
-
-            <Text
-              style={styles.handleLabel}
+              style={[styles.mapContainer, isDesktop && styles.desktopCaseRow]}
             >
-              {actionsOpen
-                ? "Hide Actions"
-                : "Show Actions"}
-            </Text>
-
-          </Pressable>
-
-          {actionsOpen && (
-
-            <View
-              style={styles.actionsBox}
-            >
-
-              <View
-                style={
-                  styles.actionButtonsRow
-                }
-              >
-
-                <Pressable
-                  style={[
-                    styles.redButton,
-                    styles.feedButton,
-                  ]}
-                  onPress={() =>
-                    setFeedVisible(true)
-                  }
-                >
-
-                  <Text
-                    style={
-                      styles.buttonText
+              <View style={[{ flex: 1 }, isDesktop && { flex: 3 }]}>
+                <IntruderMap
+                  key={mapRefreshKey}
+                  floorPlan={floorPlan}
+                  updateMode={updatingLocation}
+                  selectedCoords={selectedCoords || confirmedCoords}
+                  showMarker={selectedCoords !== null || locationConfirmed}
+                  onMapPress={(coords) => {
+                    if (updatingLocation) {
+                      setSelectedCoords(coords);
                     }
-                  >
-                    Live Feed
-                  </Text>
-
-                </Pressable>
-
+                  }}
+                />
               </View>
 
-              <Pressable
-                style={styles.redButton}
-                onPress={() => {
+              {/* Desktop: case actions sidebar */}
+              {isDesktop && !updatingLocation && (
+                <View style={styles.desktopActionsPanel}>
+                  <Text style={styles.deskPanelTitle}>Case Actions</Text>
 
-                  setPoliceModalVisible(
-                    true
-                  )
+                  <Pressable
+                    style={[styles.deskPanelBtn, styles.deskBtnBlue]}
+                    onPress={() => setFeedVisible(true)}
+                  >
+                    <Text style={styles.deskBtnText}>Live Feed</Text>
+                  </Pressable>
 
-                }}
-              >
+                  <Pressable
+                    style={[styles.deskPanelBtn, styles.deskBtnRed]}
+                    onPress={() => setPoliceModalVisible(true)}
+                  >
+                    <Text style={styles.deskBtnText}>{getServicesLabel()}</Text>
+                  </Pressable>
 
-                <Text
-                  style={styles.buttonText}
-                >
-                  {getServicesLabel()}
-                </Text>
+                  <Pressable
+                    style={[styles.deskPanelBtn, styles.deskBtnGray]}
+                    onPress={() => {
+                      setUpdatingLocation(true);
+                      setSelectedCoords(null);
+                    }}
+                  >
+                    <Text style={styles.deskBtnTextDark}>Update Location</Text>
+                  </Pressable>
 
-              </Pressable>
+                  <View style={styles.deskDivider} />
 
-              <Pressable
-                style={[
-                  styles.redButton,
-                  {
-                    backgroundColor:
-                      "#ffffff",
-                    marginTop: 10,
-                  },
-                ]}
-                onPress={() => {
+                  <View style={styles.caseBottomRow}>
+                    <Pressable
+                      style={[
+                        styles.deskPanelBtn,
+                        styles.deskBtnGray,
+                        { flex: 1 },
+                      ]}
+                      onPress={() => {
+                        setCaseActive(false);
+                        setSelectedMapCase(null);
+                        loadOpenCases();
+                      }}
+                    >
+                      <Text style={styles.deskBtnTextDark}>Home</Text>
+                    </Pressable>
 
-                  setUpdatingLocation(
-                    true
-                  )
+                    <Pressable
+                      style={[
+                        styles.deskPanelBtn,
+                        styles.deskBtnRed,
+                        { flex: 1 },
+                      ]}
+                      onPress={handleCloseCase}
+                    >
+                      <Text style={styles.deskBtnText}>Close</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
 
-                  setSelectedCoords(
-                    null
-                  )
-
-                }}
-              >
-
-                <Text
-                  style={styles.buttonText}
-                >
-                  Update Location
-                </Text>
-
-              </Pressable>
-
-              <View style={styles.caseBottomRow}>
-
-              <Pressable
-                style={[
-                  styles.caseBottomButton,
-                  {
-                    backgroundColor: "#ffffff",
-                  },
-                ]}
-                onPress={() => {
-
-      
-
-                  setCaseActive(false)
-                  setSelectedMapCase(null)
-                  loadOpenCases()
-
-                }}
-              >
-
-    <Text style={styles.buttonText}>
-      Home
-    </Text>
-
-  </Pressable>
-
-  <Pressable
-    style={[
-      styles.caseBottomButton,
-      {
-        backgroundColor: "#ffffff",
-      },
-    ]}
-    onPress={handleCloseCase}
-  >
-
-    <Text style={styles.buttonText}>
-      Close Case
-    </Text>
-
-  </Pressable>
-
-</View>
-
+              {/* Desktop: location update sidebar */}
+              {isDesktop && updatingLocation && (
+                <View style={styles.desktopActionsPanel}>
+                  <Text style={styles.deskPanelTitle}>Set Location</Text>
+                  <Text style={styles.deskPanelHint}>
+                    Click anywhere on the map to place the incident marker.
+                  </Text>
+                  <Pressable
+                    style={[
+                      styles.deskPanelBtn,
+                      selectedCoords
+                        ? styles.deskBtnGreen
+                        : styles.deskBtnDisabled,
+                    ]}
+                    disabled={!selectedCoords}
+                    onPress={() => {
+                      if (selectedCoords) setShowLabelModal(true);
+                    }}
+                  >
+                    <Text style={styles.deskBtnText}>Confirm Location</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
 
-          )}
+            {updatingLocation && !isDesktop && (
+              <Pressable
+                style={[
+                  styles.confirmButton,
+                  {
+                    backgroundColor: selectedCoords ? '#16A34A' : '#6B7280',
 
-        </View>
+                    opacity: selectedCoords ? 1 : 0.4,
+                  },
+                ]}
+                disabled={!selectedCoords}
+                onPress={() => {
+                  if (selectedCoords) {
+                    setShowLabelModal(true);
+                  }
+                }}
+              >
+                <Text style={styles.buttonText}>Confirm Location</Text>
+              </Pressable>
+            )}
 
-      )}
+            {!updatingLocation && !isDesktop && (
+              <View style={styles.actionsWrap}>
+                <Pressable
+                  style={styles.handle}
+                  onPress={() => {
+                    setActionsOpen(!actionsOpen);
+                  }}
+                >
+                  <View style={styles.handleLine} />
 
-    </>
+                  <Text style={styles.handleLabel}>
+                    {actionsOpen ? 'Hide Actions' : 'Show Actions'}
+                  </Text>
+                </Pressable>
 
-  )}
+                {actionsOpen && (
+                  <View style={styles.actionsBox}>
+                    <View style={styles.actionButtonsRow}>
+                      <Pressable
+                        style={[styles.redButton, styles.feedButton]}
+                        onPress={() => setFeedVisible(true)}
+                      >
+                        <Text style={styles.buttonText}>Live Feed</Text>
+                      </Pressable>
+                    </View>
 
-</View>
+                    <Pressable
+                      style={styles.redButton}
+                      onPress={() => {
+                        setPoliceModalVisible(true);
+                      }}
+                    >
+                      <Text style={styles.buttonText}>
+                        {getServicesLabel()}
+                      </Text>
+                    </Pressable>
 
-      <BottomSheet
-        visible={chatVisible}
-        onClose={() => setChatVisible(false)}
-      >
+                    <Pressable
+                      style={[
+                        styles.redButton,
+                        {
+                          backgroundColor: '#ffffff',
+                          marginTop: 10,
+                        },
+                      ]}
+                      onPress={() => {
+                        setUpdatingLocation(true);
 
+                        setSelectedCoords(null);
+                      }}
+                    >
+                      <Text style={styles.buttonText}>Update Location</Text>
+                    </Pressable>
+
+                    <View style={styles.caseBottomRow}>
+                      <Pressable
+                        style={[
+                          styles.caseBottomButton,
+                          {
+                            backgroundColor: '#ffffff',
+                          },
+                        ]}
+                        onPress={() => {
+                          setCaseActive(false);
+                          setSelectedMapCase(null);
+                          loadOpenCases();
+                        }}
+                      >
+                        <Text style={styles.buttonText}>Home</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[
+                          styles.caseBottomButton,
+                          {
+                            backgroundColor: '#ffffff',
+                          },
+                        ]}
+                        onPress={handleCloseCase}
+                      >
+                        <Text style={styles.buttonText}>Close Case</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+          </>
+        )}
+      </View>
+
+      <BottomSheet visible={chatVisible} onClose={() => setChatVisible(false)}>
         <ChatSheet />
-
       </BottomSheet>
 
-      <BottomSheet
-        visible={feedVisible}
-        onClose={() => setFeedVisible(false)}
-      >
-
+      <BottomSheet visible={feedVisible} onClose={() => setFeedVisible(false)}>
         <LiveFeedSheet />
-
       </BottomSheet>
 
       <BottomSheet
         visible={policeModalVisible}
         onClose={() => setPoliceModalVisible(false)}
       >
-
         <PoliceConfirmation
           serviceType={
-            incidentType === "Maintenance"
-              ? "Maintenance"
-              : "Emergency"
+            incidentType === 'Maintenance' ? 'Maintenance' : 'Emergency'
           }
           servicesAlreadyNotified={
-            serviceStatus.includes("Notified") &&
-            !serviceStatus.includes("Not notified")
+            serviceStatus.includes('Notified') &&
+            !serviceStatus.includes('Not notified')
           }
           onCancel={() => {
-            setPoliceModalVisible(false)
+            setPoliceModalVisible(false);
           }}
           onConfirm={() => {
+            setServiceStatus(
+              incidentType === 'Maintenance'
+                ? 'Maintenance notified'
+                : 'Emergency services notified',
+            );
 
-          setServiceStatus(
-            incidentType === "Maintenance"
-              ? "Maintenance notified"
-              : "Emergency services notified"
-          )
+            addFeedItem(
+              incidentType === 'Maintenance'
+                ? 'Maintenance services have been notified'
+                : 'Emergency services have been notified',
+            );
 
-          addFeedItem(
-            incidentType === "Maintenance"
-              ? "Maintenance services have been notified"
-              : "Emergency services have been notified"
-          )
+            updateVaultCaseData();
+            loadOpenCases();
 
-          updateVaultCaseData()
-          loadOpenCases()
-
-          setPoliceModalVisible(false)
+            setPoliceModalVisible(false);
           }}
         />
-
       </BottomSheet>
 
       <BottomSheet
         visible={showCaseClosed}
         onClose={() => setShowCaseClosed(false)}
       >
-
         <CaseClosedSheet
           onClose={() => {
-            setShowCaseClosed(false)
+            setShowCaseClosed(false);
           }}
         />
-
       </BottomSheet>
 
-      <Modal
-        visible={showSituationModal}
-        transparent
-        animationType="fade"
-      >
-
+      <Modal visible={showSituationModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-
           <View style={styles.modalBox}>
-
-            <Text style={styles.modalTitle}>
-              What describes the situation?
-            </Text>
+            <Text style={styles.modalTitle}>What describes the situation?</Text>
 
             <Text style={styles.modalSubtitle}>
               Choose the option that best describes your report
@@ -1191,260 +894,171 @@ console.log("locationY:", caseData.locationY)
 
             {[
               {
-                label: "Fire",
-                icon: "🔥",
+                label: 'Fire',
+                icon: '🔥',
               },
               {
-                label: "Intruder",
-                icon: "🚨",
+                label: 'Intruder',
+                icon: '🚨',
               },
               {
-                label: "Injury",
-                icon: "🩹",
+                label: 'Injury',
+                icon: '🩹',
               },
               {
-                label: "Maintenance",
-                icon: "🔧",
+                label: 'Maintenance',
+                icon: '🔧',
               },
             ].map((item) => (
-
               <Pressable
                 key={item.label}
                 style={styles.situationCard}
                 onPress={() => {
+                  setSelectedCaseType(item.label);
+                  setQuestionAnswers(['', '']);
 
-                  setSelectedCaseType(item.label)
-                  setQuestionAnswers(["", ""])
-
-                  setShowSituationModal(false)
-                  setShowQuestionModal(true)
-
+                  setShowSituationModal(false);
+                  setShowQuestionModal(true);
                 }}
               >
-
                 <View style={styles.situationLeft}>
+                  <Text style={styles.situationEmoji}>{item.icon}</Text>
 
-                  <Text style={styles.situationEmoji}>
-                    {item.icon}
-                  </Text>
-
-                  <Text style={styles.situationText}>
-                    {item.label}
-                  </Text>
-
+                  <Text style={styles.situationText}>{item.label}</Text>
                 </View>
 
-                <Text style={styles.chevron}>
-                  ›
-                </Text>
-
+                <Text style={styles.chevron}>›</Text>
               </Pressable>
-
             ))}
 
             <Pressable
               style={[
                 styles.modalButton,
                 {
-                  backgroundColor: "#d9dbdd",
+                  backgroundColor: '#d9dbdd',
                   marginTop: 16,
                 },
               ]}
               onPress={() => {
-                setShowSituationModal(false)
+                setShowSituationModal(false);
               }}
             >
-
-              <Text style={styles.modalButtonText}>
-                Cancel
-              </Text>
-
+              <Text style={styles.modalButtonText}>Cancel</Text>
             </Pressable>
-
           </View>
-
         </View>
-
       </Modal>
 
-      <Modal
-        visible={showQuestionModal}
-        transparent
-        animationType="fade"
-      >
-
+      <Modal visible={showQuestionModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-
           <View style={styles.modalBox}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>{selectedCaseType} Details</Text>
 
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-            >
+              {(caseQuestions[selectedCaseType] || []).map((item, index) => (
+                <View key={item.question} style={{ marginBottom: 16 }}>
+                  <Text style={styles.questionLabel}>{item.question}</Text>
 
-              <Text style={styles.modalTitle}>
-                {selectedCaseType} Details
-              </Text>
+                  {item.type === 'yesno' ? (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        gap: 10,
+                      }}
+                    >
+                      <Pressable
+                        style={[
+                          styles.yesNoButton,
+                          questionAnswers[index] === 'Yes' && {
+                            backgroundColor: '#34b864',
+                          },
+                        ]}
+                        onPress={() => {
+                          const updated = [...questionAnswers];
 
-              {(caseQuestions[selectedCaseType] || [])
-                .map((item, index) => (
+                          updated[index] = 'Yes';
 
-                  <View
-                    key={item.question}
-                    style={{ marginBottom: 16 }}
-                  >
+                          setQuestionAnswers(updated);
 
-                    <Text style={styles.questionLabel}>
-                      {item.question}
-                    </Text>
-
-                    {item.type === "yesno" ? (
-
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          gap: 10,
+                          updateServiceStatusFromAnswer(item.question, 'Yes');
                         }}
                       >
+                        <Text style={styles.modalButtonText}>Yes</Text>
+                      </Pressable>
 
-                        <Pressable
-                          style={[
-                            styles.yesNoButton,
-                            questionAnswers[index] === "Yes" && {
-                              backgroundColor: "#34b864",
-                            },
-                          ]}
-                          onPress={() => {
+                      <Pressable
+                        style={[
+                          styles.yesNoButton,
+                          questionAnswers[index] === 'No' && {
+                            backgroundColor: '#e13f3f',
+                          },
+                        ]}
+                        onPress={() => {
+                          const updated = [...questionAnswers];
 
-                            const updated = [...questionAnswers]
+                          updated[index] = 'No';
 
-                            updated[index] = "Yes"
+                          setQuestionAnswers(updated);
 
-                            setQuestionAnswers(updated)
+                          updateServiceStatusFromAnswer(item.question, 'No');
+                        }}
+                      >
+                        <Text style={styles.modalButtonText}>No</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter response..."
+                      placeholderTextColor="#999"
+                      value={questionAnswers[index] || ''}
+                      onChangeText={(text) => {
+                        const updated = [...questionAnswers];
 
-                            updateServiceStatusFromAnswer(
-                              item.question,
-                              "Yes"
-                            )
-                          }}
-                        >
-      <Text style={styles.modalButtonText}>
-        Yes
-      </Text>
-    </Pressable>
+                        updated[index] = text;
 
-    <Pressable
-      style={[
-        styles.yesNoButton,
-        questionAnswers[index] === "No" && {
-          backgroundColor: "#e13f3f",
-        },
-      ]}
-      onPress={() => {
-
-        const updated = [...questionAnswers]
-
-        updated[index] = "No"
-
-        setQuestionAnswers(updated)
-
-        updateServiceStatusFromAnswer(
-          item.question,
-          "No"
-        )
-
-      }}
-    >
-        <Text style={styles.modalButtonText}>
-          No
-        </Text>
-    </Pressable>
-
-  </View>
-
-) : (
-
-  <TextInput
-    style={styles.input}
-    placeholder="Enter response..."
-    placeholderTextColor="#999"
-    value={questionAnswers[index] || ""}
-    onChangeText={(text) => {
-
-      const updated = [...questionAnswers]
-
-      updated[index] = text
-
-      setQuestionAnswers(updated)
-
-    }}
-  />
-
-)}
-
-              </View>
-              )
-              )}
-
-              
+                        setQuestionAnswers(updated);
+                      }}
+                    />
+                  )}
+                </View>
+              ))}
 
               <Pressable
                 style={[
                   styles.modalButton,
                   {
-                    backgroundColor: "#64c982",
+                    backgroundColor: '#64c982',
                     marginTop: 10,
                   },
                 ]}
                 onPress={() => {
+                  setShowQuestionModal(false);
 
-                  setShowQuestionModal(false)
-
-                  openCase(selectedCaseType)
-
+                  openCase(selectedCaseType);
                 }}
               >
-
-                <Text style={styles.modalButtonText}>
-                  Continue
-                </Text>
-
+                <Text style={styles.modalButtonText}>Continue</Text>
               </Pressable>
 
               <Pressable
                 style={styles.backButton}
                 onPress={() => {
-
-                  setShowQuestionModal(false)
-                  setShowSituationModal(true)
-
+                  setShowQuestionModal(false);
+                  setShowSituationModal(true);
                 }}
               >
-                <Text style={styles.backButtonText}>
-                  Back
-                </Text>
+                <Text style={styles.backButtonText}>Back</Text>
               </Pressable>
-
             </ScrollView>
-
           </View>
-
         </View>
-
       </Modal>
 
-      <Modal
-        visible={showLabelModal}
-        transparent
-        animationType="fade"
-      >
-
+      <Modal visible={showLabelModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-
           <View style={styles.modalBox}>
-
-            <Text style={styles.modalTitle}>
-              Enter Location
-            </Text>
+            <Text style={styles.modalTitle}>Enter Location</Text>
 
             <TextInput
               style={styles.input}
@@ -1453,129 +1067,97 @@ console.log("locationY:", caseData.locationY)
               value={locationInput}
               maxLength={15}
               onChangeText={(text) => {
-
                 if (text.length <= 15) {
-                  setLocationInput(text)
+                  setLocationInput(text);
                 }
-
               }}
             />
 
             <Pressable
-  style={[
-    styles.modalButton,
-    {
-      backgroundColor:"#71d795",
-      marginTop:15,
-    },
-  ]}
+              style={[
+                styles.modalButton,
+                {
+                  backgroundColor: '#71d795',
+                  marginTop: 15,
+                },
+              ]}
+              onPress={async () => {
+                if (!locationInput.trim() || !selectedCoords) {
+                  return;
+                }
 
-  onPress={async()=>{
+                const cleanLabel = locationInput.trim();
 
-    if(
-      !locationInput.trim() ||
-      !selectedCoords
-    ){
-      return
-    }
+                const coords = selectedCoords;
 
+                setConfirmedCoords(coords);
 
-    const cleanLabel =
-      locationInput.trim()
+                setLocationConfirmed(true);
 
+                setIntruderLocation(cleanLabel);
 
-    const coords =
-      selectedCoords
+                if (currentVaultCaseId) {
+                  await updateCase(
+                    currentVaultCaseId.toString(),
 
+                    {
+                      locationX: coords.x,
+                      locationY: coords.y,
+                      locationLabel: cleanLabel,
+                      lastUpdatedAt: Date.now(),
+                    },
+                  );
+                }
 
-    setConfirmedCoords(coords)
+                addFeedItem(
+                  intruderLocation
+                    ? `UPDATE! ${incidentType} location is now ${cleanLabel}`
+                    : `CAUTION! ${incidentType} spotted in ${cleanLabel}`,
+                );
 
-    setLocationConfirmed(true)
+                await updateVaultCaseData();
 
-    setIntruderLocation(cleanLabel)
+                await loadOpenCases();
 
+                setMapRefreshKey((prev) => prev + 1);
 
-    if(currentVaultCaseId){
+                setUpdatingLocation(false);
 
-      await updateCase(
+                setSelectedCoords(null);
 
-        currentVaultCaseId.toString(),
+                setLocationInput('');
 
-        {
-          locationX:coords.x,
-          locationY:coords.y,
-          locationLabel:cleanLabel,
-          lastUpdatedAt:Date.now()
-        }
-
-      )
-
-    }
-
-
-    addFeedItem(
-
-      intruderLocation
-
-      ? `UPDATE! ${incidentType} location is now ${cleanLabel}`
-
-      : `CAUTION! ${incidentType} spotted in ${cleanLabel}`
-
-    )
-
-
-    await updateVaultCaseData()
-
-    await loadOpenCases()
-
-
-    setMapRefreshKey(
-      prev=>prev+1
-    )
-
-
-    setUpdatingLocation(false)
-
-    setSelectedCoords(null)
-
-    setLocationInput("")
-
-    setShowLabelModal(false)
-
-  }}
->
-
-              <Text style={styles.modalButtonText}>
-                Continue
-              </Text>
-
+                setShowLabelModal(false);
+              }}
+            >
+              <Text style={styles.modalButtonText}>Continue</Text>
             </Pressable>
-
           </View>
-
         </View>
-
       </Modal>
-
     </View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
-
   container: {
     flex: 1,
-    backgroundColor: "#F5F7FA",
+    backgroundColor: '#F5F7FA',
   },
 
   header: {
     height: 60,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F3F4F6",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.08)",
-    elevation: 3,
+    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
 
   logo: {
@@ -1585,47 +1167,71 @@ const styles = StyleSheet.create({
   },
 
   alertBox: {
-    marginTop: 5,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: "#e3e3e3",
-    borderLeftWidth: 8,
-    borderLeftColor: "#b6b6b6",
-    alignItems: "center",
+    display: 'none' as any,
   },
 
-  alertText: {
-    color: "#c41313",
-    fontSize: 18,
-    fontWeight: "700",
+  statusBar: {
+    backgroundColor: '#111827',
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: '#DC2626',
+    gap: 12,
   },
 
-  infoText: {
-    color: "#000000",
-    fontSize: 16,
-    fontWeight: "600",
+  statusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+    flexShrink: 0,
   },
 
-  row: {
-    flexDirection: "row",
+  statusBody: {
+    flex: 1,
+  },
+
+  statusLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+
+  statusTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  serviceBadge: {
+    backgroundColor: '#374151',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    minWidth: 90,
+  },
+
+  serviceBadgeActive: {
+    backgroundColor: '#064E3B',
+  },
+
+  serviceBadgeLabel: {
+    fontSize: 9,
+    color: '#9CA3AF',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+
+  serviceBadgeStatus: {
+    fontSize: 11,
+    color: '#FFFFFF',
+    fontWeight: '700',
     marginTop: 2,
-  },
-
-  smallText: {
-    color: "#000000",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-
-  yellowText: {
-    color: "#FACC15",
-    fontSize: 15,
-  },
-
-  blueText: {
-    color: "#000000",
-    fontSize: 15,
   },
 
   content: {
@@ -1634,25 +1240,107 @@ const styles = StyleSheet.create({
 
   mapContainer: {
     flex: 1,
-    width: "100%",
+    width: '100%',
+  },
+
+  desktopRow: {
+    flexDirection: 'row',
+  },
+
+  desktopCaseRow: {
+    flexDirection: 'row',
+    flex: 1,
+  },
+
+  desktopSidePanel: {
+    position: 'relative',
+    left: undefined,
+    right: undefined,
+    bottom: undefined,
+    width: 300,
+    height: '100%' as any,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderLeftWidth: 1,
+    borderLeftColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+
+  desktopActionsPanel: {
+    width: 240,
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    borderLeftWidth: 1,
+    borderLeftColor: '#E5E7EB',
+  },
+
+  deskPanelTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 14,
+  },
+
+  deskPanelHint: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+
+  deskPanelBtn: {
+    paddingVertical: 11,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  deskBtnBlue: { backgroundColor: '#2563EB' },
+  deskBtnRed: { backgroundColor: '#DC2626' },
+  deskBtnGreen: { backgroundColor: '#16A34A' },
+  deskBtnGray: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  deskBtnDisabled: { backgroundColor: '#D1D5DB' },
+
+  deskBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+
+  deskBtnTextDark: {
+    color: '#374151',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+
+  deskDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 12,
   },
 
   startButtonWrap: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 30,
-    width: "100%",
+    width: '100%',
     paddingHorizontal: 16,
   },
 
   actionsWrap: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 0,
-    width: "100%",
+    width: '100%',
   },
 
   handle: {
-    backgroundColor: "#e3e3e3",
-    alignItems: "center",
+    backgroundColor: '#e3e3e3',
+    alignItems: 'center',
     paddingVertical: 8,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
@@ -1662,25 +1350,23 @@ const styles = StyleSheet.create({
     width: 40,
     height: 5,
     borderRadius: 999,
-    backgroundColor: "#6B7280",
+    backgroundColor: '#6B7280',
     marginBottom: 6,
   },
 
   handleLabel: {
-    color: "#000000",
+    color: '#000000',
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 
-
-
   actionsBox: {
-    backgroundColor: "#ebeaea",
-    padding: 12 ,
+    backgroundColor: '#ebeaea',
+    padding: 12,
   },
 
   actionButtonsRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     marginBottom: 10,
   },
 
@@ -1689,215 +1375,215 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "#30497C",
-    alignItems: "center",
+    backgroundColor: '#30497C',
+    alignItems: 'center',
   },
 
   feedButton: {
-    backgroundColor: "#ffffff",
+    backgroundColor: '#ffffff',
   },
 
   actionButtonText: {
-    color: "#000000",
-    fontWeight: "600",
+    color: '#000000',
+    fontWeight: '600',
   },
 
   redButton: {
-    width: "100%",
+    width: '100%',
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: "#ffffff",
-    alignItems: "center",
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
   },
 
   viewButton: {
-    width: "100%",
+    width: '100%',
     marginTop: 30,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: "#DC2626",
-    alignItems: "center",
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
   },
 
   confirmButton: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 40,
-    alignSelf: "center",
-    width: "90%",
+    alignSelf: 'center',
+    width: '90%',
     paddingVertical: 15,
     borderRadius: 12,
-    alignItems: "center",
+    alignItems: 'center',
   },
 
   buttonText: {
-    color: "#000000",
-    fontWeight: "700",
+    color: '#000000',
+    fontWeight: '700',
     fontSize: 20,
   },
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   modalBox: {
-    width: "90%",
-    backgroundColor: "#F5F5F5",
+    width: '90%',
+    maxWidth: 480,
+    backgroundColor: '#F5F5F5',
     borderRadius: 28,
     padding: 24,
   },
 
   modalTitle: {
-    color: "#000000",
+    color: '#000000',
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
     marginBottom: 10,
   },
 
   questionLabel: {
-    color: "#545454",
+    color: '#545454',
     fontSize: 14,
     marginBottom: 6,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 
   input: {
-    backgroundColor: "#e2e0e0",
-    color: "#000000",
+    backgroundColor: '#e2e0e0',
+    color: '#000000',
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#d4d4d4",
+    borderColor: '#d4d4d4',
   },
 
   modalButton: {
     paddingVertical: 12,
     borderRadius: 10,
-    alignItems: "center",
+    alignItems: 'center',
   },
 
   modalButtonText: {
-    color: "#000000",
-    fontWeight: "600",
+    color: '#000000',
+    fontWeight: '600',
   },
 
-
   dashboardContainer: {
-  flex: 1,
-  backgroundColor: "#FFFFFF",
-  padding: 16,
-},
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+  },
 
-sectionTitle: {
-  fontSize: 24,
-  fontWeight: "700",
-  color: "#111827",
-  marginBottom: 14,
-  marginTop: 25,
-},
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 14,
+    marginTop: 25,
+  },
 
-emptyText: {
-  color: "#6B7280",
-  fontSize: 16,
-},
+  emptyText: {
+    color: '#6B7280',
+    fontSize: 16,
+  },
 
-caseCard: {
-  backgroundColor: "#F9FAFB",
-  padding: 16,
-  borderRadius: 12,
-  marginBottom: 12,
-  borderWidth: 1,
-  borderColor: "#E5E7EB",
-},
+  caseCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+  },
 
-bottomButtons: {
-  position: "absolute",
-  bottom: 25,
-  left: 16,
-  right: 16,
-  flexDirection: "row",
-  gap: 12,
-},
+  bottomButtons: {
+    position: 'absolute',
+    bottom: 25,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    gap: 12,
+  },
 
-actionBottomButton: {
-  flex: 1,
-  borderRadius: 12,
-  paddingVertical: 14,
-  alignItems: "center",
-},
+  actionBottomButton: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
 
-mapBackBtn: {
-  padding: 16,
-},
+  mapBackBtn: {
+    padding: 16,
+  },
 
-caseDate: {
-  color: "#6B7280",
-  marginTop: 4,
-},
+  caseDate: {
+    color: '#6B7280',
+    marginTop: 4,
+  },
 
+  caseTitleCard: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 5,
+  },
 
-caseTitleCard: {
-  fontSize: 16,
-  fontWeight: "700",
-  color: "#111827",
-  marginBottom: 5,
-},
+  caseDateCard: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#6B7280',
+  },
 
-caseDateCard: {
-  marginTop: 4,
-  fontSize: 12,
-  color: "#6B7280",
-},
+  caseHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
 
-caseHeaderRow: {
-  flexDirection: "row",
-  alignItems: "center",
-},
+  closeCaseBtn: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
 
-closeCaseBtn: {
-  backgroundColor: "#DC2626",
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  borderRadius: 8,
-},
+  closeCaseBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
 
-closeCaseBtnText: {
-  color: "#FFFFFF",
-  fontWeight: "600",
-},
+  caseBottomRow: {
+    flexDirection: 'row',
+    marginTop: 10,
+    gap: 10,
+  },
 
+  caseBottomButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
 
-caseBottomRow: {
-  flexDirection: "row",
-  marginTop: 10,
-  gap: 10,
-},
+  yesNoButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#d8d8d8',
+    alignItems: 'center',
+  },
 
-caseBottomButton: {
-  flex: 1,
-  paddingVertical: 10,
-  borderRadius: 12,
-  alignItems: "center",
-},
-
-
-yesNoButton: {
-  flex: 1,
-  paddingVertical: 12,
-  borderRadius: 10,
-  backgroundColor: "#d8d8d8",
-  alignItems: "center",
-},
-
-floatingStartCase: {
-    position: "absolute",
+  floatingStartCase: {
+    position: 'absolute',
 
     bottom: 120,
     right: 24,
 
-    backgroundColor: "#2563EB",
+    backgroundColor: '#2563EB',
 
     paddingHorizontal: 22,
     paddingVertical: 14,
@@ -1905,140 +1591,132 @@ floatingStartCase: {
     borderRadius: 28,
 
     elevation: 8,
-},
+  },
 
-floatingStartText: {
-    color: "#FFF",
-    fontWeight: "700",
+  floatingStartText: {
+    color: '#FFF',
+    fontWeight: '700',
     fontSize: 16,
-},
+  },
 
-bottomSheet: {
-    position: "absolute",
-
+  bottomSheet: {
+    position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-
     height: 220,
-
-    backgroundColor: "#f8f8f8",
-
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 18,
-},
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -3 },
+    elevation: 12,
+  },
 
-bottomSheetExpanded: {
-    height: "60%",
-},
+  bottomSheetExpanded: {
+    height: '60%',
+  },
 
-sheetHandle: {
-    alignItems: "center",
+  sheetHandle: {
+    alignItems: 'center',
     marginBottom: 12,
-},
+  },
 
-handleBar: {
+  handleBar: {
     width: 48,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#C8C8C8",
-},
+    backgroundColor: '#C8C8C8',
+  },
 
-sheetHeading: {
+  sheetHeading: {
     fontSize: 23,
-    fontWeight: "700",
+    fontWeight: '700',
     marginBottom: 16,
     marginTop: 16,
-    color: "#070707",
-},
+    color: '#070707',
+  },
 
-sheetSubHeading: {
+  sheetSubHeading: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#5a5959",
-},
+    fontWeight: '700',
+    color: '#5a5959',
+  },
 
+  situationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
 
+    paddingHorizontal: 18,
+    paddingVertical: 18,
 
-situationCard: {
-  backgroundColor: "#FFFFFF",
-  borderRadius: 18,
+    marginBottom: 14,
 
-  paddingHorizontal: 18,
-  paddingVertical: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
 
-  marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
 
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
+  situationLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
 
-  borderWidth: 1,
-  borderColor: "#E5E7EB",
-},
+  situationEmoji: {
+    fontSize: 24,
+    marginRight: 14,
+  },
 
-situationLeft: {
-  flexDirection: "row",
-  alignItems: "center",
-},
+  situationText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#111827',
+  },
 
-situationEmoji: {
-  fontSize: 24,
-  marginRight: 14,
-},
+  chevron: {
+    fontSize: 28,
+    color: '#9CA3AF',
+    fontWeight: '300',
+  },
 
-situationText: {
-  fontSize: 17,
-  fontWeight: "600",
-  color: "#111827",
-},
+  modalSubtitle: {
+    color: '#000000',
+    fontSize: 14,
+    marginTop: 6,
+    marginBottom: 24,
+  },
 
-chevron: {
-  fontSize: 28,
-  color: "#9CA3AF",
-  fontWeight: "300",
-},
+  cancelButton: {
+    marginTop: 10,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 16,
+    alignItems: 'center',
+    paddingVertical: 15,
+  },
 
-modalSubtitle: {
-  color: "#000000",
-  fontSize: 14,
-  marginTop: 6,
-  marginBottom: 24,
-},
+  cancelButtonText: {
+    color: '#374151',
+    fontWeight: '700',
+    fontSize: 16,
+  },
 
-cancelButton: {
-  marginTop: 10,
-  backgroundColor: "#E5E7EB",
-  borderRadius: 16,
-  alignItems: "center",
-  paddingVertical: 15,
-},
+  backButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+  },
 
-cancelButtonText: {
-  color: "#374151",
-  fontWeight: "700",
-  fontSize: 16,
-},
-
-
-
-
-backButton: {
-  marginTop: 12,
-  paddingVertical: 12,
-  borderRadius: 12,
-  backgroundColor: "#E5E7EB",
-  alignItems: "center",
-},
-
-backButtonText: {
-  color: "#374151",
-  fontWeight: "700",
-  fontSize: 16,
-},
-
-
-}
-)
+  backButtonText: {
+    color: '#374151',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+});
