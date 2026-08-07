@@ -121,7 +121,31 @@ npm run db:ping            # quick connectivity check
 #### Note before changing `server.js`
 If you plan to switch API routes from Mongo to Postgres, tell the team in the backend chat first so nobody’s local server breaks.
 
+### Demo hosting (GitHub Pages + Render)
 
+| Environment | Frontend | Backend API |
+|-------------|----------|-------------|
+| **Development** | `npx expo start` on your machine | Local `backend/new` → `http://localhost:3000` |
+| **Production (demo)** | GitHub Pages | Render → `https://sentinel-beacon-app.onrender.com` |
+
+Env files in `expo-app/`:
+- `.env.development` → local API
+- `.env.production` → Render API  
+
+On every push to `main`, GitHub Actions builds the static web app and deploys Pages.
+
+**Demo URL:** https://lgs-tech.github.io/sentinel-beacon-app/
+
+**One-time GitHub setup (org admin):**
+1. Repo → **Settings → Pages**
+2. Source: **GitHub Actions**
+3. On Render, set `ALLOWED_ORIGINS=https://lgs-tech.github.io`
+
+Local backend (dev) still:
+```bash
+cd backend/new
+node server.js
+```
 
 
 ## Get started
