@@ -249,7 +249,7 @@ export default function VaultScreen() {
 
   const filteredCases = useMemo(() => {
     return vaultData.filter((item) =>
-      item.title.toLowerCase().includes(search.toLowerCase()),
+      (item.title ?? '').toLowerCase().includes(search.toLowerCase()),
     );
   }, [vaultData, search]);
 
