@@ -9,12 +9,17 @@ const path = require("path");
 const Case = require("./models/Case");
 const authOptions = require('./options/auth_options');
 const { authenticate, authorize } = require('./middleware/auth');
+const sessionOptions = require('./options/session_options');
+
+
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use('/auth', authOptions);
+app.use('/session', sessionOptions);
+
 
 mongoose.connect(process.env.MONGO_URI);
 
