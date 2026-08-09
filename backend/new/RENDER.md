@@ -18,7 +18,7 @@ Local `npm start` / Docker Postgres stay for day-to-day development.
 | Key | Notes |
 |-----|--------|
 | `MONGO_URI` | Same Atlas URI from team chat (required for cases) |
-| `ALLOWED_ORIGINS` | Comma-separated demo frontends, e.g. `https://YOUR_ORG.github.io,http://localhost:8081` |
+| `ALLOWED_ORIGINS` | Optional extras. Defaults already include `https://lgs-tech.github.io`. Example: `https://lgs-tech.github.io,http://localhost:8081` |
 | `DATABASE_URL` | Optional for now (Postgres not wired into `server.js` yet) |
 
 Render sets `PORT` automatically — do not hardcode it.
