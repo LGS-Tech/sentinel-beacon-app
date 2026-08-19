@@ -22,11 +22,19 @@ async function main() {
 
   try {
     await client.query(sql);
+    const departments = await client.query(
+      "SELECT COUNT(*)::int AS count FROM departments"
+    );
     const cases = await client.query("SELECT COUNT(*)::int AS count FROM cases");
     const users = await client.query("SELECT COUNT(*)::int AS count FROM users");
+    const events = await client.query(
+      "SELECT COUNT(*)::int AS count FROM case_events"
+    );
     console.log("PostgreSQL schema applied.");
-    console.log(`cases rows: ${cases.rows[0].count}`);
+    console.log(`departments rows: ${departments.rows[0].count}`);
     console.log(`users rows: ${users.rows[0].count}`);
+    console.log(`cases rows: ${cases.rows[0].count}`);
+    console.log(`case_events rows: ${events.rows[0].count}`);
   } finally {
     await client.end();
   }
