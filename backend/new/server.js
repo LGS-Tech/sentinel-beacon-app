@@ -6,8 +6,6 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 
-const Case = require("./models/Case");
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -26,14 +24,13 @@ function buildCorsOptions() {
     .filter(Boolean);
   const origins = [...new Set([...defaults, ...fromEnv])];
 
-  if (origins.includes("*")) {
+  if (origins.length === 0) {
     return { origin: true };
   }
 
   return {
     origin(origin, callback) {
-      // Allow non-browser clients (curl, mobile native) with no Origin header
-      if (!origin || origins.includes(origin)) {
+      if (!origin || origins.includes(origin) || origins.includes("*")) {
         return callback(null, true);
       }
       // Reject without throwing — throwing makes Express return 500 and the
@@ -56,7 +53,6 @@ app.get("/", (_req, res) => {
 
 app.get("/health", (_req, res) => {
   const mongoState = mongoose.connection.readyState;
-  // 1 = connected
   res.status(mongoState === 1 ? 200 : 503).json({
     ok: mongoState === 1,
     service: "lgs-tech-api",
@@ -84,47 +80,11 @@ function writeUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify({ users }, null, 2));
 }
 
-/* Cases (Mongo) */
-app.get("/cases", async (req, res) => {
-  try {
-    const cases = await Case.find();
-    res.json(cases);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+/* Cases */
+const casesRouter = require("./routes/cases");
+app.use("/cases", casesRouter);
 
-app.post("/cases", async (req, res) => {
-  try {
-    const created = await Case.create(req.body);
-    res.json(created);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.put("/cases/:id", async (req, res) => {
-  try {
-    const updated = await Case.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
-    res.json(updated);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.delete("/cases/:id", async (req, res) => {
-  try {
-    await Case.findByIdAndDelete(req.params.id);
-    res.sendStatus(204);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/* Users (file JSON — Settings profile / login)
-   Note: on Render free disk is ephemeral — prefer Mongo/Postgres for durable users later. */
+/* Users (file JSON — Settings profile / login) */
 app.get("/users", (req, res) => {
   try {
     res.json(readUsers());
