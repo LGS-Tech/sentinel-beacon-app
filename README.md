@@ -101,8 +101,11 @@ npm run db:ping
 
 You should see something like:
 - `PostgreSQL schema applied.`
-- `users rows: 4` (seed staff accounts)
+- `departments rows: 6`
+- `users rows: 7` (seed staff, maintainers, student)
 - `PostgreSQL OK: ...`
+
+Optional: `npm run db:smoke` exercises create / assign / close through the data layer.
 
 #### Useful commands
 ```bash
@@ -110,18 +113,47 @@ docker compose ps          # container status
 docker compose logs -f     # DB logs
 docker compose down        # stop Postgres
 npm run db:ping            # quick connectivity check
+npm run db:smoke           # data-layer smoke test
 ```
 
 #### What gets created
 | Table | Purpose |
 |--------|---------|
-| `cases` | Tickets (from `models/Case.js`) |
-| `users` | Accounts / roles (from `data/users.json`) |
+| `departments` | Teams tickets can be assigned to |
+| `users` | Students / staff / maintainers / leads |
+| `cases` | Tickets and incidents (location, category, assignment) |
+| `case_events` | Feed and assignment history |
+
+Query helpers live in `backend/new/db/` (`db.users`, `db.cases`, `db.departments`). **Mongo `server.js` is unchanged.**
 
 #### Note before changing `server.js`
 If you plan to switch API routes from Mongo to Postgres, tell the team in the backend chat first so nobody’s local server breaks.
 
+### Demo hosting (GitHub Pages + Render)
 
+| Environment | Frontend | Backend API |
+|-------------|----------|-------------|
+| **Development** | `npx expo start` on your machine | Local `backend/new` → `http://localhost:3000` |
+| **Production (demo)** | GitHub Pages | Render → `https://sentinel-beacon-app.onrender.com` |
+
+Env files in `expo-app/`:
+- `.env.development` → local API
+- `.env.production` → Render API  
+
+On every push to `main`, GitHub Actions builds the static web app and deploys Pages.
+
+**Demo URL:** https://lgs-tech.github.io/sentinel-beacon-app/
+
+**One-time GitHub setup (org admin):**
+1. Repo → **Settings → Pages**
+2. Source: **GitHub Actions**
+3. On Render, set `ALLOWED_ORIGINS=https://lgs-tech.github.io`
+
+Local backend (dev) still:
+```bash
+cd backend/new
+node server.js
+```
 
 
 ## Get started

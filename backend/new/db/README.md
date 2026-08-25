@@ -1,6 +1,6 @@
 # PostgreSQL base (LGS Tech)
 
-This folder adds the **PostgreSQL foundation** for LGS Tech without replacing the current Mongo-backed `server.js`.
+This folder is the **PostgreSQL foundation** for LGS Tech. The live Express API in `server.js` still uses Mongo (cases) and `data/users.json` until the team switches routes over.
 
 ## Shared credentials (team)
 
@@ -10,12 +10,40 @@ This folder adds the **PostgreSQL foundation** for LGS Tech without replacing th
 | Database | `lgs_tech` |
 | Password | ask in backend chat / local `.env` (`POSTGRES_PASSWORD`) — **do not commit** |
 
-## What maps from `backend/new`
+## Tables
 
-| Current (Mongo / JSON) | PostgreSQL |
-|------------------------|------------|
-| `models/Case.js` | `cases` table (`db/schema.sql`) |
-| `data/users.json` | `users` table |
+| Table | Purpose |
+|--------|---------|
+| `departments` | Assignable teams (Facilities, IT, Engineering, Security, Medical, Estates) |
+| `users` | Students, staff, maintainers, leads (expanded from `users.json`) |
+| `cases` | Tickets / incidents (expanded from Mongo `Case`) |
+| `case_events` | Feed + assignment / status history |
+
+### Users (extra vs JSON)
+
+`college_id`, `department_id`, `year_semester`, `user_type` (`student` / `staff` / `maintainer` / `lead`), `is_active`, `last_login_at`, `updated_at`
+
+### Cases (extra vs Mongo)
+
+`category`, `description`, `chat`, `priority`, `assigned_department_id`, `assigned_user_id`, `created_by_user_id`, `closed_by_user_id`, `closed_at`, `estimated_cost`, emergency-service flags
+
+Status: `ACTIVE` \| `IN_PROGRESS` \| `CLOSED` \| `RESOLVED`  
+Category: Fire, Intruder, Injury, Maintenance, Missing, Facilities, IT Support, Engineering
+
+## Data layer (`db/`)
+
+```js
+const db = require("./db"); // from backend/new
+
+await db.users.listUsers();
+await db.users.getUserByEmail("aisha.khan@student.lgs.ac.uk");
+await db.cases.createCase({ title: "Fire Case", locationX: 0.4, locationY: 0.2 });
+await db.cases.assignCase(id, { departmentId: 6, userId: 5 });
+await db.cases.listCases({ openOnly: true });
+await db.cases.analyticsSummary();
+```
+
+Rows are mapped to the current API shape (`createdAt`, `_id`, `"phone number"`, …) so routes can switch later without a frontend rewrite.
 
 ## Quick start (Docker — recommended)
 
@@ -38,7 +66,10 @@ From `backend/new`:
    ```bash
    npm run db:setup
    npm run db:ping
+   npm run db:smoke
    ```
+
+`db:setup` is idempotent — it adds new columns/tables on an existing volume.
 
 ## Local Windows PostgreSQL install
 
@@ -49,4 +80,4 @@ From `backend/new`:
 ## Note for the team
 
 **Mongo `server.js` is still the live local API.**  
-PostgreSQL is the new DB base. When we switch routes over, we’ll say so in the backend chat before changing `server.js`.
+When we switch `/cases` and `/users` to this data layer, say so in the backend chat first.

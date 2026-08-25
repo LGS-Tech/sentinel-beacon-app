@@ -10,11 +10,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 function buildCorsOptions() {
-  const raw = process.env.ALLOWED_ORIGINS || "";
-  const origins = raw
+  // Always allow the GitHub Pages demo + common local Expo ports.
+  // ALLOWED_ORIGINS on Render can add more; use "*" to allow any origin.
+  const defaults = [
+    "https://lgs-tech.github.io",
+    "http://localhost:8081",
+    "http://localhost:19006",
+    "http://127.0.0.1:8081",
+  ];
+  const fromEnv = (process.env.ALLOWED_ORIGINS || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const origins = [...new Set([...defaults, ...fromEnv])];
 
   if (origins.length === 0) {
     return { origin: true };
@@ -25,7 +33,9 @@ function buildCorsOptions() {
       if (!origin || origins.includes(origin) || origins.includes("*")) {
         return callback(null, true);
       }
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
+      // Reject without throwing — throwing makes Express return 500 and the
+      // browser only shows "Failed to fetch".
+      return callback(null, false);
     },
   };
 }

@@ -1,32 +1,141 @@
-import React from "react"
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  View
-} from "react-native"
+  View,
+} from 'react-native';
 
-
+const MAP_W = 1525;
+const MAP_H = 959;
 
 type CaseMarker = {
-  id: number
-  title: string
-  locationX: number
-  locationY: number
-}
-
+  id: number;
+  title: string;
+  locationX: number;
+  locationY: number;
+};
 
 type Props = {
-    cases: any[]
-    selectedCase: any
-    onMarkerPress: (item:any)=>void
-    onView: (item:any)=>void
+  cases: any[];
+  selectedCase: any;
+  onMarkerPress: (item: any) => void;
+  onView: (item: any) => void;
+};
+
+// Web-only: mouse-wheel zoom to cursor + drag pan
+function WebMapContainer({ children }: { children: React.ReactNode }) {
+  const elRef = useRef<any>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const tRef = useRef({ x: 0, y: 0, scale: 0.5 });
+  const [t, setT] = useState({ x: 0, y: 0, scale: 0.5 });
+  const drag = useRef<{ mx: number; my: number } | null>(null);
+  const ready = useRef(false);
+
+  useEffect(() => {
+    if (!size.w || ready.current) return;
+    ready.current = true;
+    const scale = Math.min(size.w / MAP_W, size.h / MAP_H) * 0.9;
+    const init = {
+      scale,
+      x: (size.w - MAP_W * scale) / 2,
+      y: (size.h - MAP_H * scale) / 2,
+    };
+    tRef.current = init;
+    setT(init);
+  }, [size]);
+
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el?.addEventListener) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+      const p = tRef.current;
+      const ns = Math.min(4, Math.max(0.15, p.scale * factor));
+      const r = ns / p.scale;
+      const next = {
+        scale: ns,
+        x: cx - (cx - p.x) * r,
+        y: cy - (cy - p.y) * r,
+      };
+      tRef.current = next;
+      setT({ ...next });
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      drag.current = { mx: e.clientX, my: e.clientY };
+      el.style.cursor = 'grabbing';
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      if (!drag.current) return;
+      const p = tRef.current;
+      const next = {
+        ...p,
+        x: p.x + e.clientX - drag.current.mx,
+        y: p.y + e.clientY - drag.current.my,
+      };
+      drag.current = { mx: e.clientX, my: e.clientY };
+      tRef.current = next;
+      setT({ ...next });
+    };
+    const onMouseUp = () => {
+      drag.current = null;
+      el.style.cursor = 'grab';
+    };
+
+    el.style.cursor = 'grab';
+    el.style.overflow = 'hidden';
+    el.style.userSelect = 'none';
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  return (
+    <View
+      ref={elRef}
+      style={{ flex: 1 } as any}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setSize({ w: width, h: height });
+      }}
+    >
+      {size.w > 0 && (
+        <View
+          pointerEvents="box-none"
+          style={
+            {
+              position: 'absolute',
+              width: MAP_W,
+              height: MAP_H,
+              left: 0,
+              top: 0,
+              transform: `translate(${t.x}px, ${t.y}px) scale(${t.scale})`,
+              transformOrigin: '0 0',
+            } as any
+          }
+        >
+          {children}
+        </View>
+      )}
+    </View>
+  );
 }
-
-
-
 
 export default function DashboardMap({
   cases,
@@ -34,329 +143,170 @@ export default function DashboardMap({
   onMarkerPress,
   onView,
 }: Props) {
+  const floorPlan = require('../assets/images/LGSUniFloorPlan.png');
 
-  //const [cases, setCases] = useState<any[]>([])
-  //const [selectedCase, setSelectedCase] = useState<any | null>(null)
-
-  const floorPlan = require("../assets/images/LGSUniFloorPlan.png")
-
-
-  
-
-  
-
-
-// need to have marker be centered on screen when clicked
+  // need to have marker be centered on screen when clicked
 
   function getMarkerColour(title: string) {
-
-    if (title.startsWith("Fire")) {
-      return  "#DC2626"
-    }
-
-
-    if (title.startsWith("Intruder")) {
-      return "#F97316"
-    }
-
-    if (title.startsWith("Injury")) {
-      return "#16A34A"
-    }
-
-    if (title.startsWith("Maintenance")) {
-      return "#2563EB"
-    }
-
-    return  "#6B7280"
-
+    if (title.startsWith('Fire')) return '#DC2626';
+    if (title.startsWith('Intruder')) return '#F97316';
+    if (title.startsWith('Injury')) return '#16A34A';
+    if (title.startsWith('Maintenance')) return '#2563EB';
+    return '#6B7280';
   }
 
-  return (
-
-  <View style={styles.screen}>
-
-    <View
-      style={styles.legend}
-      pointerEvents="none"
-    >
-
-      <Text style={styles.legendTitle}>
-        Active Cases
-      </Text>
-
-      <View style={styles.legendRow}>
-        <View
-          style={[
-            styles.legendDot,
-            { backgroundColor: "#2563EB" },
-          ]}
-        />
-        <Text>Maintenance</Text>
-      </View>
-
-      <View style={styles.legendRow}>
-        <View
-          style={[
-            styles.legendDot,
-            { backgroundColor: "#DC2626" },
-          ]}
-        />
-        <Text>Fire</Text>
-      </View>
-
-      <View style={styles.legendRow}>
-        <View
-          style={[
-            styles.legendDot,
-            { backgroundColor: "#F97316" },
-          ]}
-        />
-        <Text>Intruder</Text>
-      </View>
-
-      <View style={styles.legendRow}>
-        <View
-          style={[
-            styles.legendDot,
-            { backgroundColor: "#16A34A" },
-          ]}
-        />
-        <Text>Injury</Text>
-      </View>
-
-    </View>
-
-    <ScrollView
-      style={styles.container}
-      horizontal
-      maximumZoomScale={2}
-      minimumZoomScale={1}
-      showsHorizontalScrollIndicator={false}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
-    >
-
-      <ScrollView
-        maximumZoomScale={2}
-        minimumZoomScale={1}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-
-        <View>
-
-          <Image
-            source={floorPlan}
-            style={styles.image}
-            resizeMode="contain"
-          />
-
-          {cases.map((item) => (
-
+  const mapContent = (
+    <>
+      <Image source={floorPlan} style={styles.image} resizeMode="contain" />
+      {cases.map((item) => (
         <View
           key={item.id}
           style={{
-            position: "absolute",
+            position: 'absolute',
             left: `${item.locationX * 100}%`,
             top: `${item.locationY * 100}%`,
-            transform: [
-              { translateX: -13 },
-              { translateY: -13 },
-            ],
-            alignItems: "center",
+            transform: [{ translateX: -13 }, { translateY: -13 }],
+            alignItems: 'center',
           }}
         >
-
-    
-
           <Pressable
             onPress={() =>
-              onMarkerPress(
-                selectedCase?.id === item.id
-                ? null
-                : item
-              )
+              onMarkerPress(selectedCase?.id === item.id ? null : item)
             }
             style={[
               styles.marker,
-              {
-               backgroundColor: getMarkerColour(item.title),
-              },
+              { backgroundColor: getMarkerColour(item.title) },
+              Platform.OS === 'web' && ({ cursor: 'pointer' } as any),
             ]}
           >
-
-          <View style={styles.markerGlow} />
-
+            <View style={styles.markerGlow} />
           </Pressable>
-
         </View>
+      ))}
+    </>
+  );
 
+  return (
+    <View style={styles.screen}>
+      {/* Legend */}
+      <View style={styles.legend} pointerEvents="none">
+        <Text style={styles.legendTitle}>Active Cases</Text>
+        {[
+          { color: '#2563EB', label: 'Maintenance' },
+          { color: '#DC2626', label: 'Fire' },
+          { color: '#F97316', label: 'Intruder' },
+          { color: '#16A34A', label: 'Injury' },
+        ].map(({ color, label }) => (
+          <View key={label} style={styles.legendRow}>
+            <View style={[styles.legendDot, { backgroundColor: color }]} />
+            <Text style={styles.legendLabel}>{label}</Text>
+          </View>
         ))}
+      </View>
 
-        </View>
-
-      </ScrollView>
-
-    </ScrollView>
-
-    
-
-  </View>
-
-)
-
-
+      {Platform.OS === 'web' ? (
+        <WebMapContainer>{mapContent}</WebMapContainer>
+      ) : (
+        <ScrollView
+          style={styles.container}
+          horizontal
+          maximumZoomScale={3}
+          minimumZoomScale={0.4}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+        >
+          <ScrollView
+            maximumZoomScale={3}
+            minimumZoomScale={0.4}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.content}
+          >
+            <View>{mapContent}</View>
+          </ScrollView>
+        </ScrollView>
+      )}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-
-  container: {
-    flex: 1 ,
-  },
-
-
-
-  content: {
-    width: 1525,
-    height: 959,
-  },
-
-  image: {
-    width: 1525,
-    height: 959,
-  },
+  screen: { flex: 1 },
+  container: { flex: 1 },
+  content: { width: MAP_W, height: MAP_H },
+  image: { width: MAP_W, height: MAP_H },
 
   marker: {
-    position: "absolute",
+    position: 'absolute',
     width: 26,
     height: 26,
     borderRadius: 13,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: "#FFFFFF",
-    transform: [
-      { translateX: -13 },
-      { translateY: -13 },
-    ],
+    borderColor: '#FFFFFF',
+    transform: [{ translateX: -13 }, { translateY: -13 }],
   },
 
-  markerText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "700",
+  markerGlow: {
+    position: 'absolute',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.25)',
   },
 
   legend: {
-  position: "absolute",
-  top: 38,
-  left: 8,
-
-  backgroundColor: " #F5F5F5",
-
-  paddingVertical: 16,
-  paddingHorizontal: 18,
-
-  borderRadius: 16,
-
-  borderWidth: 1,
-  borderColor: "#D6D6D6",
-
-  zIndex: 999,
-
-  elevation: 8,
-},
+    position: 'absolute',
+    top: 16,
+    left: 12,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    zIndex: 999,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
 
   legendTitle: {
-  fontSize: 19,
-  fontWeight: "700",
-  marginBottom: 12,
-},
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
 
   legendRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  marginBottom: 10,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 7,
+  },
 
-legendDot: {
-  width: 18,
-  height: 18,
-  borderRadius: 9,
-  marginRight: 10,
-},
+  legendDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    marginRight: 8,
+  },
 
-markerGlow: {
-  position: "absolute",
+  legendLabel: {
+    fontSize: 13,
+    color: '#374151',
+    fontWeight: '500',
+  },
 
-  width: 42,
-  height: 42,
-
-  borderRadius: 21,
-
-  backgroundColor: "rgba(255,255,255,0.25)",
-},
-
-tooltip: {
-  marginBottom: 8,
-
-  backgroundColor: "#FFFFFF",
-
-  paddingHorizontal: 10,
-  paddingVertical: 6,
-
-  borderRadius: 8,
-
-  borderWidth: 1,
-  borderColor: "#D0D0D0",
-
-  elevation: 4,
-},
-
-tooltipText: {
-  fontSize: 13,
-  fontWeight: "600",
-  color: "#222",
-},
-
-
-
-
-
-screen: {
-  flex: 1,
-},
-
-
-closeButton: {
-    position: "absolute",
-
-    right: 18,
-    top: 18,
-
-    width: 34,
-    height: 34,
-
-    borderRadius: 17,
-
-    backgroundColor:  "#ECECEC",
-
-    justifyContent: "center",
-    alignItems: "center",
-},
-
-closeButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#555",
-},
-
-
-
-
-
-
-}
-
-)
+  // unused but kept for safety
+  markerText: {},
+  tooltip: {},
+  tooltipText: {},
+  closeButton: {},
+  closeButtonText: {},
+});
