@@ -1,7 +1,6 @@
-# Deploying backend/new on Render (demo API)
+# Deploying backend/new on Render (PostgreSQL API)
 
 This hosts the Express API so a static demo (e.g. GitHub Pages) can call it.
-Local `npm start` / Docker Postgres stay for day-to-day development.
 
 ## What Render needs
 
@@ -13,47 +12,39 @@ Local `npm start` / Docker Postgres stay for day-to-day development.
 | Start command | `npm start` |
 | Health check | `/health` |
 
-## Env vars (set in Render Dashboard → Environment)
+## Env vars (Render Dashboard → Environment)
 
 | Key | Notes |
 |-----|--------|
-| `MONGO_URI` | Same Atlas URI from team chat (required for cases) |
-| `ALLOWED_ORIGINS` | Optional extras. Defaults already include `https://lgs-tech.github.io`. Example: `https://lgs-tech.github.io,http://localhost:8081` |
-| `DATABASE_URL` | Optional for now (Postgres not wired into `server.js` yet) |
+| `DATABASE_URL` | **Required** — managed Postgres or external URL |
+| `JWT_SECRET` | **Required** — long random string for `/auth/login` |
+| `REQUIRE_AUTH` | `false` for demo until all clients send Bearer tokens; `true` in production |
+| `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,http://localhost:8081` |
 
-Render sets `PORT` automatically — do not hardcode it.
+Render sets `PORT` automatically.
 
-## Steps (dashboard)
+After first deploy with a new database, run schema setup once (from your machine or a one-off job):
 
-1. Push this repo to GitHub (with `.env` gitignored).
-2. Go to [render.com](https://render.com) → **New** → **Web Service**.
-3. Connect the repo.
-4. Set **Root Directory** = `backend/new`.
-5. Build = `npm install`, Start = `npm start`.
-6. Add `MONGO_URI` and `ALLOWED_ORIGINS`.
-7. Deploy → copy the URL, e.g. `https://lgs-tech-api.onrender.com`.
-
-Or use the root [`render.yaml`](../../render.yaml) Blueprint.
-
-## Point the demo frontend at Render
-
-In the static / Expo web build env (or runtime config):
-
-```env
-EXPO_PUBLIC_API_URL=https://YOUR-SERVICE.onrender.com
+```bash
+npm run db:setup
+npm run db:hash-seeds
 ```
-
-Do **not** commit real secrets. Local `.env` can keep `localhost` / LAN IP for development.
-
-## Important limits (free tier)
-
-- Service may **spin down** after idle; first request can be slow (~30–60s).
-- Disk is **ephemeral** — writes to `data/users.json` can reset on redeploy. Cases on **Mongo Atlas** persist.
-- Keep developing against local servers; use Render mainly for demos.
 
 ## Smoke test after deploy
 
 ```bash
 curl https://YOUR-SERVICE.onrender.com/health
 curl https://YOUR-SERVICE.onrender.com/cases
+curl -X POST https://YOUR-SERVICE.onrender.com/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jimstevens@gmail.com","password":"London588"}'
+```
+
+## Local development
+
+```bash
+docker compose up -d
+npm run db:setup
+npm run db:hash-seeds
+npm start
 ```

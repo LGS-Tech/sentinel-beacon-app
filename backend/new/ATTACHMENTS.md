@@ -4,14 +4,14 @@ Metadata-only attachments linked to Postgres `cases`. **No binary storage in Pos
 
 ## Endpoints (after merge with Core API)
 
-Base path: **`/api/cases/:caseId/attachments`**
+Base path: **`/cases/:caseId/attachments`**
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/cases/:caseId/attachments` | List attachments for a case |
-| POST | `/api/cases/:caseId/attachments` | Register an attachment reference |
-| GET | `/api/cases/:caseId/attachments/:attachmentId` | Get one attachment |
-| DELETE | `/api/cases/:caseId/attachments/:attachmentId` | Remove attachment metadata |
+| GET | `/cases/:caseId/attachments` | List attachments for a case |
+| POST | `/cases/:caseId/attachments` | Register an attachment reference |
+| GET | `/cases/:caseId/attachments/:attachmentId` | Get one attachment |
+| DELETE | `/cases/:caseId/attachments/:attachmentId` | Remove attachment metadata |
 
 ### POST body (JSON)
 

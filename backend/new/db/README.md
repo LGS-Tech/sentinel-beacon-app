@@ -1,6 +1,6 @@
 # PostgreSQL base (LGS Tech)
 
-This folder is the **PostgreSQL foundation** for LGS Tech. The live Express API in `server.js` still uses Mongo (cases) and `data/users.json` until the team switches routes over.
+This folder is the **PostgreSQL backend** for LGS Tech. Express `server.js` uses Postgres only (no Mongo).
 
 ## Shared credentials (team)
 
@@ -85,5 +85,4 @@ From `backend/new`:
 
 ## Note for the team
 
-**Mongo `server.js` is still the live local API.**  
-When we switch `/cases` and `/users` to this data layer, say so in the backend chat first.
+**Mongo has been removed from `server.js`.** Set `DATABASE_URL` and run `npm run db:setup` before starting the API.

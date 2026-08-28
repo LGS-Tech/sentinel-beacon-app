@@ -1,13 +1,21 @@
-const API =
-  (process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000").replace(
-    /\/$/,
-    ""
-  );
+import { getAuthHeaders } from "./api";
+
+const API = (
+  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000"
+).replace(/\/$/, "");
 
 async function requestJson(path: string, init?: RequestInit) {
+  const authHeaders = await getAuthHeaders();
   let response: Response;
   try {
-    response = await fetch(`${API}${path}`, init);
+    response = await fetch(`${API}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+        ...(init?.headers ?? {}),
+      },
+    });
   } catch (error) {
     throw new Error(
       `Cannot reach API at ${API}${path}. Is backend/new running? (${
@@ -31,7 +39,7 @@ export async function getCases() {
   const data = await requestJson("/cases");
   return (data as any[]).map((c: any) => ({
     ...c,
-    id: c._id,
+    id: c._id ?? c.id,
   }));
 }
 

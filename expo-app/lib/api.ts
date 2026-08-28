@@ -47,6 +47,7 @@ export function getAccessResponsibilities(authorisation?: number): string[] {
 }
 
 const SESSION_KEY = "sentinel.currentUserId";
+const TOKEN_KEY = "sentinel.authToken";
 const DEFAULT_EXPRESS = "http://localhost:3000";
 const DEFAULT_FLASK = "http://localhost:5000";
 
@@ -67,6 +68,7 @@ export const EXPRESS_URL = resolveUrl("EXPO_PUBLIC_API_URL", DEFAULT_EXPRESS);
 export const FLASK_URL = resolveUrl("EXPO_PUBLIC_FLASK_URL", DEFAULT_FLASK);
 
 let currentUserId = 1;
+let authToken: string | null = null;
 let sessionHydrated = false;
 
 export function getCurrentUserId(): number {
@@ -77,31 +79,46 @@ export function setCurrentUserId(id: number): void {
   currentUserId = id;
 }
 
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  await hydrateSession();
+  if (!authToken) return {};
+  return { Authorization: `Bearer ${authToken}` };
+}
+
 export async function hydrateSession(): Promise<number> {
   if (sessionHydrated) return currentUserId;
   try {
-    const raw = await AsyncStorage.getItem(SESSION_KEY);
-    if (raw) {
-      const parsed = Number(raw);
+    const [rawId, rawToken] = await Promise.all([
+      AsyncStorage.getItem(SESSION_KEY),
+      AsyncStorage.getItem(TOKEN_KEY),
+    ]);
+    if (rawId) {
+      const parsed = Number(rawId);
       if (!Number.isNaN(parsed) && parsed > 0) currentUserId = parsed;
     }
+    if (rawToken) authToken = rawToken;
   } catch {
-    // keep default
+    // keep defaults
   }
   sessionHydrated = true;
   return currentUserId;
 }
 
-export async function persistSession(id: number): Promise<void> {
+export async function persistSession(id: number, token?: string): Promise<void> {
   currentUserId = id;
   sessionHydrated = true;
   await AsyncStorage.setItem(SESSION_KEY, String(id));
+  if (token) {
+    authToken = token;
+    await AsyncStorage.setItem(TOKEN_KEY, token);
+  }
 }
 
 export async function clearSession(): Promise<void> {
   currentUserId = 1;
+  authToken = null;
   sessionHydrated = true;
-  await AsyncStorage.removeItem(SESSION_KEY);
+  await AsyncStorage.multiRemove([SESSION_KEY, TOKEN_KEY]);
 }
 
 async function request<T>(
@@ -111,12 +128,14 @@ async function request<T>(
 ): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
+  const authHeaders = await getAuthHeaders();
 
   try {
     const res = await fetch(`${base}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders,
         ...(init?.headers ?? {}),
       },
       signal: controller.signal,
@@ -139,8 +158,11 @@ export async function getUsers(): Promise<User[]> {
 }
 
 export async function getUser(id: number): Promise<User | null> {
-  const users = await getUsers();
-  return users.find((u) => u.id === id) ?? null;
+  try {
+    return await request<User>(EXPRESS_URL, `/users/${id}`);
+  } catch {
+    return null;
+  }
 }
 
 export async function updateUser(
@@ -166,29 +188,35 @@ export function getUserPhone(user: User): string {
   return user.phone ?? user["phone number"] ?? "";
 }
 
+type LoginResponse = { token: string; user: User };
+
 export async function loginWithEmailPassword(
   email: string,
   password: string
 ): Promise<User> {
-  const users = await getUsers();
-  const normalized = email.trim().toLowerCase();
-  const user = users.find(
-    (u) =>
-      u.email?.toLowerCase() === normalized &&
-      (u.password ?? "") === password
-  );
-  if (!user) {
+  const result = await request<LoginResponse>(EXPRESS_URL, "/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!result?.user?.id || !result.token) {
     throw new Error("Invalid email or password.");
   }
-  await persistSession(user.id);
-  return user;
+
+  await persistSession(result.user.id, result.token);
+  return result.user;
 }
 
 export async function checkExpressHealth(): Promise<HealthStatus> {
   try {
-    // New Mongo cases API is the primary ticketing backend
-    await request<unknown>(EXPRESS_URL, "/cases");
-    return { ok: true, message: "Connected" };
+    const res = await request<{ ok?: boolean; database?: string }>(
+      EXPRESS_URL,
+      "/health"
+    );
+    if (res.ok) {
+      return { ok: true, message: "PostgreSQL connected" };
+    }
+    return { ok: false, message: "API unhealthy" };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unable to reach API";
