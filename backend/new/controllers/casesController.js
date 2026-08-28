@@ -4,6 +4,7 @@ const {
   createCase,
   updateCase,
   deleteCase,
+  assignCase,
 } = require("../db/queries/cases");
 
 const getAllCases = async (req, res) => {
@@ -55,10 +56,29 @@ const deleteExistingCase = async (req, res) => {
   }
 };
 
+const assignCaseToUser = async (req, res) => {
+  try {
+    const { caseId, userId, departmentId } = req.body;
+    
+    const actorUserId = req.user?.id || req.user?.userId;
+
+    const assigned = await assignCase(caseId, { 
+      userId, 
+      departmentId, 
+      actorUserId 
+    });
+    if (!assigned) return res.status(404).json({ error: "Case or User not found" });
+    res.json(assigned);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to assign case" });
+  }
+}
+
 module.exports = {
   getAllCases,
   getCase,
   createNewCase,
   updateExistingCase,
   deleteExistingCase,
+  assignCaseToUser,
 };
