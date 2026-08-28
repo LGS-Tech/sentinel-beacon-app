@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
+const db = require("./db"); //import the database connection module
 
 const apiRoutes = require("./routes"); 
 
@@ -42,19 +43,28 @@ app.get("/", (_req, res) => {
   res.json({
     service: "lgs-tech-api",
     message: "LGS Tech API is running",
-    endpoints: ["/health", "/api/cases", "/api/users"],
+    endpoints: ["/health", "/cases", "/users"],
   });
 });
 
-app.get("/health", (_req, res) => {
-  res.status(200).json({
-    ok: true,
-    service: "lgs-tech-api",
-    database: "postgres-layer-active"
-  });
+app.get("/health", async (_req, res) => {
+  try {
+    await db.ping();
+    res.status(200).json({
+      ok: true,
+      service: "lgs-tech-api",
+      database: "connected",
+    });
+  } catch (err) {
+    res.status(503).json({
+      ok: false,
+      service: "lgs-tech-api",
+      database: "disconnected",
+    });
+  }
 });
 
-app.use("/api", apiRoutes);
+app.use(apiRoutes);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);

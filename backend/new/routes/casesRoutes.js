@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { authenticate } = require("../middleware/auth");
 
 const {
   getAllCases,
@@ -8,6 +9,9 @@ const {
   updateExistingCase,
   deleteExistingCase,
 } = require("../controllers/casesController");
+
+router.use(authenticate); 
+
 
 router.get("/", getAllCases);
 router.get("/:id", getCase);

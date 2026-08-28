@@ -1,5 +1,7 @@
 const express = require("express");
 const router = express.Router();
+const { authenticate } = require("../middleware/auth");
+
 
 const {
   getAllUsers,
@@ -8,6 +10,8 @@ const {
   updateExistingUser,
   deleteExistingUser,
 } = require("../controllers/usersController");
+
+router.use(authenticate);
 
 router.get("/", getAllUsers);
 router.get("/:id", getUser);

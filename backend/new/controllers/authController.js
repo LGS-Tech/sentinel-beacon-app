@@ -5,6 +5,10 @@ const { getUserByEmail, createUser, recordLogin } = require('../db/queries/users
 
 const secret = process.env.JWT_SECRET;
 
+if (!secret) {
+  throw new Error("JWT_SECRET is missing. Set it in .env");
+}
+
 // POST /api/auth/signup
 const signup = async (req, res) => {
   const { username, password, email, name, phone, role, authorisation } = req.body;
@@ -25,6 +29,10 @@ const signup = async (req, res) => {
       role,
       authorisation
     });
+
+     if (newUser && newUser.password) {
+      delete newUser.password;
+    }
 
     res.status(201).json({
       message: 'User registered successfully',
