@@ -10,10 +10,12 @@ const pool = require("./pool");
 const departments = require("./queries/departments");
 const users = require("./queries/users");
 const cases = require("./queries/cases");
+const attachments = require("./queries/attachments");
 
 module.exports = {
   pool,
   departments,
   users,
   cases,
+  attachments,
 };

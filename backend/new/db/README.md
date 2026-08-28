@@ -18,6 +18,7 @@ This folder is the **PostgreSQL foundation** for LGS Tech. The live Express API 
 | `users` | Students, staff, maintainers, leads (expanded from `users.json`) |
 | `cases` | Tickets / incidents (expanded from Mongo `Case`) |
 | `case_events` | Feed + assignment / status history |
+| `case_attachments` | File/image metadata per case (URL/path only, no binary) |
 
 ### Users (extra vs JSON)
 
@@ -41,6 +42,10 @@ await db.cases.createCase({ title: "Fire Case", locationX: 0.4, locationY: 0.2 }
 await db.cases.assignCase(id, { departmentId: 6, userId: 5 });
 await db.cases.listCases({ openOnly: true });
 await db.cases.analyticsSummary();
+await db.attachments.createAttachment(caseId, {
+  filename: "photo.jpg",
+  storageUrl: "https://cdn.example.com/photo.jpg",
+});
 ```
 
 Rows are mapped to the current API shape (`createdAt`, `_id`, `"phone number"`, …) so routes can switch later without a frontend rewrite.
@@ -67,6 +72,7 @@ From `backend/new`:
    npm run db:setup
    npm run db:ping
    npm run db:smoke
+   npm run db:smoke-attachments
    ```
 
 `db:setup` is idempotent — it adds new columns/tables on an existing volume.
