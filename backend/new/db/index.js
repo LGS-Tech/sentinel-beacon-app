@@ -15,5 +15,5 @@ module.exports = {
   pool,
   departments,
   users,
-  cases,
+  ping: pool.ping,
 };
