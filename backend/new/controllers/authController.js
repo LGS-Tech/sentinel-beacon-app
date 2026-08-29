@@ -61,11 +61,11 @@ const login = async (req, res) => {
 
     await recordLogin(user.id);
 
-    const token = jwt.sign(
-      { userId: user.id, role: user.role, authorisation: user.authorisation },
-      secret,
-      { expiresIn: '1d' }
-    );
+  const token = jwt.sign(
+    { userId: user.id, userType: user.userType, authorisation: user.authorisation },
+    secret,
+    { expiresIn: '1d' }
+  );
 
     res.json({ token });
   } catch (err) {

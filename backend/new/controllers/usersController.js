@@ -1,3 +1,5 @@
+const bcrypt = require("bcrypt");
+
 const {
   listUsers,
   getUserById,
@@ -10,38 +12,53 @@ const {
 const getAllUsers = async (req, res) => {
   try {
     const users = await listUsers(req.query);
-    res.json(users);
+    const safeUsers = users.map(({ password, ...rest }) => rest);
+    res.json(safeUsers);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch users" });
   }
 };
 
-// [READ ONE] GET /api/users/:id
 const getUser = async (req, res) => {
   try {
     const found = await getUserById(req.params.id);
     if (!found) return res.status(404).json({ error: "User not found" });
-    res.json(found);
+    const { password, ...safeUser } = found;
+    res.json(safeUser);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch user" });
   }
 };
 
-// [CREATE] POST /api/users
 const createNewUser = async (req, res) => {
   try {
-    const created = await createUser(req.body);
+    const hashedPassword = await bcrypt.hash(req.body.password, 10);
+    const created = await createUser({ ...req.body, password: hashedPassword });
+
+    if (created && created.password) {
+      delete created.password;
+    }
+
     res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message || "Failed to create user" });
   }
 };
 
-// [UPDATE] PUT /api/users/:id
 const updateExistingUser = async (req, res) => {
   try {
-    const updated = await updateUser(req.params.id, req.body);
+    const body = { ...req.body };
+    if (body.password) {
+      body.password = await bcrypt.hash(body.password, 10);
+    }
+
+    const updated = await updateUser(req.params.id, body);
     if (!updated) return res.status(404).json({ error: "User not found" });
+
+    if (updated.password) {
+      delete updated.password;
+    }
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: "Failed to update user" });

@@ -35,14 +35,12 @@ function authenticate(req, res, next) {
  * MIDDLEWARE GENERATOR: Authorization
  * Accepts a required role string and returns a middleware function
  */
-function authorize(requiredRole) {
-    // Returns the middleware function
+function authorize(allowedRoles) {
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
   return (req, res, next) => {
-    // req.user?.role uses optional chaining in case req.user is somehow undefined
-    if (req.user?.role !== requiredRole) {
+   if (!roles.includes(req.user?.userType)) {
       return res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
     }
-    // User has the correct role so proceed to the option handler
     next();
   };
 }
