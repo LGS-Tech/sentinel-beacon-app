@@ -19,7 +19,7 @@ router.get("/:id", getCase);
 router.post("/", createNewCase);
 router.put("/:id", updateExistingCase);
 router.delete("/:id", deleteExistingCase);
-router.post("/:assign", assignCaseToUser);
+router.post("/assign", assignCaseToUser);
 
 module.exports = router;
 
