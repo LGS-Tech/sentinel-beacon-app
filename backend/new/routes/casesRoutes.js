@@ -20,6 +20,7 @@ router.post("/", createNewCase);
 router.put("/:id", updateExistingCase);
 router.delete("/:id", deleteExistingCase);
 router.post("/assign", assignCaseToUser);
+router.get("/analytics", getAnalyticsSummary);
 
 module.exports = router;
 
