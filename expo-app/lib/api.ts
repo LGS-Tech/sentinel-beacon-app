@@ -9,7 +9,7 @@ export type User = {
   name: string;
   role: string;
   authorisation?: number;
-  /** Express JSON uses a spaced key for some seed rows */
+  /** Legacy seed rows may use a spaced phone key */
   "phone number"?: string;
   phone?: string;
 };
@@ -58,12 +58,12 @@ export function getAccessResponsibilities(authorisation?: number): string[] {
       "Manage own profile and notification prefs",
     ];
   }
-  return ["Sign in to load role-based access from the Express API."];
+  return ["Sign in to load role-based access from the PostgreSQL API."];
 }
 
 const SESSION_KEY = "sentinel.currentUserId";
 const TOKEN_KEY = "sentinel.authToken";
-const DEFAULT_EXPRESS = "http://localhost:3000";
+const DEFAULT_API_URL = "http://localhost:3000";
 const DEFAULT_FLASK = "http://localhost:5000";
 
 function resolveUrl(envKey: string, fallback: string): string {
@@ -79,8 +79,11 @@ function resolveUrl(envKey: string, fallback: string): string {
   return fallback;
 }
 
-export const EXPRESS_URL = resolveUrl("EXPO_PUBLIC_API_URL", DEFAULT_EXPRESS);
+export const API_URL = resolveUrl("EXPO_PUBLIC_API_URL", DEFAULT_API_URL);
 export const FLASK_URL = resolveUrl("EXPO_PUBLIC_FLASK_URL", DEFAULT_FLASK);
+
+/** @deprecated Use API_URL */
+export const EXPRESS_URL = API_URL;
 
 let currentUserId = 1;
 let authToken: string | null = null;
@@ -169,12 +172,12 @@ async function request<T>(
 }
 
 export async function getUsers(): Promise<User[]> {
-  return request<User[]>(EXPRESS_URL, "/users");
+  return request<User[]>(API_URL, "/users");
 }
 
 export async function getUser(id: number): Promise<User | null> {
   try {
-    return await request<User>(EXPRESS_URL, `/users/${id}`);
+    return await request<User>(API_URL, `/users/${id}`);
   } catch {
     return null;
   }
@@ -184,7 +187,7 @@ export async function updateUser(
   id: number,
   body: Partial<User>
 ): Promise<User> {
-  return request<User>(EXPRESS_URL, `/users/${id}`, {
+  return request<User>(API_URL, `/users/${id}`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
@@ -193,7 +196,7 @@ export async function updateUser(
 export async function createUser(
   body: Omit<User, "id"> & { id?: number }
 ): Promise<User> {
-  return request<User>(EXPRESS_URL, "/users", {
+  return request<User>(API_URL, "/users", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -209,7 +212,7 @@ export async function loginWithEmailPassword(
   email: string,
   password: string
 ): Promise<User> {
-  const result = await request<LoginResponse>(EXPRESS_URL, "/auth/login", {
+  const result = await request<LoginResponse>(API_URL, "/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
@@ -223,7 +226,7 @@ export async function loginWithEmailPassword(
 }
 
 export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
-  return request<AnalyticsSummary>(EXPRESS_URL, "/cases/analytics");
+  return request<AnalyticsSummary>(API_URL, "/cases/analytics");
 }
 
 export async function checkAnalyticsHealth(): Promise<HealthStatus> {
@@ -237,12 +240,13 @@ export async function checkAnalyticsHealth(): Promise<HealthStatus> {
   }
 }
 
-export async function checkExpressHealth(): Promise<HealthStatus> {
+export async function checkApiHealth(): Promise<HealthStatus> {
   try {
-    const res = await request<{ ok?: boolean; database?: string }>(
-      EXPRESS_URL,
-      "/health"
-    );
+    const res = await request<{
+      ok?: boolean;
+      database?: string;
+      status?: string;
+    }>(API_URL, "/health");
     if (res.ok) {
       return { ok: true, message: "PostgreSQL connected" };
     }
@@ -250,6 +254,20 @@ export async function checkExpressHealth(): Promise<HealthStatus> {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unable to reach API";
+    return { ok: false, message };
+  }
+}
+
+/** @deprecated Use checkApiHealth */
+export const checkExpressHealth = checkApiHealth;
+
+export async function checkCasesHealth(): Promise<HealthStatus> {
+  try {
+    await request<unknown>(API_URL, "/cases");
+    return { ok: true, message: "Connected" };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to reach cases API";
     return { ok: false, message };
   }
 }

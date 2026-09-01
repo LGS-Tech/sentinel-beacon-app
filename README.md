@@ -42,7 +42,7 @@ MAKE SURE YOU PUT BOTH `.env` FILES IN `.gitignore`. DO NOT COMMIT SECRETS.
 
 ### PostgreSQL setup (for the whole team)
 
-The Express API reads/writes **Postgres** via `backend/new/db/`.  
+The Express API reads/writes **PostgreSQL** via `backend/new/db/`.  
 More detail: [`backend/new/db/README.md`](backend/new/db/README.md)
 
 #### Prerequisites
@@ -163,17 +163,17 @@ node server.js
 
 ### Connecting Settings integrations (optional)
 
-Settings → Profile and Settings → Integrations talk to the local backends. Start them in separate terminals:
-
-**Express mock API** (users / cases) — default `http://localhost:3000`:
+Settings → Profile and Settings → Integrations talk to the **PostgreSQL API** in `backend/new`. Start it first:
 
 ```bash
-cd server
-npm install
-node server.js
+cd backend/new
+docker compose up -d
+npm run db:setup
+npm run db:hash-seeds
+npm start
 ```
 
-**Flask alerts API** — default `http://localhost:5000`:
+**Flask alerts API** (optional) — default `http://localhost:5000`:
 
 ```bash
 cd backend
@@ -191,15 +191,17 @@ cd expo-app
 npx expo start
 ```
 
-- `EXPO_PUBLIC_API_URL` — Express base URL (default `http://localhost:3000`)
+- `EXPO_PUBLIC_API_URL` — PostgreSQL API base URL (default `http://localhost:3000`)
 - `EXPO_PUBLIC_FLASK_URL` — Flask base URL (default `http://localhost:5000`)
 
 On a physical device, use your computer’s LAN IP instead of `localhost` / `10.0.2.2`.
 
 ## Server
 
-The "server" folder is where a Node.js/Express, file-based database will be contained for temporary use to simulate true backend. 
-This contains tables for User and Case that will be connected to the Expo app. Settings Profile loads/saves the current prototype user via this API.
+The API lives in **`backend/new`** — Node.js + Express + **PostgreSQL** (`pg`).  
+There is no MongoDB or file-based `users.json` backend anymore. Demo users are seeded via `db/schema.sql` and `npm run db:hash-seeds`.
+
+The legacy `serverOLD/` folder is archived mock JSON storage — do not use it for new work.
 
 ## Backend
 

@@ -1,4 +1,4 @@
-# Optional local PostgreSQL for LGS Tech (does NOT replace Mongo server.js yet)
+# Local PostgreSQL for LGS Tech (used by backend/new API)
 # Credentials come from backend/new/.env — never commit real passwords.
 
 services:

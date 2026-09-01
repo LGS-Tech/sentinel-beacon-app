@@ -1,5 +1,11 @@
-# Render Blueprint — LGS Tech API (backend/new)
+# Render Blueprint — LGS Tech API (PostgreSQL)
 # Docs: https://render.com/docs/blueprint-spec
+
+databases:
+  - name: lgs-tech-postgres
+    databaseName: lgs_tech
+    user: lgs_tech
+    plan: free
 
 services:
   - type: web
@@ -8,13 +14,16 @@ services:
     plan: free
     rootDir: backend/new
     buildCommand: npm install
+    preDeployCommand: npm run db:setup && npm run db:hash-seeds
     startCommand: npm start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: lgs-tech-postgres
+          property: connectionString
       - key: JWT_SECRET
         sync: false
       - key: REQUIRE_AUTH

@@ -16,10 +16,11 @@ import {
   settingsStyles,
 } from "@/constants/settings-theme";
 import {
-  EXPRESS_URL,
+  API_URL,
   FLASK_URL,
   checkAnalyticsHealth,
-  checkExpressHealth,
+  checkApiHealth,
+  checkCasesHealth,
   checkFlaskHealth,
   checkUsersHealth,
   type HealthStatus,
@@ -41,8 +42,8 @@ export default function IntegrationsScreen() {
 
   const probe = useCallback(async () => {
     const [postgres, cases, users, analytics, flask] = await Promise.all([
-      checkExpressHealth(),
-      checkExpressHealth(),
+      checkApiHealth(),
+      checkCasesHealth(),
       checkUsersHealth(),
       checkAnalyticsHealth(),
       checkFlaskHealth(),
@@ -52,25 +53,25 @@ export default function IntegrationsScreen() {
       {
         id: "postgres",
         title: "PostgreSQL API",
-        detail: `${EXPRESS_URL}/health`,
+        detail: `${API_URL}/health`,
         status: postgres,
       },
       {
         id: "cases",
         title: "Cases API",
-        detail: `${EXPRESS_URL}/cases`,
+        detail: `${API_URL}/cases`,
         status: cases,
       },
       {
         id: "users",
         title: "Users API (Settings)",
-        detail: `${EXPRESS_URL}/users`,
+        detail: `${API_URL}/users`,
         status: users,
       },
       {
         id: "analytics",
         title: "Analytics API",
-        detail: `${EXPRESS_URL}/cases/analytics`,
+        detail: `${API_URL}/cases/analytics`,
         status: analytics,
       },
       {

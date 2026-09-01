@@ -39,7 +39,7 @@ export default function LoginPage() {
         'Login failed',
         e instanceof Error
           ? e.message
-          : 'Could not sign in. Is the Express server running?',
+          : 'Could not sign in. Is the PostgreSQL backend running?',
       );
     } finally {
       setBusy(false);

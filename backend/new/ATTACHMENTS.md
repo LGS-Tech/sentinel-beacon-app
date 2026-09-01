@@ -74,5 +74,5 @@ npm run db:smoke-attachments
 
 ## Coordination notes
 
-- Does **not** change `server.js` on `main` (still Mongo) — routes ship on this branch for merge after / alongside Muna's Core API PR.
+- Attachments routes are mounted on the PostgreSQL API in `server.js` (`/cases/:caseId/attachments`).
 - File upload binary handling is **out of scope** for this sprint; frontend can use a placeholder URL until Blob/S3 is chosen.

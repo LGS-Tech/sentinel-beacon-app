@@ -1,8 +1,6 @@
-import { getAuthHeaders } from "./api";
+import { API_URL, getAuthHeaders } from "./api";
 
-const API = (
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000"
-).replace(/\/$/, "");
+const API = API_URL;
 
 async function requestJson(path: string, init?: RequestInit) {
   const authHeaders = await getAuthHeaders();

@@ -42,9 +42,11 @@ app.get("/", (_req, res) => {
   res.json({
     service: "lgs-tech-api",
     message: "LGS Tech PostgreSQL API is running",
+    database: "postgresql",
     endpoints: [
       "/health",
       "/cases",
+      "/cases/analytics",
       "/users",
       "/auth/login",
       "/auth/signup",
@@ -58,19 +60,36 @@ app.get("/health", async (_req, res) => {
     res.status(200).json({
       ok: true,
       service: "lgs-tech-api",
-      database: "connected",
+      database: "postgresql",
+      status: "connected",
     });
   } catch {
     res.status(503).json({
       ok: false,
       service: "lgs-tech-api",
-      database: "disconnected",
+      database: "postgresql",
+      status: "disconnected",
     });
   }
 });
 
 app.use(apiRoutes);
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT} (PostgreSQL)`);
-});
+async function start() {
+  try {
+    await db.ping();
+    console.log("PostgreSQL connected");
+  } catch (err) {
+    console.error(
+      "PostgreSQL unavailable. Set DATABASE_URL and run npm run db:setup:",
+      err.message
+    );
+    process.exit(1);
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT} (PostgreSQL)`);
+  });
+}
+
+start();
