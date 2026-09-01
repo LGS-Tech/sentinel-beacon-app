@@ -1,15 +1,94 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+
+import { getAnalyticsSummary, type AnalyticsSummary } from '@/lib/api';
+
+function formatDuration(ms: number): string {
+  if (!ms || ms <= 0) return '—';
+  const totalMinutes = Math.round(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function formatResolvedRate(closed: number, total: number): string {
+  if (!total) return '—';
+  return `${Math.round((closed / total) * 100)}%`;
+}
 
 export default function AnalyticsScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
+  const [data, setData] = useState<AnalyticsSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const summary = await getAnalyticsSummary();
+          if (active) setData(summary);
+        } catch (e) {
+          if (active) {
+            setData(null);
+            setError(
+              e instanceof Error ? e.message : 'Could not load analytics'
+            );
+          }
+        } finally {
+          if (active) setLoading(false);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  if (loading && !data) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={styles.loadingText}>Loading analytics…</Text>
+      </View>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.errorTitle}>Analytics unavailable</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.errorHint}>
+          Start the PostgreSQL backend (`npm start` in backend/new).
+        </Text>
+      </View>
+    );
+  }
+
+  const summary = data!;
+  const overview = [
+    { num: String(summary.active), label: 'Active Cases' },
+    { num: String(summary.closed), label: 'Closed Cases' },
+    { num: formatDuration(summary.avgDurationMs), label: 'Avg Case Duration' },
+    {
+      num: formatResolvedRate(summary.closed, summary.total),
+      label: 'Resolved',
+    },
+  ];
 
   return (
     <ScrollView
@@ -20,16 +99,10 @@ export default function AnalyticsScreen() {
       ]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Overview */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Overview</Text>
         <View style={[styles.statsRow, isDesktop && styles.statsRowDesktop]}>
-          {[
-            { num: '42', label: 'Active Cases' },
-            { num: '318', label: 'Closed Cases' },
-            { num: '1h 52m', label: 'Avg Case Duration' },
-            { num: '96%', label: 'Resolved' },
-          ].map((s) => (
+          {overview.map((s) => (
             <View
               key={s.label}
               style={[styles.statCard, isDesktop && styles.statCardDesktop]}
@@ -45,15 +118,13 @@ export default function AnalyticsScreen() {
         <View style={isDesktop ? { flex: 1 } : undefined}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Number of incidents</Text>
-            {[
-              { label: 'Fire', value: '18 Cases' },
-              { label: 'Intruder', value: '42 Cases' },
-              { label: 'Injury', value: '27 Cases' },
-              { label: 'Maintenance', value: '95 Cases' },
-            ].map((row) => (
-              <View key={row.label} style={styles.item}>
-                <Text style={styles.itemTitle}>{row.label}</Text>
-                <Text style={styles.itemValue}>{row.value}</Text>
+            {(summary.byCategory.length
+              ? summary.byCategory
+              : [{ category: 'No data yet', count: 0 }]
+            ).map((row) => (
+              <View key={row.category} style={styles.item}>
+                <Text style={styles.itemTitle}>{row.category}</Text>
+                <Text style={styles.itemValue}>{row.count} Cases</Text>
               </View>
             ))}
           </View>
@@ -61,14 +132,13 @@ export default function AnalyticsScreen() {
         <View style={isDesktop ? { flex: 1 } : undefined}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Incident Hotspots</Text>
-            {[
-              { label: 'Main Lecture Theatre', value: '34 incidents' },
-              { label: 'Corridor', value: '28 incidents' },
-              { label: 'Cafeteria', value: '17 incidents' },
-            ].map((row) => (
+            {(summary.hotspots.length
+              ? summary.hotspots
+              : [{ label: 'No locations yet', count: 0 }]
+            ).map((row) => (
               <View key={row.label} style={styles.item}>
                 <Text style={styles.itemTitle}>{row.label}</Text>
-                <Text style={styles.itemValue}>{row.value}</Text>
+                <Text style={styles.itemValue}>{row.count} incidents</Text>
               </View>
             ))}
           </View>
@@ -81,9 +151,18 @@ export default function AnalyticsScreen() {
             <Text style={styles.sectionTitle}>Emergency Services</Text>
             <View style={isDesktop ? styles.metricsRow : undefined}>
               {[
-                { label: 'Police Called', value: '6 Times' },
-                { label: 'Fire Brigade Called', value: '16 Times' },
-                { label: 'Ambulance Called', value: '24 Times' },
+                {
+                  label: 'Police Called',
+                  value: summary.servicesContacted.police,
+                },
+                {
+                  label: 'Fire Brigade Called',
+                  value: summary.servicesContacted.fire,
+                },
+                {
+                  label: 'Ambulance Called',
+                  value: summary.servicesContacted.ambulance,
+                },
               ].map((m) => (
                 <View
                   key={m.label}
@@ -93,7 +172,7 @@ export default function AnalyticsScreen() {
                   ]}
                 >
                   <Text style={styles.metricTitle}>{m.label}</Text>
-                  <Text style={styles.metricValue}>{m.value}</Text>
+                  <Text style={styles.metricValue}>{m.value} Times</Text>
                 </View>
               ))}
             </View>
@@ -116,6 +195,20 @@ export default function AnalyticsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F7FA' },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  loadingText: { marginTop: 12, color: '#6B7280' },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  errorText: { color: '#DC2626', textAlign: 'center', marginBottom: 8 },
+  errorHint: { color: '#6B7280', textAlign: 'center', fontSize: 13 },
   content: { padding: 18 },
   contentDesktop: {
     maxWidth: 960,

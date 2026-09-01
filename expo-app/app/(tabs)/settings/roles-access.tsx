@@ -34,13 +34,13 @@ export default function RolesAccessScreen() {
       await hydrateSession();
       const loaded = await getUser(getCurrentUserId());
       setUser(loaded);
-      if (!loaded) setError("User not found on Express API.");
+      if (!loaded) setError("User not found on the API.");
     } catch (e) {
       setUser(null);
       setError(
         e instanceof Error
           ? e.message
-          : "Could not load access. Is Express running?"
+          : "Could not load access. Is the backend API running?"
       );
     } finally {
       setLoading(false);

@@ -16,6 +16,7 @@ import {
   getCurrentUserId,
   getUser,
   hydrateSession,
+  loginWithEmailPassword,
   updateUser,
 } from "@/lib/api";
 
@@ -41,18 +42,26 @@ export default function ChangePasswordScreen() {
       const id = getCurrentUserId();
       const user = await getUser(id);
       if (!user) {
-        Alert.alert("Offline", "Could not load your account from Express.");
+        Alert.alert("Offline", "Could not load your account from the API.");
         return;
       }
-      if ((user.password ?? "") !== currentPassword) {
+      if (!user.email) {
+        Alert.alert("Error", "Account email is missing.");
+        return;
+      }
+
+      try {
+        await loginWithEmailPassword(user.email, currentPassword);
+      } catch {
         Alert.alert("Incorrect", "Current password is wrong.");
         return;
       }
+
       await updateUser(id, { password: nextPassword });
       setCurrentPassword("");
       setNextPassword("");
       setConfirmPassword("");
-      Alert.alert("Updated", "Password saved to the Express API.");
+      Alert.alert("Updated", "Password saved to the PostgreSQL API.");
     } catch (e) {
       Alert.alert(
         "Failed",
@@ -72,7 +81,7 @@ export default function ChangePasswordScreen() {
       <Text style={settingsStyles.title}>Change Password</Text>
       <Text style={[settingsStyles.subtitle, { marginBottom: 16 }]}>
         Update your credentials to keep your account secure. Changes sync to
-        Express when the server is running.
+        the PostgreSQL backend when the server is running.
       </Text>
 
       <Text style={settingsStyles.inputLabel}>Current password</Text>

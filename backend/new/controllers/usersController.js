@@ -6,6 +6,15 @@ const {
   deleteUser,
 } = require("../db/queries/users");
 const { userToPublicApi } = require("../db/mappers");
+const bcrypt = require("bcrypt");
+
+async function hashPasswordIfPresent(body) {
+  if (!body?.password) return body;
+  return {
+    ...body,
+    password: await bcrypt.hash(body.password, 10),
+  };
+}
 
 const getAllUsers = async (req, res) => {
   try {
@@ -28,7 +37,8 @@ const getUser = async (req, res) => {
 
 const createNewUser = async (req, res) => {
   try {
-    const created = await createUser(req.body);
+    const payload = await hashPasswordIfPresent(req.body);
+    const created = await createUser(payload);
     res.status(201).json(userToPublicApi(created));
   } catch (err) {
     res.status(500).json({ error: err.message || "Failed to create user" });
@@ -37,7 +47,8 @@ const createNewUser = async (req, res) => {
 
 const updateExistingUser = async (req, res) => {
   try {
-    const updated = await updateUser(req.params.id, req.body);
+    const payload = await hashPasswordIfPresent(req.body);
+    const updated = await updateUser(req.params.id, payload);
     if (!updated) return res.status(404).json({ error: "User not found" });
     res.json(userToPublicApi(updated));
   } catch (err) {

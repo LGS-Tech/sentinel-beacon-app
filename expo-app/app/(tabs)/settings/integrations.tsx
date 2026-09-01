@@ -18,13 +18,14 @@ import {
 import {
   EXPRESS_URL,
   FLASK_URL,
+  checkAnalyticsHealth,
   checkExpressHealth,
   checkFlaskHealth,
   checkUsersHealth,
   type HealthStatus,
 } from "@/lib/api";
 
-type IntegrationId = "cases" | "users" | "flask" | "map" | "vault";
+type IntegrationId = "postgres" | "cases" | "users" | "analytics" | "flask" | "map" | "vault";
 
 type IntegrationRow = {
   id: IntegrationId;
@@ -39,13 +40,21 @@ export default function IntegrationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const probe = useCallback(async () => {
-    const [cases, users, flask] = await Promise.all([
+    const [postgres, cases, users, analytics, flask] = await Promise.all([
+      checkExpressHealth(),
       checkExpressHealth(),
       checkUsersHealth(),
+      checkAnalyticsHealth(),
       checkFlaskHealth(),
     ]);
 
     setRows([
+      {
+        id: "postgres",
+        title: "PostgreSQL API",
+        detail: `${EXPRESS_URL}/health`,
+        status: postgres,
+      },
       {
         id: "cases",
         title: "Cases API",
@@ -57,6 +66,12 @@ export default function IntegrationsScreen() {
         title: "Users API (Settings)",
         detail: `${EXPRESS_URL}/users`,
         status: users,
+      },
+      {
+        id: "analytics",
+        title: "Analytics API",
+        detail: `${EXPRESS_URL}/cases/analytics`,
+        status: analytics,
       },
       {
         id: "flask",
@@ -115,8 +130,8 @@ export default function IntegrationsScreen() {
     >
       <Text style={settingsStyles.title}>Integrations</Text>
       <Text style={[settingsStyles.subtitle, { marginBottom: 16 }]}>
-        Connection status for services used by Dashboard, Vault, and alerts.
-        Pull to refresh or tap Refresh.
+        Connection status for PostgreSQL, Dashboard, Analytics, Vault, and
+        alerts. Pull to refresh or tap Refresh.
       </Text>
 
       {loading && rows.length === 0 ? (

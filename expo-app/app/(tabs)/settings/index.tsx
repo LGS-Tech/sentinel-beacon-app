@@ -247,7 +247,7 @@ export default function SettingsScreen() {
               <Text style={settingsStyles.muted}>
                 {user?.email ??
                   (offline
-                    ? "Offline — start Express API to sync"
+                    ? "Offline — start backend/new API to sync"
                     : "Loading profile…")}
               </Text>
               {user ? (

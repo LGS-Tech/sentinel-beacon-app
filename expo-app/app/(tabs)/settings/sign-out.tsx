@@ -31,7 +31,7 @@ export default function SignOutScreen() {
       </Text>
       <Text style={[settingsStyles.muted, { marginBottom: 16 }]}>
         You will need to sign in again with your email and password against the
-        Express user directory.
+        PostgreSQL backend.
       </Text>
 
       <Pressable

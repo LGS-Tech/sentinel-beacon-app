@@ -19,6 +19,21 @@ export type HealthStatus = {
   message: string;
 };
 
+export type AnalyticsSummary = {
+  active: number;
+  closed: number;
+  total: number;
+  avgDurationMs: number;
+  byCategory: { category: string; count: number }[];
+  hotspots: { label: string; count: number }[];
+  servicesContacted: {
+    police: number;
+    fire: number;
+    ambulance: number;
+    maintenance: number;
+  };
+};
+
 /** authorisation 1 = site lead / higher priority; 2 = standard staff */
 export function getAccessLevelLabel(authorisation?: number): string {
   if (authorisation === 1) return "Priority / Lead";
@@ -205,6 +220,21 @@ export async function loginWithEmailPassword(
 
   await persistSession(result.user.id, result.token);
   return result.user;
+}
+
+export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
+  return request<AnalyticsSummary>(EXPRESS_URL, "/cases/analytics");
+}
+
+export async function checkAnalyticsHealth(): Promise<HealthStatus> {
+  try {
+    await getAnalyticsSummary();
+    return { ok: true, message: "Connected" };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to reach analytics API";
+    return { ok: false, message };
+  }
 }
 
 export async function checkExpressHealth(): Promise<HealthStatus> {

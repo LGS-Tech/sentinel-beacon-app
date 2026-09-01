@@ -43,7 +43,7 @@ export default function ProfileScreen() {
       const id = getCurrentUserId();
       const user = await getUser(id);
       if (!user) {
-        setError("User not found on Express API.");
+        setError("User not found on the API.");
         setUserId(null);
         return;
       }
@@ -52,7 +52,7 @@ export default function ProfileScreen() {
       setError(
         e instanceof Error
           ? e.message
-          : "Could not load profile. Is the Express server running?"
+          : "Could not load profile. Is the backend API running?"
       );
     } finally {
       setLoading(false);
@@ -76,7 +76,7 @@ export default function ProfileScreen() {
 
   async function onSave() {
     if (userId == null) {
-      Alert.alert("Offline", "Connect to the Express API to save profile changes.");
+      Alert.alert("Offline", "Connect to the backend API to save profile changes.");
       return;
     }
 
@@ -90,7 +90,7 @@ export default function ProfileScreen() {
         phone: phone.trim(),
       });
       applyUser(updated);
-      Alert.alert("Saved", "Profile updated on the Express API.");
+      Alert.alert("Saved", "Profile updated on the PostgreSQL API.");
     } catch (e) {
       Alert.alert(
         "Save failed",
@@ -117,8 +117,8 @@ export default function ProfileScreen() {
     >
       <Text style={settingsStyles.title}>Profile</Text>
       <Text style={[settingsStyles.subtitle, { marginBottom: 16 }]}>
-        Manage your personal account details. Changes sync to the Express mock
-        API when it is online.
+        Manage your personal account details. Changes sync to the PostgreSQL
+        backend when it is online.
       </Text>
 
       {error ? (
