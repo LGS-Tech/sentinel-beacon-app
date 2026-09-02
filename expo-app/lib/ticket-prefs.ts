@@ -8,12 +8,16 @@ export type TicketCategory =
   | "Engineering"
   | "Injury";
 
+export type TicketPriority = "normal" | "high";
+
 export type TicketPrefs = {
   defaultCategory: TicketCategory;
+  defaultPriority: TicketPriority;
   pinOnMapWhenRaising: boolean;
   showHiddenCostField: boolean;
   allowReopenClosed: boolean;
   quickUpdateFromMap: boolean;
+  confirmBeforeSubmit: boolean;
 };
 
 export const ticketCategories: TicketCategory[] = [
@@ -25,10 +29,12 @@ export const ticketCategories: TicketCategory[] = [
 
 export const defaultTicketPrefs: TicketPrefs = {
   defaultCategory: "Facilities",
+  defaultPriority: "normal",
   pinOnMapWhenRaising: true,
   showHiddenCostField: false,
   allowReopenClosed: false,
   quickUpdateFromMap: true,
+  confirmBeforeSubmit: true,
 };
 
 export async function loadTicketPrefs(): Promise<TicketPrefs> {

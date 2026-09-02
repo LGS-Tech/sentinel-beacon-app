@@ -3,14 +3,14 @@ import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import 'react-native-reanimated'
 
-import { useColorScheme } from '@/hooks/use-color-scheme'
+import { AppearanceProvider, useAppearance } from '@/contexts/appearance'
 
 export const unstable_settings = {
   anchor: '(tabs)',
 }
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme()
+function RootNavigation() {
+  const { colorScheme } = useAppearance()
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -48,7 +48,15 @@ export default function RootLayout() {
 
       </Stack>
 
-      <StatusBar style="auto" />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
+  )
+}
+
+export default function RootLayout() {
+  return (
+    <AppearanceProvider>
+      <RootNavigation />
+    </AppearanceProvider>
   )
 }

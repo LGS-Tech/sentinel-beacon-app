@@ -39,6 +39,7 @@ export default function IntegrationsScreen() {
   const [rows, setRows] = useState<IntegrationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastChecked, setLastChecked] = useState<string | null>(null);
 
   const probe = useCallback(async () => {
     const [postgres, cases, users, analytics, flask] = await Promise.all([
@@ -95,6 +96,7 @@ export default function IntegrationsScreen() {
           : { ok: false, message: "Cases API offline" },
       },
     ]);
+    setLastChecked(new Date().toLocaleTimeString());
   }, []);
 
   useFocusEffect(
@@ -130,10 +132,17 @@ export default function IntegrationsScreen() {
       }
     >
       <Text style={settingsStyles.title}>Integrations</Text>
-      <Text style={[settingsStyles.subtitle, { marginBottom: 16 }]}>
+      <Text style={[settingsStyles.subtitle, { marginBottom: 8 }]}>
         Connection status for PostgreSQL, Dashboard, Analytics, Vault, and
         alerts. Pull to refresh or tap Refresh.
       </Text>
+      {lastChecked ? (
+        <Text style={[settingsStyles.muted, { marginBottom: 16 }]}>
+          Last checked {lastChecked}
+        </Text>
+      ) : (
+        <View style={{ marginBottom: 16 }} />
+      )}
 
       {loading && rows.length === 0 ? (
         <ActivityIndicator color={SettingsColors.primary} size="large" />

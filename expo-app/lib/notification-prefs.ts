@@ -4,21 +4,25 @@ const STORAGE_KEY = "sentinel.notificationPrefs.v2";
 
 /** Aligned with LGS v1 ticket categories from the Client & Features brief */
 export type NotificationPrefs = {
+  enabled: boolean;
   facilities: boolean;
   itSupport: boolean;
   engineering: boolean;
   injury: boolean;
   assignmentUpdates: boolean;
   overdueSla: boolean;
+  digestSummary: boolean;
 };
 
 export const defaultNotificationPrefs: NotificationPrefs = {
+  enabled: true,
   facilities: true,
   itSupport: true,
   engineering: true,
   injury: true,
   assignmentUpdates: true,
   overdueSla: true,
+  digestSummary: false,
 };
 
 export async function loadNotificationPrefs(): Promise<NotificationPrefs> {

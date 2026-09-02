@@ -9,6 +9,15 @@ export type User = {
   name: string;
   role: string;
   authorisation?: number;
+  collegeId?: string | null;
+  departmentId?: number | null;
+  department?: string | null;
+  yearSemester?: string | null;
+  userType?: string | null;
+  isActive?: boolean;
+  lastLoginAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   /** Legacy seed rows may use a spaced phone key */
   "phone number"?: string;
   phone?: string;
@@ -204,6 +213,47 @@ export async function createUser(
 
 export function getUserPhone(user: User): string {
   return user.phone ?? user["phone number"] ?? "";
+}
+
+export function formatUserType(userType?: string | null): string {
+  if (!userType) return "Staff";
+  return userType.charAt(0).toUpperCase() + userType.slice(1);
+}
+
+export function formatDateTime(value?: string | null): string {
+  if (!value) return "Never";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString();
+}
+
+export function getRoleComparison(): {
+  level: string;
+  authorisation: number;
+  highlights: string[];
+}[] {
+  return [
+    {
+      level: "Priority / Lead",
+      authorisation: 1,
+      highlights: [
+        "Reassign tickets across departments",
+        "Analytics cost and dwell insights",
+        "Reopen closed vault cases",
+        "Higher priority on active tickets",
+      ],
+    },
+    {
+      level: "Standard staff",
+      authorisation: 2,
+      highlights: [
+        "Raise and update site tickets",
+        "Dashboard map and active cases",
+        "Vault history for your site",
+        "Profile and notification preferences",
+      ],
+    },
+  ];
 }
 
 type LoginResponse = { token: string; user: User };

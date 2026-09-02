@@ -1,24 +1,28 @@
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Switch,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
   View,
-  StyleSheet,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
 
+import { SettingsToggleRow } from "@/components/settings-toggle-row";
 import {
   SettingsColors,
   settingsStyles,
 } from "@/constants/settings-theme";
 import {
+  defaultNotificationPrefs,
   loadNotificationPrefs,
   saveNotificationPrefs,
   type NotificationPrefs,
 } from "@/lib/notification-prefs";
 
-type ToggleKey = keyof NotificationPrefs;
+type ToggleKey = Exclude<keyof NotificationPrefs, "enabled">;
 
 const rows: { key: ToggleKey; label: string; description: string }[] = [
   {
@@ -51,6 +55,11 @@ const rows: { key: ToggleKey; label: string; description: string }[] = [
     label: "Overdue / past target",
     description: "Tickets dwelling past target response timelines",
   },
+  {
+    key: "digestSummary",
+    label: "Daily digest",
+    description: "One summary notification per day instead of every event",
+  },
 ];
 
 export default function NotificationsScreen() {
@@ -69,11 +78,17 @@ export default function NotificationsScreen() {
     }, [])
   );
 
-  async function toggle(key: ToggleKey, value: boolean) {
+  async function patch(partial: Partial<NotificationPrefs>) {
     if (!prefs) return;
-    const next = { ...prefs, [key]: value };
+    const next = { ...prefs, ...partial };
     setPrefs(next);
     await saveNotificationPrefs(next);
+  }
+
+  async function resetDefaults() {
+    setPrefs({ ...defaultNotificationPrefs });
+    await saveNotificationPrefs({ ...defaultNotificationPrefs });
+    Alert.alert("Reset", "Notification preferences restored to defaults.");
   }
 
   if (!prefs) {
@@ -84,55 +99,60 @@ export default function NotificationsScreen() {
     );
   }
 
-  return (
-    <View style={settingsStyles.screen}>
-      <View style={settingsStyles.content}>
-        <Text style={settingsStyles.title}>Notifications</Text>
-        <Text style={[settingsStyles.subtitle, { marginBottom: 16 }]}>
-          Choose which ticket categories and workflow events notify you.
-          Preferences are stored on this device.
-        </Text>
+  const categoryCount = rows.filter((row) => prefs[row.key]).length;
 
-        <View style={settingsStyles.card}>
-          {rows.map((row, index) => (
-            <View
-              key={row.key}
-              style={[
-                styles.row,
-                index === rows.length - 1 && settingsStyles.rowLast,
-              ]}
-            >
-              <View style={styles.textBlock}>
-                <Text style={settingsStyles.label}>{row.label}</Text>
-                <Text style={settingsStyles.muted}>{row.description}</Text>
-              </View>
-              <Switch
-                value={prefs[row.key]}
-                onValueChange={(v) => toggle(row.key, v)}
-                trackColor={{
-                  false: "#D1D5DB",
-                  true: "#FCA5A5",
-                }}
-                thumbColor={prefs[row.key] ? SettingsColors.primary : "#f4f4f5"}
-              />
-            </View>
-          ))}
+  return (
+    <ScrollView
+      style={settingsStyles.screen}
+      contentContainerStyle={settingsStyles.content}
+    >
+      <Text style={settingsStyles.title}>Notifications</Text>
+      <Text style={[settingsStyles.subtitle, { marginBottom: 16 }]}>
+        Control which ticket categories and workflow events notify you on this
+        device. Push delivery will connect when mobile alerts ship.
+      </Text>
+
+      <View style={[settingsStyles.card, { marginBottom: 16 }]}>
+        <SettingsToggleRow
+          label="Enable notifications"
+          description="Master switch for all categories below"
+          value={prefs.enabled}
+          onChange={(enabled) => patch({ enabled })}
+        />
+        <View style={[styles.statRow, settingsStyles.rowLast]}>
+          <Text style={settingsStyles.muted}>
+            {prefs.enabled
+              ? `${categoryCount} of ${rows.length} notification types active`
+              : "All notifications paused"}
+          </Text>
         </View>
       </View>
-    </View>
+
+      <Text style={settingsStyles.sectionTitle}>Categories & events</Text>
+      <View style={settingsStyles.card}>
+        {rows.map((row, index) => (
+          <SettingsToggleRow
+            key={row.key}
+            label={row.label}
+            description={row.description}
+            value={prefs[row.key]}
+            onChange={(value) => patch({ [row.key]: value })}
+            disabled={!prefs.enabled}
+            last={index === rows.length - 1}
+          />
+        ))}
+      </View>
+
+      <Pressable style={settingsStyles.secondaryButton} onPress={resetDefaults}>
+        <Text style={settingsStyles.secondaryButtonText}>Reset to defaults</Text>
+      </Pressable>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
+  statRow: {
     paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: SettingsColors.border,
-    gap: 12,
+    paddingBottom: 12,
   },
-  textBlock: { flex: 1, paddingRight: 8 },
 });

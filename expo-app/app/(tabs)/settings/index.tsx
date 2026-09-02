@@ -22,12 +22,20 @@ import {
   hydrateSession,
   type User,
 } from "@/lib/api";
+import {
+  THEME_LABELS,
+  TEXT_SCALE_LABELS,
+  loadAppearancePrefs,
+} from "@/lib/appearance-prefs";
+import { loadNotificationPrefs } from "@/lib/notification-prefs";
+import { loadTicketPrefs } from "@/lib/ticket-prefs";
 
 type SettingItem = {
   id: string;
   label: string;
   route: string;
   icon: keyof typeof MaterialIcons.glyphMap;
+  hint?: string;
 };
 
 type SettingSection = {
@@ -157,6 +165,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [offline, setOffline] = useState(false);
+  const [hints, setHints] = useState<Record<string, string>>({});
 
   useFocusEffect(
     useCallback(() => {
@@ -165,10 +174,25 @@ export default function SettingsScreen() {
       (async () => {
         try {
           await hydrateSession();
-          const loaded = await getUser(getCurrentUserId());
+          const [loaded, appearance, tickets, notifications] =
+            await Promise.all([
+              getUser(getCurrentUserId()),
+              loadAppearancePrefs(),
+              loadTicketPrefs(),
+              loadNotificationPrefs(),
+            ]);
           if (!active) return;
           setUser(loaded);
           setOffline(!loaded);
+          setHints({
+            "/settings/ticket-preferences": `${tickets.defaultCategory} · ${tickets.defaultPriority} priority`,
+            "/settings/notifications": notifications.enabled
+              ? "On · tap to customise categories"
+              : "Paused",
+            "/settings/theme": THEME_LABELS[appearance.theme],
+            "/settings/text-size": TEXT_SCALE_LABELS[appearance.textScale],
+            "/settings/integrations": "PostgreSQL API health checks",
+          });
         } catch {
           if (!active) return;
           setUser(null);
@@ -195,7 +219,14 @@ export default function SettingsScreen() {
           color={SettingsColors.muted}
           style={styles.rowIcon}
         />
-        <Text style={settingsStyles.label}>{item.label}</Text>
+        <View style={styles.rowText}>
+          <Text style={settingsStyles.label}>{item.label}</Text>
+          {hints[item.route] || item.hint ? (
+            <Text style={styles.rowHint}>
+              {hints[item.route] ?? item.hint}
+            </Text>
+          ) : null}
+        </View>
       </View>
       <MaterialIcons name="chevron-right" size={20} color="#999" />
     </Pressable>
@@ -283,6 +314,12 @@ const styles = StyleSheet.create({
     borderBottomColor: SettingsColors.border,
   },
   rowLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
+  rowText: { flex: 1 },
+  rowHint: {
+    fontSize: 12,
+    color: SettingsColors.muted,
+    marginTop: 2,
+  },
   rowIcon: { marginRight: 12 },
   profileCard: {
     flexDirection: "row",
