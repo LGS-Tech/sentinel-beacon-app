@@ -45,4 +45,34 @@ function authorize(allowedRoles) {
   };
 }
 
-module.exports = { authenticate, authorize };
+
+/**
+ * Allows users to modify their own resource, while privileged roles
+ * may modify resources belonging to other users.
+ */
+function authorizeSelfOrRoles(allowedRoles) {
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+
+  return (req, res, next) => {
+    const authenticatedUserId = Number(req.user?.userId);
+    const targetUserId = Number(req.params.id);
+
+    if (
+      Number.isInteger(authenticatedUserId) &&
+      Number.isInteger(targetUserId) &&
+      authenticatedUserId === targetUserId
+    ) {
+      return next();
+    }
+
+    if (roles.includes(req.user?.userType)) {
+      return next();
+    }
+
+    return res.status(403).json({
+      error: 'Forbidden: Insufficient permissions'
+    });
+  };
+}
+
+module.exports = { authenticate, authorize, authorizeSelfOrRoles };

@@ -21,6 +21,13 @@ function attachmentToApi(row) {
   };
 }
 
+function userToPublicApi(user) {
+  if (!user) return null;
+  const copy = { ...user };
+  delete copy.password;
+  return copy;
+}
+
 function userToApi(row) {
   if (!row) return null;
   return {
@@ -117,6 +124,7 @@ function pick(body, camel, snake) {
 }
 
 module.exports = {
+  userToPublicApi,
   attachmentToApi,
   userToApi,
   departmentToApi,
