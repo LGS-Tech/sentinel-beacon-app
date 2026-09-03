@@ -60,8 +60,8 @@ Update root `/` endpoint list to include attachments if desired.
 
 ## Database
 
-Table: `case_attachments` in `db/schema.sql`  
-Queries: `db/queries/attachments.js`  
+Table: `case_attachments` in `db/schema.sql`
+Queries: `db/queries/attachments.js`
 Access: `const db = require("./db"); await db.attachments.listAttachmentsByCaseId(caseId);`
 
 Apply schema:

@@ -302,4 +302,3 @@ CREATE INDEX IF NOT EXISTS idx_case_attachments_case_id
 
 CREATE INDEX IF NOT EXISTS idx_case_attachments_uploaded_by
   ON case_attachments (uploaded_by_user_id);
-
