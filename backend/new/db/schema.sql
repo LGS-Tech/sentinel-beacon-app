@@ -105,7 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_users_department_id ON users (department_id);
 CREATE INDEX IF NOT EXISTS idx_users_user_type ON users (user_type);
 CREATE INDEX IF NOT EXISTS idx_users_college_id ON users (college_id);
 
--- Seed demo staff (same ids/passwords as data/users.json) plus maintainer + student
+-- Seed demo staff plus maintainer and student
 INSERT INTO users (
   id, username, password, email, name, phone, role, authorisation,
   user_type, department_id, college_id

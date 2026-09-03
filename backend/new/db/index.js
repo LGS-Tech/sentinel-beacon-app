@@ -1,6 +1,5 @@
 /**
  * PostgreSQL data layer for LGS Tech.
- * Live Express routes in server.js still use Mongo / users.json until the team switches.
  *
  *   const db = require("./db");
  *   await db.cases.listCases({ openOnly: true });

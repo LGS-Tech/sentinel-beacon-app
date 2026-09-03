@@ -17,7 +17,7 @@ Local `npm start` / Docker Postgres stay for day-to-day development.
 
 | Key | Notes |
 |-----|--------|
-| `MONGO_URI` | Same Atlas URI from team chat (required for cases) |
+| `DATABASE_URL` | PostgreSQL connection string (required) |
 | `ALLOWED_ORIGINS` | Optional extras. Defaults already include `https://lgs-tech.github.io`. Example: `https://lgs-tech.github.io,http://localhost:8081` |
 | `DATABASE_URL` | Optional for now (Postgres not wired into `server.js` yet) |
 
@@ -30,7 +30,7 @@ Render sets `PORT` automatically — do not hardcode it.
 3. Connect the repo.
 4. Set **Root Directory** = `backend/new`.
 5. Build = `npm install`, Start = `npm start`.
-6. Add `MONGO_URI` and `ALLOWED_ORIGINS`.
+6. Add `DATABASE_URL`, `JWT_SECRET`, and `ALLOWED_ORIGINS`.
 7. Deploy → copy the URL, e.g. `https://lgs-tech-api.onrender.com`.
 
 Or use the root [`render.yaml`](../../render.yaml) Blueprint.
@@ -48,7 +48,7 @@ Do **not** commit real secrets. Local `.env` can keep `localhost` / LAN IP for d
 ## Important limits (free tier)
 
 - Service may **spin down** after idle; first request can be slow (~30–60s).
-- Disk is **ephemeral** — writes to `data/users.json` can reset on redeploy. Cases on **Mongo Atlas** persist.
+- PostgreSQL is the persistent backend data store; do not store application data in the service filesystem.
 - Keep developing against local servers; use Render mainly for demos.
 
 ## Smoke test after deploy
