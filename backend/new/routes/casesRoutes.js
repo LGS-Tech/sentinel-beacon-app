@@ -9,12 +9,15 @@ const {
   updateExistingCase,
   deleteExistingCase,
   assignCaseToUser,
+  getAnalyticsSummary,
 } = require("../controllers/casesController");
 
 router.use(authenticate); 
 
 
 router.get("/", getAllCases);
+router.get("/analytics", getAnalyticsSummary);
+router.post("/assign", assignCaseToUser);
 router.get("/:id", getCase);
 router.post("/", createNewCase);
 router.put("/:id", updateExistingCase);
