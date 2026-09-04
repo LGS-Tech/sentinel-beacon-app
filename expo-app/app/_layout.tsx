@@ -1,33 +1,36 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
-import { Stack } from 'expo-router'
-import { StatusBar } from 'expo-status-bar'
-import 'react-native-reanimated'
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from '@react-navigation/native';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme'
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
   anchor: '(tabs)',
-}
+};
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme()
+  const colorScheme = useColorScheme();
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
-
         <Stack.Screen
           name="(tabs)"
           options={{
             headerShown: false,
-            title: ""
+            title: '',
           }}
         />
 
         <Stack.Screen
           name="vault-folder"
           options={{
-            headerBackTitle: ""
+            headerBackTitle: '',
           }}
         />
 
@@ -37,7 +40,7 @@ export default function RootLayout() {
         />
 
         <Stack.Screen
-          name="login-page"
+          name="login"
           options={{ headerShown: false, title: 'Login' }}
         />
 
@@ -45,10 +48,9 @@ export default function RootLayout() {
           name="registerPage"
           options={{ headerShown: false, title: 'Register' }}
         />
-
       </Stack>
 
       <StatusBar style="auto" />
     </ThemeProvider>
-  )
+  );
 }
