@@ -20,17 +20,23 @@ import {
   AuthButton,
   AuthCheckbox,
   AuthInput,
+  HoverLink,
+  isValidEmail,
+  StaggerItem,
 } from '@/components/auth/auth-controls';
 import { AuthSidebar, LanguageSelector } from '@/components/auth/auth-sidebar';
 import { LoginIllustration } from '@/components/auth/login-illustration';
+import { usePageTransition } from '@/components/auth/use-page-transition';
 import { loginWithEmailPassword } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
+  const { pageStyle, navigate } = usePageTransition();
 
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -39,18 +45,21 @@ export default function LoginPage() {
   const heroEnter = useSharedValue(0);
 
   React.useEffect(() => {
-    heroEnter.value = withTiming(1, { duration: 480 });
-    cardEnter.value = withDelay(120, withTiming(1, { duration: 480 }));
+    heroEnter.value = withTiming(1, { duration: 520 });
+    cardEnter.value = withDelay(200, withTiming(1, { duration: 560 }));
   }, [cardEnter, heroEnter]);
 
   const cardStyle = useAnimatedStyle(() => ({
     opacity: cardEnter.value,
-    transform: [{ translateY: (1 - cardEnter.value) * 18 }],
+    transform: [
+      { translateY: (1 - cardEnter.value) * 26 },
+      { scale: 0.94 + cardEnter.value * 0.06 },
+    ],
   }));
 
   const heroStyle = useAnimatedStyle(() => ({
     opacity: heroEnter.value,
-    transform: [{ translateX: (1 - heroEnter.value) * -24 }],
+    transform: [{ translateX: (1 - heroEnter.value) * -36 }],
   }));
 
   async function onLogin() {
@@ -59,6 +68,10 @@ export default function LoginPage() {
         'Missing details',
         'Enter your username or email and password.',
       );
+      return;
+    }
+    if (email.includes('@') && !isValidEmail(email)) {
+      setEmailError('Enter a valid email address (e.g. name@example.com).');
       return;
     }
 
@@ -89,7 +102,18 @@ export default function LoginPage() {
             icon="mail-outline"
             placeholder="Username or Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(v) => {
+              setEmail(v);
+              if (emailError) setEmailError('');
+            }}
+            onBlur={() => {
+              if (email.includes('@') && !isValidEmail(email)) {
+                setEmailError(
+                  'Enter a valid email address (e.g. name@example.com).',
+                );
+              }
+            }}
+            errorText={emailError}
             autoCapitalize="none"
             editable={!busy}
           />
@@ -126,8 +150,8 @@ export default function LoginPage() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.shell}>
-        <AuthSidebar active="login" />
+      <Animated.View style={[styles.shell, pageStyle]}>
+        <AuthSidebar active="login" onNavigate={navigate} />
 
         <View style={styles.main}>
           <View style={styles.topBar}>
@@ -141,55 +165,76 @@ export default function LoginPage() {
             </Animated.View>
 
             <Animated.View style={[styles.card, cardStyle]}>
-              <AuthInput
-                icon="mail-outline"
-                placeholder="Username or Email"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                editable={!busy}
-              />
-              <AuthInput
-                icon="lock-outline"
-                placeholder="Password"
-                value={password}
-                onChangeText={setPassword}
-                isPassword
-                editable={!busy}
-              />
+              <StaggerItem delay={140}>
+                <AuthInput
+                  icon="mail-outline"
+                  placeholder="Username or Email"
+                  value={email}
+                  onChangeText={(v) => {
+                    setEmail(v);
+                    if (emailError) setEmailError('');
+                  }}
+                  onBlur={() => {
+                    if (email.includes('@') && !isValidEmail(email)) {
+                      setEmailError(
+                        'Enter a valid email address (e.g. name@example.com).',
+                      );
+                    }
+                  }}
+                  errorText={emailError}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  editable={!busy}
+                />
+              </StaggerItem>
+              <StaggerItem delay={185}>
+                <AuthInput
+                  icon="lock-outline"
+                  placeholder="Password"
+                  value={password}
+                  onChangeText={setPassword}
+                  isPassword
+                  editable={!busy}
+                />
+              </StaggerItem>
 
-              <View style={styles.optionsRow}>
-                <AuthCheckbox
-                  checked={remember}
-                  onToggle={() => setRemember((r) => !r)}
-                >
-                  <Text style={styles.rememberText}>Remember me</Text>
-                </AuthCheckbox>
-                <Text
-                  style={styles.forgotText}
-                  onPress={() =>
-                    Alert.alert(
-                      'Forgot password',
-                      'Password reset is not wired up yet.',
-                    )
-                  }
-                >
-                  Forgot password?
-                </Text>
-              </View>
+              <StaggerItem delay={225}>
+                <View style={styles.optionsRow}>
+                  <AuthCheckbox
+                    checked={remember}
+                    onToggle={() => setRemember((r) => !r)}
+                  >
+                    <Text style={styles.rememberText}>Remember me</Text>
+                  </AuthCheckbox>
+                  <HoverLink
+                    style={styles.forgotText}
+                    onPress={() =>
+                      Alert.alert(
+                        'Forgot password',
+                        'Password reset is not wired up yet.',
+                      )
+                    }
+                  >
+                    Forgot password?
+                  </HoverLink>
+                </View>
+              </StaggerItem>
 
-              <AuthButton label="Login" onPress={onLogin} loading={busy} />
+              <StaggerItem delay={265}>
+                <AuthButton label="Login" onPress={onLogin} loading={busy} />
+              </StaggerItem>
               <View style={{ height: 12 }} />
-              <AuthButton
-                label="Sign Up"
-                variant="secondary"
-                onPress={() => router.push('/registerPage')}
-              />
+              <StaggerItem delay={305}>
+                <AuthButton
+                  label="Sign Up"
+                  variant="secondary"
+                  onPress={() => navigate('/registerPage')}
+                />
+              </StaggerItem>
             </Animated.View>
           </View>
         </View>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }

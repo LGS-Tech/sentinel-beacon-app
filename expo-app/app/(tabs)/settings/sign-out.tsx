@@ -1,9 +1,9 @@
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
-import { settingsStyles } from "@/constants/settings-theme";
-import { clearSession } from "@/lib/api";
+import { settingsStyles } from '@/constants/settings-theme';
+import { clearSession } from '@/lib/api';
 
 export default function SignOutScreen() {
   const router = useRouter();
@@ -13,11 +13,11 @@ export default function SignOutScreen() {
     setBusy(true);
     try {
       await clearSession();
-      router.replace("/login-page");
+      router.replace('/login');
     } catch (e) {
       Alert.alert(
-        "Sign out failed",
-        e instanceof Error ? e.message : "Could not clear session."
+        'Sign out failed',
+        e instanceof Error ? e.message : 'Could not clear session.',
       );
       setBusy(false);
     }
