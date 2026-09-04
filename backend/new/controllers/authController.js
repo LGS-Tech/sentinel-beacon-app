@@ -31,9 +31,16 @@ const signup = async (req, res) => {
       authorisation
     });
 
+      const token = jwt.sign(
+    { userId: newUser.id, userType: newUser.userType, authorisation: newUser.authorisation },
+    secret,
+    { expiresIn: '1d' }
+    );
+
     res.status(201).json({
       message: 'User registered successfully',
-      user: userToPublicApi(newUser)
+      user: userToPublicApi(newUser),
+      token
     });
   } catch (err) {
     console.error('Error during signup:', err);
