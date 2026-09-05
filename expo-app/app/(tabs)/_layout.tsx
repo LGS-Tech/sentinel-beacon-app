@@ -1,6 +1,7 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Redirect, Tabs } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +13,7 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getAuthToken, hydrateSession } from '@/lib/api';
 
 function DesktopTabBar({ state, descriptors, navigation }: any) {
   const colorScheme = useColorScheme();
@@ -114,12 +116,49 @@ const desktopStyles = StyleSheet.create({
   activeLabel: {
     fontWeight: '700',
   },
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      await hydrateSession();
+      const token = await getAuthToken();
+
+      if (active) {
+        setAuthenticated(Boolean(token));
+        setCheckingSession(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (checkingSession) {
+    return (
+      <View style={desktopStyles.loading}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (!authenticated) {
+    return <Redirect href="/login-page" />;
+  }
 
   return (
     <Tabs
