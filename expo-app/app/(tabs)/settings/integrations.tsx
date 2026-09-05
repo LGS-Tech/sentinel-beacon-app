@@ -16,15 +16,17 @@ import {
   settingsStyles,
 } from "@/constants/settings-theme";
 import {
-  EXPRESS_URL,
+  API_URL,
   FLASK_URL,
-  checkExpressHealth,
+  checkAnalyticsHealth,
+  checkApiHealth,
+  checkCasesHealth,
   checkFlaskHealth,
   checkUsersHealth,
   type HealthStatus,
 } from "@/lib/api";
 
-type IntegrationId = "cases" | "users" | "flask" | "map" | "vault";
+type IntegrationId = "postgres" | "cases" | "users" | "analytics" | "flask" | "map" | "vault";
 
 type IntegrationRow = {
   id: IntegrationId;
@@ -37,26 +39,41 @@ export default function IntegrationsScreen() {
   const [rows, setRows] = useState<IntegrationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastChecked, setLastChecked] = useState<string | null>(null);
 
   const probe = useCallback(async () => {
-    const [cases, users, flask] = await Promise.all([
-      checkExpressHealth(),
+    const [postgres, cases, users, analytics, flask] = await Promise.all([
+      checkApiHealth(),
+      checkCasesHealth(),
       checkUsersHealth(),
+      checkAnalyticsHealth(),
       checkFlaskHealth(),
     ]);
 
     setRows([
       {
+        id: "postgres",
+        title: "PostgreSQL API",
+        detail: `${API_URL}/health`,
+        status: postgres,
+      },
+      {
         id: "cases",
         title: "Cases API",
-        detail: `${EXPRESS_URL}/cases`,
+        detail: `${API_URL}/cases`,
         status: cases,
       },
       {
         id: "users",
         title: "Users API (Settings)",
-        detail: `${EXPRESS_URL}/users`,
+        detail: `${API_URL}/users`,
         status: users,
+      },
+      {
+        id: "analytics",
+        title: "Analytics API",
+        detail: `${API_URL}/cases/analytics`,
+        status: analytics,
       },
       {
         id: "flask",
@@ -79,6 +96,7 @@ export default function IntegrationsScreen() {
           : { ok: false, message: "Cases API offline" },
       },
     ]);
+    setLastChecked(new Date().toLocaleTimeString());
   }, []);
 
   useFocusEffect(
@@ -114,10 +132,17 @@ export default function IntegrationsScreen() {
       }
     >
       <Text style={settingsStyles.title}>Integrations</Text>
-      <Text style={[settingsStyles.subtitle, { marginBottom: 16 }]}>
-        Connection status for services used by Dashboard, Vault, and alerts.
-        Pull to refresh or tap Refresh.
+      <Text style={[settingsStyles.subtitle, { marginBottom: 8 }]}>
+        Connection status for PostgreSQL, Dashboard, Analytics, Vault, and
+        alerts. Pull to refresh or tap Refresh.
       </Text>
+      {lastChecked ? (
+        <Text style={[settingsStyles.muted, { marginBottom: 16 }]}>
+          Last checked {lastChecked}
+        </Text>
+      ) : (
+        <View style={{ marginBottom: 16 }} />
+      )}
 
       {loading && rows.length === 0 ? (
         <ActivityIndicator color={SettingsColors.primary} size="large" />

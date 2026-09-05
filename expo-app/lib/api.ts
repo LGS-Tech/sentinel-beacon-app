@@ -9,7 +9,16 @@ export type User = {
   name: string;
   role: string;
   authorisation?: number;
-  /** Express JSON uses a spaced key for some seed rows */
+  collegeId?: string | null;
+  departmentId?: number | null;
+  department?: string | null;
+  yearSemester?: string | null;
+  userType?: string | null;
+  isActive?: boolean;
+  lastLoginAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  /** Legacy seed rows may use a spaced phone key */
   "phone number"?: string;
   phone?: string;
 };
@@ -17,6 +26,21 @@ export type User = {
 export type HealthStatus = {
   ok: boolean;
   message: string;
+};
+
+export type AnalyticsSummary = {
+  active: number;
+  closed: number;
+  total: number;
+  avgDurationMs: number;
+  byCategory: { category: string; count: number }[];
+  hotspots: { label: string; count: number }[];
+  servicesContacted: {
+    police: number;
+    fire: number;
+    ambulance: number;
+    maintenance: number;
+  };
 };
 
 /** authorisation 1 = site lead / higher priority; 2 = standard staff */
@@ -43,11 +67,12 @@ export function getAccessResponsibilities(authorisation?: number): string[] {
       "Manage own profile and notification prefs",
     ];
   }
-  return ["Sign in to load role-based access from the Express API."];
+  return ["Sign in to load role-based access from the PostgreSQL API."];
 }
 
 const SESSION_KEY = "sentinel.currentUserId";
-const DEFAULT_EXPRESS = "http://localhost:3000";
+const TOKEN_KEY = "sentinel.authToken";
+const DEFAULT_API_URL = "http://localhost:3000";
 const DEFAULT_FLASK = "http://localhost:5000";
 
 function resolveUrl(envKey: string, fallback: string): string {
@@ -63,10 +88,14 @@ function resolveUrl(envKey: string, fallback: string): string {
   return fallback;
 }
 
-export const EXPRESS_URL = resolveUrl("EXPO_PUBLIC_API_URL", DEFAULT_EXPRESS);
+export const API_URL = resolveUrl("EXPO_PUBLIC_API_URL", DEFAULT_API_URL);
 export const FLASK_URL = resolveUrl("EXPO_PUBLIC_FLASK_URL", DEFAULT_FLASK);
 
+/** @deprecated Use API_URL */
+export const EXPRESS_URL = API_URL;
+
 let currentUserId = 1;
+let authToken: string | null = null;
 let sessionHydrated = false;
 
 export function getCurrentUserId(): number {
@@ -77,31 +106,46 @@ export function setCurrentUserId(id: number): void {
   currentUserId = id;
 }
 
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  await hydrateSession();
+  if (!authToken) return {};
+  return { Authorization: `Bearer ${authToken}` };
+}
+
 export async function hydrateSession(): Promise<number> {
   if (sessionHydrated) return currentUserId;
   try {
-    const raw = await AsyncStorage.getItem(SESSION_KEY);
-    if (raw) {
-      const parsed = Number(raw);
+    const [rawId, rawToken] = await Promise.all([
+      AsyncStorage.getItem(SESSION_KEY),
+      AsyncStorage.getItem(TOKEN_KEY),
+    ]);
+    if (rawId) {
+      const parsed = Number(rawId);
       if (!Number.isNaN(parsed) && parsed > 0) currentUserId = parsed;
     }
+    if (rawToken) authToken = rawToken;
   } catch {
-    // keep default
+    // keep defaults
   }
   sessionHydrated = true;
   return currentUserId;
 }
 
-export async function persistSession(id: number): Promise<void> {
+export async function persistSession(id: number, token?: string): Promise<void> {
   currentUserId = id;
   sessionHydrated = true;
   await AsyncStorage.setItem(SESSION_KEY, String(id));
+  if (token) {
+    authToken = token;
+    await AsyncStorage.setItem(TOKEN_KEY, token);
+  }
 }
 
 export async function clearSession(): Promise<void> {
   currentUserId = 1;
+  authToken = null;
   sessionHydrated = true;
-  await AsyncStorage.removeItem(SESSION_KEY);
+  await AsyncStorage.multiRemove([SESSION_KEY, TOKEN_KEY]);
 }
 
 async function request<T>(
@@ -111,12 +155,14 @@ async function request<T>(
 ): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
+  const authHeaders = await getAuthHeaders();
 
   try {
     const res = await fetch(`${base}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders,
         ...(init?.headers ?? {}),
       },
       signal: controller.signal,
@@ -135,19 +181,22 @@ async function request<T>(
 }
 
 export async function getUsers(): Promise<User[]> {
-  return request<User[]>(EXPRESS_URL, "/users");
+  return request<User[]>(API_URL, "/users");
 }
 
 export async function getUser(id: number): Promise<User | null> {
-  const users = await getUsers();
-  return users.find((u) => u.id === id) ?? null;
+  try {
+    return await request<User>(API_URL, `/users/${id}`);
+  } catch {
+    return null;
+  }
 }
 
 export async function updateUser(
   id: number,
   body: Partial<User>
 ): Promise<User> {
-  return request<User>(EXPRESS_URL, `/users/${id}`, {
+  return request<User>(API_URL, `/users/${id}`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
@@ -156,7 +205,7 @@ export async function updateUser(
 export async function createUser(
   body: Omit<User, "id"> & { id?: number }
 ): Promise<User> {
-  return request<User>(EXPRESS_URL, "/users", {
+  return request<User>(API_URL, "/users", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -166,32 +215,109 @@ export function getUserPhone(user: User): string {
   return user.phone ?? user["phone number"] ?? "";
 }
 
+export function formatUserType(userType?: string | null): string {
+  if (!userType) return "Staff";
+  return userType.charAt(0).toUpperCase() + userType.slice(1);
+}
+
+export function formatDateTime(value?: string | null): string {
+  if (!value) return "Never";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString();
+}
+
+export function getRoleComparison(): {
+  level: string;
+  authorisation: number;
+  highlights: string[];
+}[] {
+  return [
+    {
+      level: "Priority / Lead",
+      authorisation: 1,
+      highlights: [
+        "Reassign tickets across departments",
+        "Analytics cost and dwell insights",
+        "Reopen closed vault cases",
+        "Higher priority on active tickets",
+      ],
+    },
+    {
+      level: "Standard staff",
+      authorisation: 2,
+      highlights: [
+        "Raise and update site tickets",
+        "Dashboard map and active cases",
+        "Vault history for your site",
+        "Profile and notification preferences",
+      ],
+    },
+  ];
+}
+
+type LoginResponse = { token: string; user: User };
+
 export async function loginWithEmailPassword(
   email: string,
   password: string
 ): Promise<User> {
-  const users = await getUsers();
-  const normalized = email.trim().toLowerCase();
-  const user = users.find(
-    (u) =>
-      u.email?.toLowerCase() === normalized &&
-      (u.password ?? "") === password
-  );
-  if (!user) {
+  const result = await request<LoginResponse>(API_URL, "/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!result?.user?.id || !result.token) {
     throw new Error("Invalid email or password.");
   }
-  await persistSession(user.id);
-  return user;
+
+  await persistSession(result.user.id, result.token);
+  return result.user;
 }
 
-export async function checkExpressHealth(): Promise<HealthStatus> {
+export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
+  return request<AnalyticsSummary>(API_URL, "/cases/analytics");
+}
+
+export async function checkAnalyticsHealth(): Promise<HealthStatus> {
   try {
-    // New Mongo cases API is the primary ticketing backend
-    await request<unknown>(EXPRESS_URL, "/cases");
+    await getAnalyticsSummary();
     return { ok: true, message: "Connected" };
   } catch (error) {
     const message =
+      error instanceof Error ? error.message : "Unable to reach analytics API";
+    return { ok: false, message };
+  }
+}
+
+export async function checkApiHealth(): Promise<HealthStatus> {
+  try {
+    const res = await request<{
+      ok?: boolean;
+      database?: string;
+      status?: string;
+    }>(API_URL, "/health");
+    if (res.ok) {
+      return { ok: true, message: "PostgreSQL connected" };
+    }
+    return { ok: false, message: "API unhealthy" };
+  } catch (error) {
+    const message =
       error instanceof Error ? error.message : "Unable to reach API";
+    return { ok: false, message };
+  }
+}
+
+/** @deprecated Use checkApiHealth */
+export const checkExpressHealth = checkApiHealth;
+
+export async function checkCasesHealth(): Promise<HealthStatus> {
+  try {
+    await request<unknown>(API_URL, "/cases");
+    return { ok: true, message: "Connected" };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to reach cases API";
     return { ok: false, message };
   }
 }

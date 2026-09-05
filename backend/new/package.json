@@ -11,17 +11,21 @@
     "db:down": "docker compose down",
     "db:setup": "node scripts/setup-postgres.js",
     "db:ping": "node scripts/ping-postgres.js",
-    "db:smoke": "node scripts/smoke-data-layer.js"
+    "db:deploy": "npm run db:setup && npm run db:hash-seeds",
+    "db:smoke": "node scripts/smoke-data-layer.js",
+    "db:smoke-attachments": "node scripts/smoke-attachments.js",
+    "db:hash-seeds": "node scripts/hashSeedPasswords.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "mongoose": "^9.7.4",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.22.0"
   }
 }

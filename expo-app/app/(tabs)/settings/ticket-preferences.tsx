@@ -4,12 +4,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
 
+import { SettingsToggleRow } from "@/components/settings-toggle-row";
 import {
   SettingsColors,
   settingsStyles,
@@ -26,7 +26,13 @@ import {
   ticketCategories,
   type TicketCategory,
   type TicketPrefs,
+  type TicketPriority,
 } from "@/lib/ticket-prefs";
+
+const priorities: { value: TicketPriority; label: string; detail: string }[] = [
+  { value: "normal", label: "Normal", detail: "Standard queue processing" },
+  { value: "high", label: "High", detail: "Escalated visibility for urgent issues" },
+];
 
 export default function TicketPreferencesScreen() {
   const [prefs, setPrefs] = useState<TicketPrefs | null>(null);
@@ -36,19 +42,14 @@ export default function TicketPreferencesScreen() {
     useCallback(() => {
       let active = true;
       (async () => {
-        const [loaded, _] = await Promise.all([
-          loadTicketPrefs(),
-          hydrateSession(),
-        ]);
+        const [loaded] = await Promise.all([loadTicketPrefs(), hydrateSession()]);
         let note = "";
         try {
           const user = await getUser(getCurrentUserId());
           if (user) {
             note = `${user.role} · ${getAccessLevelLabel(user.authorisation)}`;
-            // Lead accounts default reopen capability on first load if unset in storage sense —
-            // we still respect stored prefs; only surface guidance.
             if (user.authorisation === 1 && !loaded.allowReopenClosed) {
-              note += " — leads can enable reopen closed tickets below";
+              note += " — leads can enable vault reopen below";
             }
           }
         } catch {
@@ -86,8 +87,9 @@ export default function TicketPreferencesScreen() {
     >
       <Text style={settingsStyles.title}>Ticket preferences</Text>
       <Text style={[settingsStyles.subtitle, { marginBottom: 8 }]}>
-        Defaults for raising and updating tickets on the map dashboard. Matches
-        v1 categories: Facilities, IT Support, Engineering (+ Injury).
+        Defaults for raising and updating tickets on the Dashboard map.
+        Categories align with LGS v1: Facilities, IT Support, Engineering, and
+        Injury.
       </Text>
       {accessNote ? (
         <Text style={[settingsStyles.muted, { marginBottom: 16 }]}>
@@ -113,12 +115,30 @@ export default function TicketPreferencesScreen() {
               }
             >
               <Text style={settingsStyles.label}>{category}</Text>
-              <View
-                style={[
-                  styles.radio,
-                  selected && styles.radioSelected,
-                ]}
-              />
+              <View style={[styles.radio, selected && styles.radioSelected]} />
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={settingsStyles.sectionTitle}>Default priority</Text>
+      <View style={[settingsStyles.card, { marginBottom: 20 }]}>
+        {priorities.map((priority, index) => {
+          const selected = prefs.defaultPriority === priority.value;
+          return (
+            <Pressable
+              key={priority.value}
+              style={[
+                styles.chipRow,
+                index === priorities.length - 1 && settingsStyles.rowLast,
+              ]}
+              onPress={() => patch({ defaultPriority: priority.value })}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={settingsStyles.label}>{priority.label}</Text>
+                <Text style={settingsStyles.muted}>{priority.detail}</Text>
+              </View>
+              <View style={[styles.radio, selected && styles.radioSelected]} />
             </Pressable>
           );
         })}
@@ -126,25 +146,31 @@ export default function TicketPreferencesScreen() {
 
       <Text style={settingsStyles.sectionTitle}>Raise & update flow</Text>
       <View style={settingsStyles.card}>
-        <ToggleRow
+        <SettingsToggleRow
           label="Pin on map when raising"
           description="Place a map marker so tickets stay location-traceable"
           value={prefs.pinOnMapWhenRaising}
           onChange={(v) => patch({ pinOnMapWhenRaising: v })}
         />
-        <ToggleRow
+        <SettingsToggleRow
           label="Quick update from map"
           description="Tap a map icon to jump straight into that ticket"
           value={prefs.quickUpdateFromMap}
           onChange={(v) => patch({ quickUpdateFromMap: v })}
         />
-        <ToggleRow
+        <SettingsToggleRow
+          label="Confirm before submit"
+          description="Show a confirmation step when raising a ticket"
+          value={prefs.confirmBeforeSubmit}
+          onChange={(v) => patch({ confirmBeforeSubmit: v })}
+        />
+        <SettingsToggleRow
           label="Show hidden cost field"
           description="Optional cost impact on tickets (when quantified)"
           value={prefs.showHiddenCostField}
           onChange={(v) => patch({ showHiddenCostField: v })}
         />
-        <ToggleRow
+        <SettingsToggleRow
           label="Allow reopen closed tickets"
           description="Vault can reopen closed cases for follow-up"
           value={prefs.allowReopenClosed}
@@ -153,35 +179,6 @@ export default function TicketPreferencesScreen() {
         />
       </View>
     </ScrollView>
-  );
-}
-
-function ToggleRow({
-  label,
-  description,
-  value,
-  onChange,
-  last,
-}: {
-  label: string;
-  description: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-  last?: boolean;
-}) {
-  return (
-    <View style={[styles.row, last && settingsStyles.rowLast]}>
-      <View style={styles.textBlock}>
-        <Text style={settingsStyles.label}>{label}</Text>
-        <Text style={settingsStyles.muted}>{description}</Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: "#D1D5DB", true: "#FCA5A5" }}
-        thumbColor={value ? SettingsColors.primary : "#f4f4f5"}
-      />
-    </View>
   );
 }
 
@@ -194,6 +191,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: SettingsColors.border,
+    gap: 12,
   },
   radio: {
     width: 20,
@@ -206,15 +204,4 @@ const styles = StyleSheet.create({
     borderColor: SettingsColors.primary,
     backgroundColor: SettingsColors.primary,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: SettingsColors.border,
-    gap: 12,
-  },
-  textBlock: { flex: 1, paddingRight: 8 },
 });

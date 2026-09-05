@@ -3,6 +3,30 @@
  * (camelCase + Mongo-style `_id` on cases, spaced phone key on users).
  */
 
+function attachmentToApi(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    caseId: row.case_id,
+    filename: row.filename,
+    mimeType: row.mime_type,
+    storageUrl: row.storage_url,
+    storageProvider: row.storage_provider,
+    fileSizeBytes:
+      row.file_size_bytes != null ? Number(row.file_size_bytes) : null,
+    uploadedByUserId: row.uploaded_by_user_id,
+    uploadedByName: row.uploaded_by_name ?? null,
+    createdAt: row.created_at != null ? Number(row.created_at) : null,
+  };
+}
+
+function userToPublicApi(user) {
+  if (!user) return null;
+  const copy = { ...user };
+  delete copy.password;
+  return copy;
+}
+
 function userToApi(row) {
   if (!row) return null;
   return {
@@ -100,9 +124,11 @@ function pick(body, camel, snake) {
 
 module.exports = {
   userToApi,
+  userToPublicApi,
   departmentToApi,
   caseToApi,
   eventToApi,
+  attachmentToApi,
   nowMs,
   pick,
 };
