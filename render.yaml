@@ -11,6 +11,7 @@ services:
     plan: free
     rootDir: backend/new
     buildCommand: npm install
+    preDeployCommand: npm run db:setup && npm run db:hash-seeds
     startCommand: npm start
     healthCheckPath: /health
     envVars:
