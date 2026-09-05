@@ -1,13 +1,13 @@
 require("dotenv").config();
 const bcrypt = require("bcrypt");
-const { pool } = require("../db/pool");
+const db = require("../db");
 
 function isBcryptHash(value) {
   return typeof value === "string" && /^\$2[aby]\$/.test(value);
 }
 
 async function main() {
-  const { rows: users } = await pool.query("SELECT id, password FROM users");
+  const { rows: users } = await db.pool.query("SELECT id, password FROM users");
 
   let updated = 0;
   let skipped = 0;
@@ -19,7 +19,7 @@ async function main() {
     }
 
     const hashed = await bcrypt.hash(user.password, 10);
-    await pool.query("UPDATE users SET password = $1 WHERE id = $2", [
+    await db.pool.query("UPDATE users SET password = $1 WHERE id = $2", [
       hashed,
       user.id,
     ]);
@@ -31,15 +31,13 @@ async function main() {
 
 main()
   .then(async () => {
-    await pool.end();
+    await db.pool.pool.end();
     process.exit(0);
   })
   .catch(async (err) => {
     console.error("Migration failed:", err.message);
     try {
-      await pool.end();
-    } catch {
-      // ignore
-    }
+      await db.pool.pool.end();
+    } catch {}
     process.exit(1);
   });

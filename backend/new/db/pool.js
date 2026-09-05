@@ -1,6 +1,6 @@
 /**
  * PostgreSQL connection pool for LGS Tech.
- * Requires DATABASE_URL in .env (see .env.example).
+ * Uses DATABASE_URL from the environment.
  */
 require("dotenv").config();
 
