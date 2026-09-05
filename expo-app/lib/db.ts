@@ -1,3 +1,5 @@
+import { getAuthToken } from "./api";
+
 const API =
   (process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000").replace(
     /\/$/,
@@ -7,7 +9,16 @@ const API =
 async function requestJson(path: string, init?: RequestInit) {
   let response: Response;
   try {
-    response = await fetch(`${API}${path}`, init);
+    const token = await getAuthToken();
+
+    response = await fetch(`${API}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {}),
+      },
+    });
   } catch (error) {
     throw new Error(
       `Cannot reach API at ${API}${path}. Is backend/new running? (${
