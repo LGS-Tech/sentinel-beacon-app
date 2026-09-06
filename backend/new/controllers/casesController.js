@@ -5,6 +5,7 @@ const {
   updateCase,
   deleteCase,
   assignCase,
+  analyticsSummary,
 } = require("../db/queries/cases");
 
 const getAllCases = async (req, res) => {
@@ -73,6 +74,14 @@ const assignCaseToUser = async (req, res) => {
     res.status(500).json({ error: "Failed to assign case" });
   }
 }
+const getAnalyticsSummary = async (req, res) => {
+  try {
+    const summary = await analyticsSummary();
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch analytics summary" });
+  }
+}
 
 module.exports = {
   getAllCases,
@@ -81,4 +90,5 @@ module.exports = {
   updateExistingCase,
   deleteExistingCase,
   assignCaseToUser,
+  getAnalyticsSummary,
 };

@@ -1,6 +1,6 @@
 /**
  * PostgreSQL connection pool for LGS Tech.
- * Uses DATABASE_URL from .env — keep Mongo server.js unchanged until migration.
+ * Uses DATABASE_URL from the environment.
  */
 require("dotenv").config();
 

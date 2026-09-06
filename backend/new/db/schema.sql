@@ -105,7 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_users_department_id ON users (department_id);
 CREATE INDEX IF NOT EXISTS idx_users_user_type ON users (user_type);
 CREATE INDEX IF NOT EXISTS idx_users_college_id ON users (college_id);
 
--- Seed demo staff (same ids/passwords as data/users.json) plus maintainer + student
+-- Seed demo staff plus maintainer and student
 INSERT INTO users (
   id, username, password, email, name, phone, role, authorisation,
   user_type, department_id, college_id
@@ -280,3 +280,25 @@ CREATE TABLE IF NOT EXISTS case_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_case_events_case_id ON case_events (case_id, created_at);
+
+-- ---------------------------------------------------------------------------
+-- Case attachments (metadata only — binary stored outside Postgres)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS case_attachments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id UUID NOT NULL REFERENCES cases (id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  mime_type TEXT,
+  storage_url TEXT NOT NULL,
+  storage_provider TEXT NOT NULL DEFAULT 'external'
+    CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'other')),
+  file_size_bytes BIGINT,
+  uploaded_by_user_id INTEGER REFERENCES users (id),
+  created_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+);
+
+CREATE INDEX IF NOT EXISTS idx_case_attachments_case_id
+  ON case_attachments (case_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_case_attachments_uploaded_by
+  ON case_attachments (uploaded_by_user_id);

@@ -30,11 +30,15 @@ async function main() {
     const events = await client.query(
       "SELECT COUNT(*)::int AS count FROM case_events"
     );
+    const attachments = await client.query(
+      "SELECT COUNT(*)::int AS count FROM case_attachments"
+    );
     console.log("PostgreSQL schema applied.");
     console.log(`departments rows: ${departments.rows[0].count}`);
     console.log(`users rows: ${users.rows[0].count}`);
     console.log(`cases rows: ${cases.rows[0].count}`);
     console.log(`case_events rows: ${events.rows[0].count}`);
+    console.log(`case_attachments rows: ${attachments.rows[0].count}`);
   } finally {
     await client.end();
   }

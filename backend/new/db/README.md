@@ -1,6 +1,6 @@
 # PostgreSQL base (LGS Tech)
 
-This folder is the **PostgreSQL foundation** for LGS Tech. The live Express API in `server.js` still uses Mongo (cases) and `data/users.json` until the team switches routes over.
+This folder is the **PostgreSQL backend** for LGS Tech. Express `server.js` uses PostgreSQL.
 
 ## Shared credentials (team)
 
@@ -15,7 +15,7 @@ This folder is the **PostgreSQL foundation** for LGS Tech. The live Express API 
 | Table | Purpose |
 |--------|---------|
 | `departments` | Assignable teams (Facilities, IT, Engineering, Security, Medical, Estates) |
-| `users` | Students, staff, maintainers, leads (expanded from `users.json`) |
+| `users` | Students, staff, maintainers, and leads |
 | `cases` | Tickets / incidents (expanded from Mongo `Case`) |
 | `case_events` | Feed + assignment / status history |
 
@@ -79,5 +79,4 @@ From `backend/new`:
 
 ## Note for the team
 
-**Mongo `server.js` is still the live local API.**  
-When we switch `/cases` and `/users` to this data layer, say so in the backend chat first.
+**PostgreSQL is the live backend data layer.** Set `DATABASE_URL` and run `npm run db:setup` before starting the API.

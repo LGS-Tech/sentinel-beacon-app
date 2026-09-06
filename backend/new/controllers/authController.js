@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const { getUserByEmail, createUser, recordLogin } = require('../db/queries/users');
+const { userToPublicApi } = require('../db/mappers');
 
 const secret = process.env.JWT_SECRET;
 
@@ -30,13 +31,16 @@ const signup = async (req, res) => {
       authorisation
     });
 
-     if (newUser && newUser.password) {
-      delete newUser.password;
-    }
+      const token = jwt.sign(
+    { userId: newUser.id, userType: newUser.userType, authorisation: newUser.authorisation },
+    secret,
+    { expiresIn: '1d' }
+    );
 
     res.status(201).json({
       message: 'User registered successfully',
-      user: newUser
+      user: userToPublicApi(newUser),
+      token
     });
   } catch (err) {
     console.error('Error during signup:', err);
@@ -67,7 +71,7 @@ const login = async (req, res) => {
     { expiresIn: '1d' }
   );
 
-    res.json({ token });
+    res.json({ token, user: userToPublicApi(user) });
   } catch (err) {
     console.error('Error during login:', err);
     res.status(500).json({ error: 'Login failed' });
