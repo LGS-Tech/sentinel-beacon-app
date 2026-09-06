@@ -1,6 +1,7 @@
-
-import React from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,86 +9,30 @@ import {
   View,
 } from 'react-native';
 
+import { getAnalyticsSummary, type AnalyticsSummary } from '@/lib/api';
+
+function formatDuration(ms: number): string {
+  if (!ms || ms <= 0) return '—';
+
+  const totalMinutes = Math.round(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0) return `${hours}h ${minutes}m`;
+
+  return `${minutes}m`;
+}
+
+function formatResolvedRate(closed: number, total: number): string {
+  if (!total) return '—';
+
+  return `${Math.round((closed / total) * 100)}%`;
+}
+
 // analytics:
 // needs a line chart for the average response time
 // also needs the actual values connected
 // might need a page for when there isn't enough data
-
-const overviewData = [
-  {
-    number: '42',
-    title: 'Active Cases',
-    extra: '+3 from last month',
-  },
-  {
-    number: '318',
-    title: 'Closed Cases',
-    extra: '+12 from last month',
-  },
-  {
-    number: '1h 52m',
-    title: 'Avg Case Duration',
-    extra: 'Needs attention',
-  },
-  {
-    number: '96%',
-    title: 'Resolved',
-    extra: '+2% from last month',
-  },
-];
-
-const incidentData = [
-  {
-    name: 'Fire',
-    number: 18,
-    text: '18 Cases',
-  },
-  {
-    name: 'Intruder',
-    number: 42,
-    text: '42 Cases',
-  },
-  {
-    name: 'Injury',
-    number: 27,
-    text: '27 Cases',
-  },
-  {
-    name: 'Maintenance',
-    number: 95,
-    text: '95 Cases',
-  },
-];
-
-const hotspots = [
-  {
-    name: 'Main Lecture Theatre',
-    incidents: '34 incidents',
-  },
-  {
-    name: 'Corridor',
-    incidents: '28 incidents',
-  },
-  {
-    name: 'Cafeteria',
-    incidents: '17 incidents',
-  },
-];
-
-const emergencyServices = [
-  {
-    name: 'Police Called',
-    amount: '6 Times',
-  },
-  {
-    name: 'Fire Brigade Called',
-    amount: '16 Times',
-  },
-  {
-    name: 'Ambulance Called',
-    amount: '24 Times',
-  },
-];
 
 const responseTimes = [
   {
@@ -121,7 +66,146 @@ export default function AnalyticsScreen() {
 
   const desktop = width >= 768;
 
-  const highestIncidentNumber = 95;
+  const [data, setData] = useState<AnalyticsSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      (async () => {
+        setLoading(true);
+        setError(null);
+
+        try {
+          const summary = await getAnalyticsSummary();
+
+          if (active) {
+            setData(summary);
+          }
+        } catch (e) {
+          if (active) {
+            setData(null);
+            setError(
+              e instanceof Error
+                ? e.message
+                : 'Could not load analytics'
+            );
+          }
+        } finally {
+          if (active) {
+            setLoading(false);
+          }
+        }
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  if (loading && !data) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#2563EB" />
+
+        <Text style={styles.loadingText}>
+          Loading analytics…
+        </Text>
+      </View>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.errorTitle}>
+          Analytics unavailable
+        </Text>
+
+        <Text style={styles.errorText}>
+          {error}
+        </Text>
+
+        <Text style={styles.errorHint}>
+          Start the PostgreSQL backend (`npm start` in backend/new).
+        </Text>
+      </View>
+    );
+  }
+
+  const summary = data!;
+
+  const overview = [
+    {
+      number: String(summary.active),
+      title: 'Active Cases',
+      extra: '',
+    },
+    {
+      number: String(summary.closed),
+      title: 'Closed Cases',
+      extra: '',
+    },
+    {
+      number: formatDuration(summary.avgDurationMs),
+      title: 'Avg Case Duration',
+      extra: '',
+    },
+    {
+      number: formatResolvedRate(summary.closed, summary.total),
+      title: 'Resolved',
+      extra: '',
+    },
+  ];
+
+  const incidentData = summary.byCategory.length
+    ? summary.byCategory.map((item) => ({
+        name: item.category,
+        number: item.count,
+        text: `${item.count} Cases`,
+      }))
+    : [
+        {
+          name: 'No data yet',
+          number: 0,
+          text: '0 Cases',
+        },
+      ];
+
+  const highestIncidentNumber = Math.max(
+    ...incidentData.map((item) => item.number),
+    1
+  );
+
+  const hotspots = summary.hotspots.length
+    ? summary.hotspots.map((item) => ({
+        name: item.label,
+        incidents: `${item.count} incidents`,
+      }))
+    : [
+        {
+          name: 'No locations yet',
+          incidents: '0 incidents',
+        },
+      ];
+
+  const emergencyServices = [
+    {
+      name: 'Police Called',
+      amount: `${summary.servicesContacted.police} Times`,
+    },
+    {
+      name: 'Fire Brigade Called',
+      amount: `${summary.servicesContacted.fire} Times`,
+    },
+    {
+      name: 'Ambulance Called',
+      amount: `${summary.servicesContacted.ambulance} Times`,
+    },
+  ];
 
   return (
     <ScrollView
@@ -135,7 +219,9 @@ export default function AnalyticsScreen() {
       {/* Overview */}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Overview</Text>
+        <Text style={styles.sectionTitle}>
+          Overview
+        </Text>
 
         <View
           style={[
@@ -143,7 +229,7 @@ export default function AnalyticsScreen() {
             desktop && styles.statsDesktop,
           ]}
         >
-          {overviewData.map((item) => (
+          {overview.map((item) => (
             <View
               key={item.title}
               style={[
@@ -159,15 +245,17 @@ export default function AnalyticsScreen() {
                 {item.title}
               </Text>
 
-              <Text
-                style={[
-                  styles.statExtra,
-                  item.extra === 'Needs attention' &&
-                    styles.warningText,
-                ]}
-              >
-                {item.extra}
-              </Text>
+              {item.extra ? (
+                <Text
+                  style={[
+                    styles.statExtra,
+                    item.extra === 'Needs attention' &&
+                      styles.warningText,
+                  ]}
+                >
+                  {item.extra}
+                </Text>
+              ) : null}
             </View>
           ))}
         </View>
@@ -291,7 +379,9 @@ export default function AnalyticsScreen() {
                       <View
                         style={[
                           styles.responseBar,
-                         
+                          {
+                            height: item.height as any,
+                          },
                         ]}
                       />
 
@@ -386,6 +476,36 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',
+  },
+
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+
+  loadingText: {
+    marginTop: 12,
+    color: '#6B7280',
+  },
+
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+
+  errorText: {
+    color: '#DC2626',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+
+  errorHint: {
+    color: '#6B7280',
+    textAlign: 'center',
+    fontSize: 13,
   },
 
   content: {
@@ -677,4 +797,3 @@ const styles = StyleSheet.create({
     height: 40,
   },
 });
-

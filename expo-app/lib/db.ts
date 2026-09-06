@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getAuthToken } from "./api";
 
 const API =
   (process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000").replace(
@@ -12,13 +12,16 @@ const API =
 // Without this, all case requests were rejected with 401 Unauthorized,
 // since the backend requires a valid token on /cases.
 async function requestJson(path: string, init?: RequestInit) {
-  const token = await AsyncStorage.getItem("sentinel.token");
+  
 
   let response: Response;
   try {
+    const token = await getAuthToken();
+
     response = await fetch(`${API}${path}`, {
       ...init,
       headers: {
+        "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init?.headers ?? {}),
       },

@@ -1,5 +1,5 @@
 /**
- * Smoke-test the Postgres data layer without touching Mongo / server.js.
+ * Smoke-test the Postgres data layer (no legacy JSON/Mongo backends).
  * Usage: node scripts/smoke-data-layer.js
  */
 require("dotenv").config();

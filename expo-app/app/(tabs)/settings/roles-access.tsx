@@ -1,3 +1,4 @@
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -7,7 +8,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
 
 import {
   SettingsColors,
@@ -17,12 +17,14 @@ import {
   getAccessLevelLabel,
   getAccessResponsibilities,
   getCurrentUserId,
+  getRoleComparison,
   getUser,
   hydrateSession,
   type User,
 } from "@/lib/api";
 
 export default function RolesAccessScreen() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,13 +36,13 @@ export default function RolesAccessScreen() {
       await hydrateSession();
       const loaded = await getUser(getCurrentUserId());
       setUser(loaded);
-      if (!loaded) setError("User not found on Express API.");
+      if (!loaded) setError("User not found on the API.");
     } catch (e) {
       setUser(null);
       setError(
         e instanceof Error
           ? e.message
-          : "Could not load access. Is Express running?"
+          : "Could not load access. Is the backend API running?"
       );
     } finally {
       setLoading(false);
@@ -62,6 +64,8 @@ export default function RolesAccessScreen() {
   }
 
   const responsibilities = getAccessResponsibilities(user?.authorisation);
+  const comparison = getRoleComparison();
+  const isLead = user?.authorisation === 1;
 
   return (
     <ScrollView
@@ -70,8 +74,8 @@ export default function RolesAccessScreen() {
     >
       <Text style={settingsStyles.title}>Roles & Access</Text>
       <Text style={[settingsStyles.subtitle, { marginBottom: 16 }]}>
-        Different roles allow different responsibilities or priority status on
-        the ticketing platform.
+        Authorisation levels control ticket priority, analytics visibility, and
+        vault actions on the LGS platform.
       </Text>
 
       {error ? (
@@ -92,17 +96,39 @@ export default function RolesAccessScreen() {
         <Text style={styles.metaValue}>
           {getAccessLevelLabel(user?.authorisation)}
           {user?.authorisation != null
-            ? ` (authorisation ${user.authorisation})`
+            ? ` · authorisation ${user.authorisation}`
             : ""}
         </Text>
         <Text style={[styles.metaLabel, { marginTop: 12 }]}>Account</Text>
         <Text style={styles.metaValue}>
           {user?.name ?? "—"} · {user?.email ?? "—"}
         </Text>
+        {user?.department ? (
+          <>
+            <Text style={[styles.metaLabel, { marginTop: 12 }]}>Department</Text>
+            <Text style={styles.metaValue}>{user.department}</Text>
+          </>
+        ) : null}
       </View>
 
-      <Text style={settingsStyles.sectionTitle}>Responsibilities</Text>
-      <View style={settingsStyles.card}>
+      <View
+        style={[
+          styles.callout,
+          isLead ? styles.calloutLead : styles.calloutStandard,
+        ]}
+      >
+        <Text style={styles.calloutTitle}>
+          {isLead ? "Lead access active" : "Standard access active"}
+        </Text>
+        <Text style={styles.calloutBody}>
+          {isLead
+            ? "You can manage cross-department tickets, analytics insights, and vault reopen actions."
+            : "You can raise and update tickets for your site. Enable reopen in Ticket preferences if your lead allows it."}
+        </Text>
+      </View>
+
+      <Text style={settingsStyles.sectionTitle}>Your responsibilities</Text>
+      <View style={[settingsStyles.card, { marginBottom: 20 }]}>
         {responsibilities.map((item, index) => (
           <View
             key={item}
@@ -116,6 +142,40 @@ export default function RolesAccessScreen() {
           </View>
         ))}
       </View>
+
+      <Text style={settingsStyles.sectionTitle}>Access level comparison</Text>
+      {comparison.map((tier) => {
+        const active = user?.authorisation === tier.authorisation;
+        return (
+          <View
+            key={tier.authorisation}
+            style={[
+              settingsStyles.card,
+              styles.tierCard,
+              active && styles.tierCardActive,
+            ]}
+          >
+            <Text style={styles.tierTitle}>
+              {tier.level}
+              {active ? " (you)" : ""}
+            </Text>
+            {tier.highlights.map((line) => (
+              <Text key={line} style={styles.tierLine}>
+                • {line}
+              </Text>
+            ))}
+          </View>
+        );
+      })}
+
+      <Pressable
+        style={settingsStyles.primaryButton}
+        onPress={() => router.push("/settings/ticket-preferences")}
+      >
+        <Text style={settingsStyles.primaryButtonText}>
+          Open ticket preferences
+        </Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -134,6 +194,31 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 4,
   },
+  callout: {
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  calloutLead: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+  calloutStandard: {
+    backgroundColor: "#F0F9FF",
+    borderColor: "#BAE6FD",
+  },
+  calloutTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: SettingsColors.text,
+    marginBottom: 4,
+  },
+  calloutBody: {
+    fontSize: 13,
+    color: SettingsColors.muted,
+    lineHeight: 19,
+  },
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -149,5 +234,25 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: SettingsColors.primary,
     marginTop: 6,
+  },
+  tierCard: {
+    padding: 14,
+    marginBottom: 12,
+  },
+  tierCardActive: {
+    borderColor: SettingsColors.primary,
+    borderWidth: 2,
+  },
+  tierTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: SettingsColors.text,
+    marginBottom: 8,
+  },
+  tierLine: {
+    fontSize: 13,
+    color: SettingsColors.muted,
+    lineHeight: 20,
+    marginBottom: 2,
   },
 });
