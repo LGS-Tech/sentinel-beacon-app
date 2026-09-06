@@ -16,7 +16,7 @@ import {
   View
 } from 'react-native';
 
-import { deleteCase, getCases, updateCase } from '@/lib/db';
+import { deleteCase, getCaseAttachments, getCases, updateCase } from '@/lib/db';
 
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -44,57 +44,61 @@ type CaseItem = {
   files: FileItem[];
 };
 
+// Fetches real image attachments per case from case_attachments,
+// replacing the old hardcoded placeholder image.
 const loadCases = async (): Promise<CaseItem[]> => {
   const rows = await getCases();
 
-  return rows.map((row: any) => {
-    const files: FileItem[] = [
-      {
-        id: `chat-${row._id ?? row.id}`,
-        name: 'team-chat.txt',
-        type: 'text',
-        content: row.chat || 'No chat data',
-      },
+  const cases = await Promise.all(
+    rows.map(async (row: any) => {
+      const caseId = String(row._id ?? row.id);
 
-      {
-        id: `feed-${row._id ?? row.id}`,
-        name: 'live-feed.txt',
-        type: 'text',
-        content: row.feed || 'No live feed data',
-      },
+      const files: FileItem[] = [
+        {
+          id: `chat-${caseId}`,
+          name: 'team-chat.txt',
+          type: 'text',
+          content: row.chat || 'No chat data',
+        },
+        {
+          id: `feed-${caseId}`,
+          name: 'live-feed.txt',
+          type: 'text',
+          content: row.feed || 'No live feed data',
+        },
+      ];
 
-      {
-        id: `image-${row._id ?? row.id}`,
-        name: 'evidence.jpg',
-        type: 'image',
-        content: 'https://picsum.photos/400',
-      },
-    ];
+      try {
+        const attachments = await getCaseAttachments(caseId);
+        for (const att of attachments) {
+          files.push({
+            id: att.id,
+            name: att.filename,
+            type: 'image',
+            content: att.storageUrl,
+          });
+        }
+      } catch {
+        // No attachments yet, or fetch failed — just skip, not fatal.
+      }
 
-    return {
-      id: String(row._id ?? row.id),
+      return {
+        id: caseId,
+        title: row.title,
+        createdAt: row.createdAt,
+        lastUpdatedAt: row.lastUpdatedAt,
+        status: row.status ?? 'CLOSED',
+        locationX: row.locationX,
+        locationY: row.locationY,
+        locationLabel: row.locationLabel,
+        feed: row.feed,
+        chat: row.chat,
+        files,
+      };
+    })
+  );
 
-      title: row.title,
-
-      createdAt: row.createdAt,
-
-      lastUpdatedAt: row.lastUpdatedAt,
-
-      status: row.status ?? 'CLOSED',
-
-      locationX: row.locationX,
-
-      locationY: row.locationY,
-
-      locationLabel: row.locationLabel,
-
-      feed: row.feed,
-
-      chat: row.chat,
-
-      files,
-    };
-  });
+  return cases;
 };
 
 export default function VaultScreen() {
