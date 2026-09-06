@@ -109,6 +109,8 @@ async function request<T>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
+  const token = await AsyncStorage.getItem("sentinel.token");
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
 
@@ -117,6 +119,7 @@ async function request<T>(
       ...init,
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init?.headers ?? {}),
       },
       signal: controller.signal,
@@ -169,19 +172,14 @@ export function getUserPhone(user: User): string {
 export async function loginWithEmailPassword(
   email: string,
   password: string
-): Promise<User> {
-  const users = await getUsers();
-  const normalized = email.trim().toLowerCase();
-  const user = users.find(
-    (u) =>
-      u.email?.toLowerCase() === normalized &&
-      (u.password ?? "") === password
-  );
-  if (!user) {
-    throw new Error("Invalid email or password.");
-  }
-  await persistSession(user.id);
-  return user;
+): Promise<{ token: string }> {
+  const data = await request<{ token: string }>(EXPRESS_URL, "/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+
+  await AsyncStorage.setItem("sentinel.token", data.token);
+  return data;
 }
 
 export async function checkExpressHealth(): Promise<HealthStatus> {

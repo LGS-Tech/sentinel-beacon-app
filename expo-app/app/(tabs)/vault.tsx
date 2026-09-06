@@ -6,13 +6,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Image,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   useWindowDimensions,
-  View,
+  View
 } from 'react-native';
 
 import { deleteCase, getCases, updateCase } from '@/lib/db';
@@ -25,7 +26,7 @@ import { ThemedView } from '../../components/themed-view';
 type FileItem = {
   id: string;
   name: string;
-  type: 'text';
+  type: 'text'| 'image' | 'video';
   content: string;
 };
 
@@ -60,6 +61,13 @@ const loadCases = async (): Promise<CaseItem[]> => {
         name: 'live-feed.txt',
         type: 'text',
         content: row.feed || 'No live feed data',
+      },
+
+      {
+        id: `image-${row._id ?? row.id}`,
+        name: 'evidence.jpg',
+        type: 'image',
+        content: 'https://picsum.photos/400',
       },
     ];
 
@@ -524,11 +532,19 @@ export default function VaultScreen() {
                     </Pressable>
                   </View>
 
-                  <ScrollView>
-                    <ThemedText style={styles.textContent}>
-                      {selectedFile?.content}
-                    </ThemedText>
-                  </ScrollView>
+                    <ScrollView>
+                      {selectedFile?.type === 'image' ? (
+                        <Image
+                          source={{ uri: selectedFile.content}}
+                          style={{width: '100%', height:300, borderRadius: 12}}
+                          resizeMode="contain"
+                          />
+                      ) : (
+                        <ThemedText style={styles.textContent}>
+                          {selectedFile?.content}
+                        </ThemedText>
+                      )}
+                    </ScrollView>
                 </View>
               </View>
             </Modal>
