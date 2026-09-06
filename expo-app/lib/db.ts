@@ -6,7 +6,13 @@ const API =
     ""
   );
 
+
+// Added: attach the saved login token (JWT) to every request here.
+// Without this, all case requests were rejected with 401 Unauthorized,
+// since the backend requires a valid token on /cases.
 async function requestJson(path: string, init?: RequestInit) {
+  
+
   let response: Response;
   try {
     const token = await getAuthToken();
@@ -37,6 +43,14 @@ async function requestJson(path: string, init?: RequestInit) {
   if (response.status === 204) return null;
   return response.json();
 }
+
+// Fetches attachments (images/files) for a case 
+// used by Vault to replace the old placeholder image.
+export async function getCaseAttachments(caseId: string) {
+  return requestJson(`/cases/${caseId}/attachments`);
+}
+
+
 
 export async function getCases() {
   const data = await requestJson("/cases");
