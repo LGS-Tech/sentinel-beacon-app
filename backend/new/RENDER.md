@@ -15,7 +15,7 @@ After linking the blueprint or updating an existing service, set in the Render d
 | Key | Notes |
 |-----|--------|
 | `JWT_SECRET` | **Required** — long random string for `/auth/login` |
-| `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,http://localhost:8081` |
+| `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,http://localhost:8081` |
 
 `REQUIRE_AUTH` defaults to `false` for the demo; set `true` when all clients send Bearer tokens.
 
@@ -37,7 +37,7 @@ After linking the blueprint or updating an existing service, set in the Render d
 | `DATABASE_URL` | **Required** — from Render Postgres **Internal** connection string |
 | `JWT_SECRET` | **Required** — long random string for `/auth/login` |
 | `REQUIRE_AUTH` | `false` for demo until all clients send Bearer tokens; `true` in production |
-| `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,http://localhost:8081` |
+| `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,http://localhost:8081` |
 
 Render sets `PORT` automatically.
 
