@@ -73,10 +73,11 @@ const login = async (req, res) => {
     }
 
     const stored = user.password ?? "";
-    const valid = stored.startsWith("$2")
-      ? await bcrypt.compare(password, stored)
-      : stored === password;
+    if (!stored.startsWith("$2")) {
+      return res.status(400).json({ error: "Invalid credentials" });
+    }
 
+    const valid = await bcrypt.compare(password, stored);
     if (!valid) {
       return res.status(400).json({ error: "Invalid credentials" });
     }
@@ -86,6 +87,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       {
         userId: user.id,
+        userType: user.userType,
         role: user.role,
         authorisation: user.authorisation,
       },

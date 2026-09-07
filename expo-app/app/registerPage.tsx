@@ -35,7 +35,6 @@ export default function RegisterPage() {
   const [collegeId, setCollegeId] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [department, setDepartment] = useState('');
   const [year, setYear] = useState('');
 
   const [username, setUsername] = useState('');
@@ -219,15 +218,6 @@ export default function RegisterPage() {
 
             <TextInput
               style={styles.input}
-              placeholder="Department"
-              placeholderTextColor="#999"
-              value={department}
-              onChangeText={setDepartment}
-              editable={!busy}
-            />
-
-            <TextInput
-              style={styles.input}
               placeholder="Year / Semester"
               placeholderTextColor="#999"
               value={year}
@@ -240,7 +230,9 @@ export default function RegisterPage() {
             <Pressable style={styles.uploadBox} disabled={busy}>
               <Text style={styles.uploadIcon}>☁</Text>
               <Text style={styles.uploadText}>Tap to upload</Text>
-              <Text style={styles.uploadSmall}>JPG, PNG up to 5MB</Text>
+              <Text style={styles.uploadSmall}>
+                JPG, PNG up to 5MB — coming later
+              </Text>
             </Pressable>
 
             <Pressable

@@ -11,8 +11,9 @@ services:
     plan: free
     rootDir: backend/new
     buildCommand: npm install
-    preDeployCommand: npm run db:setup && npm run db:hash-seeds
-    startCommand: npm start
+    # Pre-Deploy is not available on the free plan. Paid plans can optionally
+    # use preDeployCommand (db:setup + db:hash-seeds) and startCommand: npm start.
+    startCommand: npm run db:setup && npm run db:hash-seeds && npm start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV

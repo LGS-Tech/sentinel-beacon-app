@@ -5,13 +5,33 @@ Production uses **Render Postgres** + the Node API in `backend/new`. MongoDB and
 This hosts the Express API so a static demo (e.g. GitHub Pages) can call it.
 Local `npm start` / Docker Postgres stay for day-to-day development.
 
+## Free plan Start Command (what we actually use)
+
+**Pre-Deploy is not available on Render’s free plan.** Do not treat Pre-Deploy as the production path.
+
+On the free web service, put schema + seed hashing in the **Start Command**:
+
+```
+npm run db:setup && npm run db:hash-seeds && npm start
+```
+
+| Setting | Free-plan value |
+|--------|------------------|
+| Root directory | `backend/new` |
+| Runtime | Node |
+| Build command | `npm install` |
+| Start command | `npm run db:setup && npm run db:hash-seeds && npm start` |
+| Health check | `/health` |
+
+Paid plans can optionally move setup to **Pre-Deploy** (`npm run db:setup && npm run db:hash-seeds`) and use `npm start` as Start. That is optional and is **not** the path used for this demo.
+
 ## Blueprint (`render.yaml`)
 
 The repo blueprint provisions:
 
 - **Database:** `lgs-tech-postgres` (free tier)
 - **Web service:** `lgs-tech-api` with `DATABASE_URL` wired from the database
-- **Pre-deploy:** `npm run db:setup && npm run db:hash-seeds` (schema + bcrypt demo passwords)
+- **Start command:** `npm run db:setup && npm run db:hash-seeds && npm start` (schema + bcrypt demo passwords, then the API)
 
 After linking the blueprint or updating an existing service, set in the Render dashboard:
 
@@ -21,17 +41,6 @@ After linking the blueprint or updating an existing service, set in the Render d
 | `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,http://localhost:8081` |
 
 `REQUIRE_AUTH` defaults to `false` for the demo; set `true` when all clients send Bearer tokens.
-
-## Manual service setup (if not using blueprint)
-
-| Setting | Value |
-|--------|--------|
-| Root directory | `backend/new` |
-| Runtime | Node |
-| Build command | `npm install` |
-| Pre-deploy command | `npm run db:setup && npm run db:hash-seeds` |
-| Start command | `npm start` |
-| Health check | `/health` |
 
 ## Env vars (Render Dashboard → Environment)
 
@@ -50,7 +59,7 @@ Render sets `PORT` automatically — do not hardcode it.
 2. Go to [render.com](https://render.com) → **New** → **Web Service** (or use the root [`render.yaml`](../../render.yaml) Blueprint).
 3. Connect the repo.
 4. Set **Root Directory** = `backend/new`.
-5. Build = `npm install`, Pre-deploy = `npm run db:setup && npm run db:hash-seeds`, Start = `npm start`.
+5. Build = `npm install`. Start = `npm run db:setup && npm run db:hash-seeds && npm start`.
 6. Add `DATABASE_URL`, `JWT_SECRET`, and `ALLOWED_ORIGINS`.
 7. Deploy → copy the URL, e.g. `https://lgs-tech-api.onrender.com`.
 
