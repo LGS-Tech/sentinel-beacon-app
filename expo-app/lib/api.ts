@@ -148,13 +148,28 @@ export async function clearSession(): Promise<void> {
   await AsyncStorage.multiRemove([SESSION_KEY, TOKEN_KEY]);
 }
 
+/** Render free-tier cold starts often exceed 8s; keep auth usable. */
+const REQUEST_TIMEOUT_MS = 40000;
+
+function errorMessageFromBody(text: string, status: number): string {
+  if (!text) return `Request failed (${status})`;
+  try {
+    const parsed = JSON.parse(text) as { error?: string; message?: string };
+    if (parsed.error && typeof parsed.error === "string") return parsed.error;
+    if (parsed.message && typeof parsed.message === "string") return parsed.message;
+  } catch {
+    // not JSON
+  }
+  return text;
+}
+
 async function request<T>(
   base: string,
   path: string,
   init?: RequestInit
 ): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const authHeaders = await getAuthHeaders();
 
   try {
@@ -170,11 +185,18 @@ async function request<T>(
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new Error(text || `Request failed (${res.status})`);
+      throw new Error(errorMessageFromBody(text, res.status));
     }
 
     if (res.status === 204) return undefined as T;
     return (await res.json()) as T;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        "Request timed out. The API may be waking up — try again in a moment."
+      );
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
   }
@@ -258,6 +280,20 @@ export function getRoleComparison(): {
 
 type LoginResponse = { token: string; user: User };
 
+export type SignupPayload = {
+  username: string;
+  password: string;
+  email: string;
+  name: string;
+  phone?: string;
+  role?: string;
+  authorisation?: number;
+  collegeId?: string;
+  yearSemester?: string;
+};
+
+type SignupResponse = { message?: string; user: User };
+
 export async function loginWithEmailPassword(
   email: string,
   password: string
@@ -273,6 +309,36 @@ export async function loginWithEmailPassword(
 
   await persistSession(result.user.id, result.token);
   return result.user;
+}
+
+/**
+ * Registers via POST /auth/signup (no token returned), then signs in via
+ * /auth/login and persists the session like loginWithEmailPassword.
+ */
+export async function signupWithEmailPassword(
+  payload: SignupPayload
+): Promise<User> {
+  const { username, password, email, name } = payload;
+  if (!username?.trim() || !password || !email?.trim() || !name?.trim()) {
+    throw new Error("Username, password, email, and name are required.");
+  }
+
+  await request<SignupResponse>(API_URL, "/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({
+      username: username.trim(),
+      password,
+      email: email.trim(),
+      name: name.trim(),
+      phone: payload.phone?.trim() || undefined,
+      role: payload.role,
+      authorisation: payload.authorisation,
+      collegeId: payload.collegeId?.trim() || undefined,
+      yearSemester: payload.yearSemester?.trim() || undefined,
+    }),
+  });
+
+  return loginWithEmailPassword(email.trim(), password);
 }
 
 export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {

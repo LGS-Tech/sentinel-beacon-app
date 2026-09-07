@@ -17,8 +17,17 @@ function getJwtSecret() {
 }
 
 const signup = async (req, res) => {
-  const { username, password, email, name, phone, role, authorisation } =
-    req.body;
+  const {
+    username,
+    password,
+    email,
+    name,
+    phone,
+    role,
+    authorisation,
+    collegeId,
+    yearSemester,
+  } = req.body;
 
   if (!username || !password || !email || !name) {
     return res.status(400).json({
@@ -36,6 +45,8 @@ const signup = async (req, res) => {
       phone,
       role,
       authorisation,
+      collegeId,
+      yearSemester,
     });
 
     res.status(201).json({

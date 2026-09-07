@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -11,10 +13,24 @@ import {
   View,
 } from 'react-native';
 
-export default function RegisterPage({ navigation }: any) {
+import { signupWithEmailPassword } from '@/lib/api';
+
+const MIN_PASSWORD_LENGTH = 6;
+
+function usernameFromEmail(email: string): string {
+  const local = email.trim().split('@')[0] ?? '';
+  const cleaned = local.replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 32);
+  return cleaned || 'user';
+}
+
+export default function RegisterPage() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
+
+  const [step, setStep] = useState<1 | 2>(1);
+  const [busy, setBusy] = useState(false);
+
   const [fullName, setFullName] = useState('');
   const [collegeId, setCollegeId] = useState('');
   const [email, setEmail] = useState('');
@@ -22,97 +38,273 @@ export default function RegisterPage({ navigation }: any) {
   const [department, setDepartment] = useState('');
   const [year, setYear] = useState('');
 
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const step2Ready = useMemo(
+    () => Boolean(username.trim() && password && confirmPassword),
+    [username, password, confirmPassword],
+  );
+
+  function goBack() {
+    if (busy) return;
+    if (step === 2) {
+      setStep(1);
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/login-page');
+    }
+  }
+
+  function onNextPersonal() {
+    if (!fullName.trim()) {
+      Alert.alert('Missing details', 'Enter your full name.');
+      return;
+    }
+    if (!email.trim()) {
+      Alert.alert('Missing details', 'Enter your university email.');
+      return;
+    }
+    if (!email.includes('@')) {
+      Alert.alert('Invalid email', 'Enter a valid email address.');
+      return;
+    }
+    if (!username.trim()) {
+      setUsername(usernameFromEmail(email));
+    }
+    setStep(2);
+  }
+
+  async function onCreateAccount() {
+    if (!username.trim()) {
+      Alert.alert('Missing details', 'Enter a username.');
+      return;
+    }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      Alert.alert(
+        'Weak password',
+        `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+      );
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Password mismatch', 'Password and confirmation do not match.');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await signupWithEmailPassword({
+        name: fullName.trim(),
+        email: email.trim(),
+        username: username.trim(),
+        password,
+        phone: phone.trim() || undefined,
+        collegeId: collegeId.trim() || undefined,
+        yearSemester: year.trim() || undefined,
+      });
+      router.replace('/(tabs)');
+    } catch (e) {
+      Alert.alert(
+        'Sign up failed',
+        e instanceof Error
+          ? e.message
+          : 'Could not create account. Is the PostgreSQL backend running?',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.scrollContent,
           isDesktop && styles.scrollContentDesktop,
         ]}
       >
-        <Pressable onPress={() => navigation.goBack()}>
+        <Pressable onPress={goBack} disabled={busy}>
           <Text style={styles.back}>←</Text>
         </Pressable>
 
         <Text style={styles.title}>Create Account</Text>
 
-        <Text style={styles.subtitle}>Fill in your details to get started</Text>
+        <Text style={styles.subtitle}>
+          {step === 1
+            ? 'Fill in your details to get started'
+            : 'Choose a username and password'}
+        </Text>
 
         <View style={styles.stepContainer}>
           <View style={styles.stepCircleActive}>
             <Text style={styles.stepText}>1</Text>
           </View>
 
-          <View style={styles.line} />
+          <View
+            style={[styles.line, step === 1 && styles.lineInactive]}
+          />
 
-          <View style={styles.stepCircle}>
-            <Text style={styles.stepInactive}>2</Text>
+          <View
+            style={step === 2 ? styles.stepCircleActive : styles.stepCircle}
+          >
+            <Text
+              style={step === 2 ? styles.stepText : styles.stepInactive}
+            >
+              2
+            </Text>
           </View>
         </View>
 
         <View style={styles.labelRow}>
-          <Text style={styles.activeLabel}>Personal Info</Text>
-          <Text style={styles.inactiveLabel}>Account Info</Text>
+          <Text
+            style={step === 1 ? styles.activeLabel : styles.inactiveLabel}
+          >
+            Personal Info
+          </Text>
+          <Text
+            style={step === 2 ? styles.activeLabel : styles.inactiveLabel}
+          >
+            Account Info
+          </Text>
         </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Full Name"
-          value={fullName}
-          onChangeText={setFullName}
-        />
+        {step === 1 ? (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Full Name"
+              placeholderTextColor="#999"
+              value={fullName}
+              onChangeText={setFullName}
+              editable={!busy}
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="College ID"
-          value={collegeId}
-          onChangeText={setCollegeId}
-        />
+            <TextInput
+              style={styles.input}
+              placeholder="College ID"
+              placeholderTextColor="#999"
+              value={collegeId}
+              onChangeText={setCollegeId}
+              editable={!busy}
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="University Email"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-        />
+            <TextInput
+              style={styles.input}
+              placeholder="University Email"
+              placeholderTextColor="#999"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={email}
+              onChangeText={setEmail}
+              editable={!busy}
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Phone Number"
-          keyboardType="phone-pad"
-          value={phone}
-          onChangeText={setPhone}
-        />
+            <TextInput
+              style={styles.input}
+              placeholder="Phone Number"
+              placeholderTextColor="#999"
+              keyboardType="phone-pad"
+              value={phone}
+              onChangeText={setPhone}
+              editable={!busy}
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Department"
-          value={department}
-          onChangeText={setDepartment}
-        />
+            <TextInput
+              style={styles.input}
+              placeholder="Department"
+              placeholderTextColor="#999"
+              value={department}
+              onChangeText={setDepartment}
+              editable={!busy}
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Year / Semester"
-          value={year}
-          onChangeText={setYear}
-        />
+            <TextInput
+              style={styles.input}
+              placeholder="Year / Semester"
+              placeholderTextColor="#999"
+              value={year}
+              onChangeText={setYear}
+              editable={!busy}
+            />
 
-        <Text style={styles.uploadTitle}>Upload Student ID Card</Text>
+            <Text style={styles.uploadTitle}>Upload Student ID Card</Text>
 
-        <Pressable style={styles.uploadBox}>
-          <Text style={styles.uploadIcon}>☁</Text>
-          <Text style={styles.uploadText}>Tap to upload</Text>
-          <Text style={styles.uploadSmall}>JPG, PNG up to 5MB</Text>
-        </Pressable>
+            <Pressable style={styles.uploadBox} disabled={busy}>
+              <Text style={styles.uploadIcon}>☁</Text>
+              <Text style={styles.uploadText}>Tap to upload</Text>
+              <Text style={styles.uploadSmall}>JPG, PNG up to 5MB</Text>
+            </Pressable>
 
-        <Pressable style={styles.nextButton}>
-          <Text style={styles.nextText}>Next</Text>
-        </Pressable>
+            <Pressable
+              style={[styles.nextButton, busy && { opacity: 0.7 }]}
+              onPress={onNextPersonal}
+              disabled={busy}
+            >
+              <Text style={styles.nextText}>Next</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Username"
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={username}
+              onChangeText={setUsername}
+              editable={!busy}
+            />
 
-        <Pressable onPress={() => navigation.goBack()}>
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#999"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              editable={!busy}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              placeholderTextColor="#999"
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              editable={!busy}
+            />
+
+            <Pressable
+              style={[
+                styles.nextButton,
+                (busy || !step2Ready) && { opacity: 0.7 },
+              ]}
+              onPress={onCreateAccount}
+              disabled={busy}
+            >
+              {busy ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.nextText}>Create Account</Text>
+              )}
+            </Pressable>
+          </>
+        )}
+
+        <Pressable
+          onPress={() => router.replace('/login-page')}
+          disabled={busy}
+        >
           <Text style={styles.loginLink}>
             Already have an account?
             <Text style={{ color: '#D71920', fontWeight: '700' }}> Login</Text>
@@ -211,6 +403,10 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: '#D71920',
     marginHorizontal: 10,
+  },
+
+  lineInactive: {
+    backgroundColor: '#E5E5E5',
   },
 
   labelRow: {
