@@ -33,7 +33,7 @@ const addCaseAttachment = async (req, res) => {
   try {
     const { caseId } = req.params;
     const uploadedByUserId =
-      req.body.uploadedByUserId ?? req.user?.userId ?? req.user?.id ?? null;
+      req.user?.userId ?? req.user?.id ?? req.body.uploadedByUserId ?? null;
 
     const created = await createAttachment(caseId, {
       ...req.body,

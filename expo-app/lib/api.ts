@@ -300,7 +300,10 @@ export async function loginWithEmailPassword(
 ): Promise<User> {
   const result = await request<LoginResponse>(API_URL, "/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      email: email.trim(),
+      password,
+    }),
   });
 
   if (!result?.user?.id || !result.token) {

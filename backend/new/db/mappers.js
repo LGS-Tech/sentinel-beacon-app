@@ -5,6 +5,7 @@
 
 function attachmentToApi(row) {
   if (!row) return null;
+
   return {
     id: row.id,
     caseId: row.case_id,
@@ -123,12 +124,12 @@ function pick(body, camel, snake) {
 }
 
 module.exports = {
-  userToApi,
   userToPublicApi,
+  attachmentToApi,
+  userToApi,
   departmentToApi,
   caseToApi,
   eventToApi,
-  attachmentToApi,
   nowMs,
   pick,
 };

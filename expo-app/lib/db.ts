@@ -1,16 +1,21 @@
-import { API_URL, getAuthHeaders } from "./api";
+import { getAuthToken } from "./api";
 
-const API = API_URL;
+const API =
+  (process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000").replace(
+    /\/$/,
+    ""
+  );
 
 async function requestJson(path: string, init?: RequestInit) {
-  const authHeaders = await getAuthHeaders();
   let response: Response;
   try {
+    const token = await getAuthToken();
+
     response = await fetch(`${API}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
-        ...authHeaders,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -37,7 +42,7 @@ export async function getCases() {
   const data = await requestJson("/cases");
   return (data as any[]).map((c: any) => ({
     ...c,
-    id: c._id ?? c.id,
+    id: c._id,
   }));
 }
 

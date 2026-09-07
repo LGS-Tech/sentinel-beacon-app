@@ -2,8 +2,9 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-const db = require("./db");
-const apiRoutes = require("./routes");
+const db = require("./db"); //import the database connection module
+
+const apiRoutes = require("./routes"); 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,16 +44,8 @@ app.use(express.json());
 app.get("/", (_req, res) => {
   res.json({
     service: "lgs-tech-api",
-    message: "LGS Tech PostgreSQL API is running",
-    database: "postgresql",
-    endpoints: [
-      "/health",
-      "/cases",
-      "/cases/analytics",
-      "/users",
-      "/auth/login",
-      "/auth/signup",
-    ],
+    message: "LGS Tech API is running",
+    endpoints: ["/health", "/cases", "/users"],
   });
 });
 
@@ -62,36 +55,19 @@ app.get("/health", async (_req, res) => {
     res.status(200).json({
       ok: true,
       service: "lgs-tech-api",
-      database: "postgresql",
-      status: "connected",
+      database: "connected",
     });
-  } catch {
+  } catch (err) {
     res.status(503).json({
       ok: false,
       service: "lgs-tech-api",
-      database: "postgresql",
-      status: "disconnected",
+      database: "disconnected",
     });
   }
 });
 
 app.use(apiRoutes);
 
-async function start() {
-  try {
-    await db.ping();
-    console.log("PostgreSQL connected");
-  } catch (err) {
-    console.error(
-      "PostgreSQL unavailable. Set DATABASE_URL and run npm run db:setup:",
-      err.message
-    );
-    process.exit(1);
-  }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT} (PostgreSQL)`);
-  });
-}
-
-start();
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
