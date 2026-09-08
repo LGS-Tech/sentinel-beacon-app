@@ -112,6 +112,11 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${authToken}` };
 }
 
+export async function getAuthToken(): Promise<string | null> {
+  await hydrateSession();
+  return authToken;
+}
+
 export async function hydrateSession(): Promise<number> {
   if (sessionHydrated) return currentUserId;
   try {
