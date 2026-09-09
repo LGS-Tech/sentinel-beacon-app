@@ -12,6 +12,8 @@ const PORT = process.env.PORT || 3000;
 function buildCorsOptions() {
   const defaults = [
     "https://lgs-tech.github.io",
+    "https://lgstech.co",
+    "https://www.lgstech.co",
     "http://localhost:8081",
     "http://localhost:19006",
     "http://127.0.0.1:8081",
