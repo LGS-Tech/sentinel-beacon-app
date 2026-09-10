@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
 
 export type User = {
   id: number;
@@ -75,21 +74,14 @@ const TOKEN_KEY = "sentinel.authToken";
 const DEFAULT_API_URL = "http://localhost:3000";
 const DEFAULT_FLASK = "http://localhost:5000";
 
-function resolveUrl(envKey: string, fallback: string): string {
-  const fromEnv = process.env[envKey];
-  if (fromEnv && fromEnv.trim()) return fromEnv.replace(/\/$/, "");
+const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
+const EXPO_PUBLIC_FLASK_URL = process.env.EXPO_PUBLIC_FLASK_URL;
 
-  const extra = Constants.expoConfig?.extra as
-    | Record<string, string>
-    | undefined;
-  const fromExtra = extra?.[envKey];
-  if (fromExtra && fromExtra.trim()) return fromExtra.replace(/\/$/, "");
+export const API_URL =
+  EXPO_PUBLIC_API_URL?.trim().replace(/\/$/, "") || DEFAULT_API_URL;
 
-  return fallback;
-}
-
-export const API_URL = resolveUrl("EXPO_PUBLIC_API_URL", DEFAULT_API_URL);
-export const FLASK_URL = resolveUrl("EXPO_PUBLIC_FLASK_URL", DEFAULT_FLASK);
+export const FLASK_URL =
+  EXPO_PUBLIC_FLASK_URL?.trim().replace(/\/$/, "") || DEFAULT_FLASK;
 
 /** @deprecated Use API_URL */
 export const EXPRESS_URL = API_URL;
