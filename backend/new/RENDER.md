@@ -1,39 +1,67 @@
-# Deploying backend/new on Render (demo API)
+# Deploying backend/new on Render (PostgreSQL)
+
+Production uses **Render Postgres** + the Node API in `backend/new`. MongoDB and file-based JSON are not used.
 
 This hosts the Express API so a static demo (e.g. GitHub Pages) can call it.
 Local `npm start` / Docker Postgres stay for day-to-day development.
 
-## What Render needs
+## Free plan Start Command (what we actually use)
 
-| Setting | Value |
-|--------|--------|
+**Pre-Deploy is not available on Render’s free plan.** Do not treat Pre-Deploy as the production path.
+
+On the free web service, put schema + seed hashing in the **Start Command**:
+
+```
+npm run db:setup && npm run db:hash-seeds && npm start
+```
+
+| Setting | Free-plan value |
+|--------|------------------|
 | Root directory | `backend/new` |
 | Runtime | Node |
 | Build command | `npm install` |
-| Start command | `npm start` |
+| Start command | `npm run db:setup && npm run db:hash-seeds && npm start` |
 | Health check | `/health` |
 
-## Env vars (set in Render Dashboard → Environment)
+Paid plans can optionally move setup to **Pre-Deploy** (`npm run db:setup && npm run db:hash-seeds`) and use `npm start` as Start. That is optional and is **not** the path used for this demo.
+
+## Blueprint (`render.yaml`)
+
+The repo blueprint provisions:
+
+- **Database:** `lgs-tech-postgres` (free tier)
+- **Web service:** `lgs-tech-api` with `DATABASE_URL` wired from the database
+- **Start command:** `npm run db:setup && npm run db:hash-seeds && npm start` (schema + bcrypt demo passwords, then the API)
+
+After linking the blueprint or updating an existing service, set in the Render dashboard:
 
 | Key | Notes |
 |-----|--------|
-| `DATABASE_URL` | PostgreSQL connection string (required) |
-| `ALLOWED_ORIGINS` | Optional extras. Defaults already include `https://lgs-tech.github.io`. Example: `https://lgs-tech.github.io,http://localhost:8081` |
-| `DATABASE_URL` | Optional for now (Postgres not wired into `server.js` yet) |
+| `JWT_SECRET` | **Required** — long random string for `/auth/login` |
+| `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,http://localhost:8081` |
+
+`REQUIRE_AUTH` defaults to `false` for the demo; set `true` when all clients send Bearer tokens.
+
+## Env vars (Render Dashboard → Environment)
+
+| Key | Notes |
+|-----|--------|
+| `DATABASE_URL` | **Required** — from Render Postgres **Internal** connection string |
+| `JWT_SECRET` | **Required** — long random string for `/auth/login` |
+| `REQUIRE_AUTH` | `false` for demo until all clients send Bearer tokens; `true` in production |
+| `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,http://localhost:8081` |
 
 Render sets `PORT` automatically — do not hardcode it.
 
 ## Steps (dashboard)
 
 1. Push this repo to GitHub (with `.env` gitignored).
-2. Go to [render.com](https://render.com) → **New** → **Web Service**.
+2. Go to [render.com](https://render.com) → **New** → **Web Service** (or use the root [`render.yaml`](../../render.yaml) Blueprint).
 3. Connect the repo.
 4. Set **Root Directory** = `backend/new`.
-5. Build = `npm install`, Start = `npm start`.
+5. Build = `npm install`. Start = `npm run db:setup && npm run db:hash-seeds && npm start`.
 6. Add `DATABASE_URL`, `JWT_SECRET`, and `ALLOWED_ORIGINS`.
 7. Deploy → copy the URL, e.g. `https://lgs-tech-api.onrender.com`.
-
-Or use the root [`render.yaml`](../../render.yaml) Blueprint.
 
 ## Point the demo frontend at Render
 
@@ -55,5 +83,20 @@ Do **not** commit real secrets. Local `.env` can keep `localhost` / LAN IP for d
 
 ```bash
 curl https://YOUR-SERVICE.onrender.com/health
+curl https://YOUR-SERVICE.onrender.com/cases/analytics
 curl https://YOUR-SERVICE.onrender.com/cases
+curl -X POST https://YOUR-SERVICE.onrender.com/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jimstevens@gmail.com","password":"London588"}'
+```
+
+`/health` should return `"database":"postgresql"` and `"status":"connected"`.
+
+## Local development
+
+```bash
+docker compose up -d
+npm run db:setup
+npm run db:hash-seeds
+npm start
 ```
