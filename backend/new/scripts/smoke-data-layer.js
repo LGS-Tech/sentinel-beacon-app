@@ -27,6 +27,7 @@ async function main() {
     locationX: 0.5,
     locationY: 0.5,
     locationLabel: "Cafeteria",
+    floor: "1",
     createdByUserId: 7,
     description: "Broken tap (data-layer smoke test)",
   });

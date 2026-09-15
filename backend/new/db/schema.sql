@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS cases (
   location_x DOUBLE PRECISION,
   location_y DOUBLE PRECISION,
   location_label TEXT,
+  floor TEXT NOT NULL DEFAULT '1',
   feed TEXT,
   category TEXT NOT NULL DEFAULT 'Maintenance',
   description TEXT,
@@ -178,6 +179,11 @@ ALTER TABLE cases ADD COLUMN IF NOT EXISTS police_contacted BOOLEAN;
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS fire_contacted BOOLEAN;
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS ambulance_contacted BOOLEAN;
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS maintenance_contacted BOOLEAN;
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS floor TEXT;
+
+UPDATE cases SET floor = '1' WHERE floor IS NULL OR floor = '';
+ALTER TABLE cases ALTER COLUMN floor SET DEFAULT '1';
+ALTER TABLE cases ALTER COLUMN floor SET NOT NULL;
 
 UPDATE cases SET category = 'Maintenance' WHERE category IS NULL OR category = '';
 UPDATE cases SET priority = 'NORMAL' WHERE priority IS NULL OR priority = '';

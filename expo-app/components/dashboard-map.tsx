@@ -9,19 +9,17 @@ import {
   View,
 } from 'react-native';
 
+import { FLOORS, type FloorId } from '@/lib/floors';
+
 const MAP_W = 1525;
 const MAP_H = 959;
-
-type CaseMarker = {
-  id: number;
-  title: string;
-  locationX: number;
-  locationY: number;
-};
 
 type Props = {
   cases: any[];
   selectedCase: any;
+  floorPlan: any;
+  selectedFloor: FloorId;
+  onFloorChange: (floorId: FloorId) => void;
   onMarkerPress: (item: any) => void;
   onView: (item: any) => void;
 };
@@ -140,13 +138,12 @@ function WebMapContainer({ children }: { children: React.ReactNode }) {
 export default function DashboardMap({
   cases,
   selectedCase,
+  floorPlan,
+  selectedFloor,
+  onFloorChange,
   onMarkerPress,
   onView,
 }: Props) {
-  const floorPlan = require('../assets/images/LGSUniFloorPlan.png');
-
-  // need to have marker be centered on screen when clicked
-
   function getMarkerColour(title: string) {
     if (title.startsWith('Fire')) return '#DC2626';
     if (title.startsWith('Intruder')) return '#F97316';
@@ -202,6 +199,36 @@ export default function DashboardMap({
             <Text style={styles.legendLabel}>{label}</Text>
           </View>
         ))}
+      </View>
+
+      {/* Floor selector */}
+      <View style={styles.floorSelector}>
+        <Text style={styles.floorTitle}>Floor</Text>
+        <View style={styles.floorRow}>
+          {FLOORS.map((floor) => {
+            const active = selectedFloor === floor.id;
+            return (
+              <Pressable
+                key={floor.id}
+                onPress={() => onFloorChange(floor.id)}
+                style={[
+                  styles.floorChip,
+                  active && styles.floorChipActive,
+                  Platform.OS === 'web' && ({ cursor: 'pointer' } as any),
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.floorChipText,
+                    active && styles.floorChipTextActive,
+                  ]}
+                >
+                  {floor.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       {Platform.OS === 'web' ? (
@@ -301,6 +328,62 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#374151',
     fontWeight: '500',
+  },
+
+  floorSelector: {
+    position: 'absolute',
+    top: 16,
+    right: 12,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    zIndex: 999,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+
+  floorTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+
+  floorRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  floorChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+  },
+
+  floorChipActive: {
+    backgroundColor: '#DBEAFE',
+    borderColor: '#2563EB',
+  },
+
+  floorChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+
+  floorChipTextActive: {
+    color: '#1D4ED8',
   },
 
   // unused but kept for safety
