@@ -39,6 +39,7 @@ type CaseItem = {
   locationX?: number;
   locationY?: number;
   locationLabel?: string;
+  floor?: string;
   feed?: string;
   chat?: string;
   files: FileItem[];
@@ -68,37 +69,32 @@ const loadCases = async (): Promise<CaseItem[]> => {
         },
       ];
 
-      try {
-        const attachments = await getCaseAttachments(caseId);
-        for (const att of attachments) {
-          files.push({
-            id: att.id,
-            name: att.filename,
-            type: 'image',
-            content: att.storageUrl,
-          });
-        }
-      } catch {
-        // No attachments yet, or fetch failed — just skip, not fatal.
-      }
+    return {
+      id: String(row._id ?? row.id),
 
-      return {
-        id: caseId,
-        title: row.title,
-        createdAt: row.createdAt,
-        lastUpdatedAt: row.lastUpdatedAt,
-        status: row.status ?? 'CLOSED',
-        locationX: row.locationX,
-        locationY: row.locationY,
-        locationLabel: row.locationLabel,
-        feed: row.feed,
-        chat: row.chat,
-        files,
-      };
-    })
-  );
+      title: row.title,
 
-  return cases;
+      createdAt: row.createdAt,
+
+      lastUpdatedAt: row.lastUpdatedAt,
+
+      status: row.status ?? 'CLOSED',
+
+      locationX: row.locationX,
+
+      locationY: row.locationY,
+
+      locationLabel: row.locationLabel,
+
+      floor: row.floor,
+
+      feed: row.feed,
+
+      chat: row.chat,
+
+      files,
+    };
+  });
 };
 
 export default function VaultScreen() {
@@ -489,6 +485,9 @@ export default function VaultScreen() {
 
             {expandedCase?.locationLabel && (
               <ThemedText>Location: {expandedCase.locationLabel}</ThemedText>
+            )}
+            {expandedCase?.floor && (
+              <ThemedText>Floor: {expandedCase.floor}</ThemedText>
             )}
 
             <FlatList
