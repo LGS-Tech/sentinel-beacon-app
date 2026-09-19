@@ -16,7 +16,7 @@ function getJwtSecret() {
   return secret;
 }
 
-const signup = async (req, res) => {
+const signup = async (req, res, next) => {
   const {
     username,
     password,
@@ -54,12 +54,11 @@ const signup = async (req, res) => {
       user: userToPublicApi(newUser),
     });
   } catch (err) {
-    console.error("Error during signup:", err);
-    res.status(500).json({ error: err.message || "Signup failed" });
+    return next(err);
   }
 };
 
-const login = async (req, res) => {
+const login = async (req, res, next) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -100,8 +99,7 @@ const login = async (req, res) => {
       user: userToPublicApi(user),
     });
   } catch (err) {
-    console.error("Error during login:", err);
-    res.status(500).json({ error: err.message || "Login failed" });
+    return next(err);
   }
 };
 

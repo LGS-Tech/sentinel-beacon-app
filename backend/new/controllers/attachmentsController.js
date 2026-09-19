@@ -5,18 +5,17 @@ const {
   deleteAttachment,
 } = require("../db/queries/attachments");
 
-const listCaseAttachments = async (req, res) => {
+const listCaseAttachments = async (req, res, next) => {
   try {
     const { caseId } = req.params;
     const items = await listAttachmentsByCaseId(caseId);
     res.json(items);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to list attachments" });
+    return next(err);
   }
 };
 
-const getCaseAttachment = async (req, res) => {
+const getCaseAttachment = async (req, res, next) => {
   try {
     const { caseId, attachmentId } = req.params;
     const found = await getAttachmentForCase(caseId, attachmentId);
@@ -25,11 +24,19 @@ const getCaseAttachment = async (req, res) => {
     }
     res.json(found);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch attachment" });
+    return next(err);
   }
 };
 
-const addCaseAttachment = async (req, res) => {
+const addCaseAttachment = async (req, res, next) => {
+  const { filename, storageUrl } = req.body;
+
+  if (!filename || !storageUrl) {
+    return res.status(400).json({
+      error: "filename and storageUrl are required",
+    });
+  }
+
   try {
     const { caseId } = req.params;
     const uploadedByUserId =
@@ -46,11 +53,11 @@ const addCaseAttachment = async (req, res) => {
 
     res.status(201).json(created);
   } catch (err) {
-    res.status(400).json({ error: err.message || "Failed to add attachment" });
+    return next(err);
   }
 };
 
-const removeCaseAttachment = async (req, res) => {
+const removeCaseAttachment = async (req, res, next) => {
   try {
     const { caseId, attachmentId } = req.params;
     const removed = await deleteAttachment(caseId, attachmentId);
@@ -59,7 +66,7 @@ const removeCaseAttachment = async (req, res) => {
     }
     res.sendStatus(204);
   } catch (err) {
-    res.status(500).json({ error: "Failed to remove attachment" });
+    return next(err);
   }
 };
 

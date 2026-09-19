@@ -3,10 +3,13 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const db = require("./db"); //import the database connection module
+const requestLogger = require("./middleware/requestLogger");
+const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
 
 const apiRoutes = require("./routes"); 
 
 const app = express();
+app.disable("x-powered-by");
 const PORT = process.env.PORT || 3000;
 
 function buildCorsOptions() {
@@ -38,6 +41,7 @@ function buildCorsOptions() {
   };
 }
 
+app.use(requestLogger);
 app.use(cors(buildCorsOptions()));
 app.use(express.json());
 
@@ -67,6 +71,9 @@ app.get("/health", async (_req, res) => {
 });
 
 app.use(apiRoutes);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
