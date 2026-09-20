@@ -16,6 +16,8 @@ function getJwtSecret() {
   return secret;
 }
 
+
+const CURRENT_TERMS_VERSION = "v1";
 const signup = async (req, res, next) => {
   const {
     username,
@@ -27,6 +29,7 @@ const signup = async (req, res, next) => {
     authorisation,
     collegeId,
     yearSemester,
+    termsAccepted,
   } = req.body;
 
   if (!username || !password || !email || !name) {
@@ -47,11 +50,15 @@ const signup = async (req, res, next) => {
       authorisation,
       collegeId,
       yearSemester,
+      ...(termsAccepted && {
+        termsAcceptedAt: new Date (). toISOString(),
+        termsVersion: CURRENT_TERMS_VERSION,
+      })
     });
 
       const token = jwt.sign(
     { userId: newUser.id, userType: newUser.userType, authorisation: newUser.authorisation },
-    secret,
+    getJwtSecret(),
     { expiresIn: '1d' }
     );
 
@@ -61,7 +68,12 @@ const signup = async (req, res, next) => {
       token
     });
   } catch (err) {
-    return next(err);
+    if (err.code === '23505') {
+    return res.status(409).json({
+      error: 'An account with that username or email already exists.',
+    });
+  }
+  return next(err);
   }
 };
 
