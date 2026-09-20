@@ -7,6 +7,9 @@ const {
   assignCase,
   analyticsSummary,
 } = require("../db/queries/cases");
+const { generateReportFromDB } = require("../scripts/generateReport");
+const path = require("path");
+const fs = require("fs").promises;
 
 const getAllCases = async (req, res) => {
   try {
@@ -41,6 +44,7 @@ const updateExistingCase = async (req, res) => {
   try {
     const updated = await updateCase(req.params.id, req.body);
     if (!updated) return res.status(404).json({ error: "Case not found" });
+    await generateReportFromDB(req.params.id);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: "Failed to update case" });
@@ -83,6 +87,39 @@ const getAnalyticsSummary = async (req, res) => {
   }
 }
 
+// GET /cases/:id/report/view
+const viewCaseReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await generateReportFromDB(id);
+
+    if (!result.success) {
+      return res.status(404).json({ error: "Case not found." });
+    }
+
+    res.setHeader("Content-Type", "text/plain");
+    return res.sendFile(result.filePath);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+// GET /cases/:id/report/download
+const downloadCaseReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await generateReportFromDB(id);
+
+    if (!result.success) {
+      return res.status(404).json({ error: "Case not found." });
+    }
+
+    return res.download(result.filePath, `case-${id}-report.txt`);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getAllCases,
   getCase,
@@ -91,4 +128,6 @@ module.exports = {
   deleteExistingCase,
   assignCaseToUser,
   getAnalyticsSummary,
+  viewCaseReport,
+  downloadCaseReport,
 };
