@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const { authenticate } = require("../middleware/auth");
 const caseAttachmentsRoutes = require("./caseAttachmentsRoutes");
+const uploadRoutes = require("./uploadRoutes");
+
 
 const {
   getAllCases,
@@ -13,6 +15,8 @@ const {
   getAnalyticsSummary,
 } = require("../controllers/casesController");
 
+
+router.use("/:caseId/attachments/upload", uploadRoutes);
 router.use(authenticate);
 
 router.get("/", getAllCases);

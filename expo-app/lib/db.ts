@@ -85,3 +85,24 @@ export async function deleteCase(id: string) {
     method: "DELETE",
   });
 }
+
+// Uploads a file (any type) for a case to the backend, which forwards
+// it to R2 storage and saves the attachment metadata in Postgres.
+export async function uploadCaseAttachment(caseId: string, formData: FormData) {
+  const token = await getAuthToken();
+
+  const response = await fetch(`${API}/cases/${caseId}/attachments/upload`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text || `Upload failed (${response.status})`);
+  }
+
+  return response.json();
+}

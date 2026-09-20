@@ -1,13 +1,16 @@
 //-vault - needs an exposql update for storing pics and videos, live feed messages need reading
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useMemo, useState } from 'react';
+
 
 import {
   Alert,
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,7 +19,7 @@ import {
   View
 } from 'react-native';
 
-import { deleteCase, getCaseAttachments, getCases, updateCase } from '@/lib/db';
+import { deleteCase, getCaseAttachments, getCases, updateCase, uploadCaseAttachment } from '@/lib/db';
 
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -173,6 +176,40 @@ export default function VaultScreen() {
       ],
     );
   };
+
+const handleAddFile = async (caseId: string) => {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: '*/*',
+    copyToCacheDirectory: true,
+  });
+
+  if (result.canceled) return;
+
+  const file = result.assets[0];
+
+  const formData = new FormData();
+
+  if (Platform.OS === 'web') {
+    // On web, the picked file already comes with a real File/Blob object.
+    const response = await fetch(file.uri);
+    const blob = await response.blob();
+    formData.append('file', blob, file.name);
+  } else {
+    // On native (iOS/Android), use React Native's { uri, name, type } shape.
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType ?? 'application/octet-stream',
+    } as any);
+  }
+
+  try {
+    await uploadCaseAttachment(caseId, formData);
+    await refreshVault();
+  } catch (err) {
+    Alert.alert('Upload failed', err instanceof Error ? err.message : 'Unknown error');
+  }
+};
 
   const renameFile = () => {
     if (!selectedFileId || !selectedCaseId || !renameValue.trim()) return;
@@ -512,7 +549,7 @@ export default function VaultScreen() {
               )}
             />
 
-            <Pressable style={styles.addFileBtn} onPress={() => {}}>
+            <Pressable style={styles.addFileBtn} onPress={() => handleAddFile(expandedCase!.id)}>
               <Ionicons name="add" size={18} color="#fff" />
 
               <ThemedText style={styles.addFileBtnText}>Add File</ThemedText>
