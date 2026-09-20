@@ -39,6 +39,10 @@ After linking the blueprint or updating an existing service, set in the Render d
 |-----|--------|
 | `JWT_SECRET` | **Required** — long random string for `/auth/login` |
 | `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,http://localhost:8081` |
+| `R2_ACCOUNT_ID` | Cloudflare account ID for R2 |
+| `R2_ACCESS_KEY_ID` | R2 API token access key (Object Read & Write) |
+| `R2_SECRET_ACCESS_KEY` | R2 API token secret — never commit this |
+| `R2_BUCKET_NAME` | Private R2 bucket for Vault files |
 
 `REQUIRE_AUTH` defaults to `false` for the demo; set `true` when all clients send Bearer tokens.
 
@@ -50,6 +54,10 @@ After linking the blueprint or updating an existing service, set in the Render d
 | `JWT_SECRET` | **Required** — long random string for `/auth/login` |
 | `REQUIRE_AUTH` | `false` for demo until all clients send Bearer tokens; `true` in production |
 | `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,http://localhost:8081` |
+| `R2_ACCOUNT_ID` | Cloudflare account ID for R2 |
+| `R2_ACCESS_KEY_ID` | R2 API token access key |
+| `R2_SECRET_ACCESS_KEY` | R2 API token secret — dashboard only |
+| `R2_BUCKET_NAME` | Private R2 bucket name |
 
 Render sets `PORT` automatically — do not hardcode it.
 
@@ -60,7 +68,7 @@ Render sets `PORT` automatically — do not hardcode it.
 3. Connect the repo.
 4. Set **Root Directory** = `backend/new`.
 5. Build = `npm install`. Start = `npm run db:setup && npm run db:hash-seeds && npm start`.
-6. Add `DATABASE_URL`, `JWT_SECRET`, and `ALLOWED_ORIGINS`.
+6. Add `DATABASE_URL`, `JWT_SECRET`, `ALLOWED_ORIGINS`, and the R2 keys (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`).
 7. Deploy → copy the URL, e.g. `https://lgs-tech-api.onrender.com`.
 
 ## Point the demo frontend at Render
@@ -90,7 +98,7 @@ curl -X POST https://YOUR-SERVICE.onrender.com/auth/login \
   -d '{"email":"jimstevens@gmail.com","password":"London588"}'
 ```
 
-`/health` should return `"database":"postgresql"` and `"status":"connected"`.
+`/health` should return `"database":"connected"` and `"storage": { "ready": true, "provider": "r2" }` once R2 env vars are set.
 
 ## Local development
 

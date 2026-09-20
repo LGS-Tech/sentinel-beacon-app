@@ -1,11 +1,13 @@
-//-vault - needs an exposql update for storing pics and videos, live feed messages need reading
+// Vault lists case folders and uploaded TXT/PDF/JPG/PNG files from the API.
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -14,19 +16,34 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 
-import { deleteCase, getCases, updateCase } from '@/lib/db';
+import {
+  CaseAttachment,
+  deleteCase,
+  fetchAttachmentBlob,
+  getCaseAttachments,
+  getCases,
+  updateCase,
+  uploadCaseAttachment,
+} from '@/lib/db';
+import { pickVaultFile } from '@/lib/pickVaultFile';
 
 import { useFocusEffect } from '@react-navigation/native';
 
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 
+type FileKind = 'text' | 'pdf' | 'image' | 'file';
+
 type FileItem = {
   id: string;
   name: string;
-  type: 'text';
-  content: string;
+  kind: FileKind;
+  content?: string;
+  mimeType?: string;
+  attachmentId?: string;
+  caseId?: string;
 };
 
 type CaseItem = {
@@ -44,52 +61,76 @@ type CaseItem = {
   files: FileItem[];
 };
 
+function kindFromMime(mimeType?: string | null): FileKind {
+  if (mimeType?.startsWith('image/')) return 'image';
+  if (mimeType === 'application/pdf') return 'pdf';
+  if (mimeType === 'text/plain') return 'text';
+  return 'file';
+}
+
+function mapAttachment(row: CaseAttachment, caseId: string): FileItem {
+  return {
+    id: row.id,
+    name: row.filename,
+    kind: kindFromMime(row.mimeType),
+    mimeType: row.mimeType ?? undefined,
+    attachmentId: row.id,
+    caseId,
+  };
+}
+
+function generatedFiles(row: any): FileItem[] {
+  const id = String(row._id ?? row.id);
+  return [
+    {
+      id: `chat-${id}`,
+      name: 'team-chat.txt',
+      kind: 'text',
+      content: row.chat || 'No chat data',
+    },
+    {
+      id: `feed-${id}`,
+      name: 'live-feed.txt',
+      kind: 'text',
+      content: row.feed || 'No live feed data',
+    },
+  ];
+}
+
+async function filesForCase(row: any): Promise<FileItem[]> {
+  const caseId = String(row._id ?? row.id);
+  const generated = generatedFiles(row);
+  try {
+    const attachments = await getCaseAttachments(caseId);
+    return [...generated, ...attachments.map((item) => mapAttachment(item, caseId))];
+  } catch {
+    return generated;
+  }
+}
+
 const loadCases = async (): Promise<CaseItem[]> => {
   const rows = await getCases();
 
-  return rows.map((row: any) => {
-    const files: FileItem[] = [
-      {
-        id: `chat-${row._id ?? row.id}`,
-        name: 'team-chat.txt',
-        type: 'text',
-        content: row.chat || 'No chat data',
-      },
+  return Promise.all(
+    rows.map(async (row: any) => {
+      const files = await filesForCase(row);
 
-      {
-        id: `feed-${row._id ?? row.id}`,
-        name: 'live-feed.txt',
-        type: 'text',
-        content: row.feed || 'No live feed data',
-      },
-    ];
-
-    return {
-      id: String(row._id ?? row.id),
-
-      title: row.title,
-
-      createdAt: row.createdAt,
-
-      lastUpdatedAt: row.lastUpdatedAt,
-
-      status: row.status ?? 'CLOSED',
-
-      locationX: row.locationX,
-
-      locationY: row.locationY,
-
-      locationLabel: row.locationLabel,
-
-      floor: row.floor,
-
-      feed: row.feed,
-
-      chat: row.chat,
-
-      files,
-    };
-  });
+      return {
+        id: String(row._id ?? row.id),
+        title: row.title,
+        createdAt: row.createdAt,
+        lastUpdatedAt: row.lastUpdatedAt,
+        status: row.status ?? 'CLOSED',
+        locationX: row.locationX,
+        locationY: row.locationY,
+        locationLabel: row.locationLabel,
+        floor: row.floor,
+        feed: row.feed,
+        chat: row.chat,
+        files,
+      };
+    }),
+  );
 };
 
 export default function VaultScreen() {
@@ -97,8 +138,6 @@ export default function VaultScreen() {
   const isDesktop = width >= 768;
 
   const [vaultData, setVaultData] = useState<CaseItem[]>([]);
-
-  const [selectedText, setSelectedText] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
 
@@ -114,6 +153,10 @@ export default function VaultScreen() {
   const [expandedCase, setExpandedCase] = useState<CaseItem | null>(null);
 
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [previewText, setPreviewText] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const GRID_COLUMNS = 1;
   const PREVIEW_ROWS = 2;
@@ -139,6 +182,84 @@ export default function VaultScreen() {
     const cases = await loadCases();
 
     setVaultData(cases);
+    return cases;
+  };
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let cancelled = false;
+
+    async function loadPreview() {
+      setPreviewUri(null);
+      setPreviewText(null);
+      if (!selectedFile) return;
+
+      if (selectedFile.content != null && !selectedFile.attachmentId) {
+        setPreviewText(selectedFile.content);
+        return;
+      }
+
+      if (!selectedFile.attachmentId || !selectedFile.caseId) return;
+
+      setPreviewLoading(true);
+      try {
+        const blob = await fetchAttachmentBlob(
+          selectedFile.caseId,
+          selectedFile.attachmentId,
+        );
+        if (cancelled) return;
+
+        if (selectedFile.kind === 'text') {
+          setPreviewText(await blob.text());
+          return;
+        }
+
+        if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+          throw new Error('Unable to preview this file on this device.');
+        }
+
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUri(objectUrl);
+      } catch (error) {
+        if (!cancelled) {
+          Alert.alert(
+            'Unable to open file',
+            error instanceof Error ? error.message : 'Please try again.',
+          );
+          setSelectedFile(null);
+        }
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    }
+
+    loadPreview();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [selectedFile]);
+
+  const handleAddFile = async () => {
+    if (!expandedCase || uploading) return;
+
+    try {
+      const picked = await pickVaultFile();
+      if (!picked) return;
+
+      setUploading(true);
+      await uploadCaseAttachment(expandedCase.id, picked);
+      const cases = await refreshVault();
+      const updated = cases.find((item) => item.id === expandedCase.id);
+      if (updated) setExpandedCase(updated);
+    } catch (error) {
+      Alert.alert(
+        'Upload failed',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDeleteCase = (caseId: string) => {
@@ -264,24 +385,51 @@ export default function VaultScreen() {
     <Pressable
       style={({ pressed }) => [styles.fileItem, pressed && { opacity: 0.7 }]}
       onPress={() => {
-        setSelectedText(item.content);
+        setSelectedFile(item);
       }}
     >
       <View
         style={[
           styles.fileIconBox,
           {
-            backgroundColor: '#D1FAE5',
+            backgroundColor:
+              item.kind === 'image'
+                ? '#DBEAFE'
+                : item.kind === 'pdf'
+                  ? '#FEE2E2'
+                  : '#D1FAE5',
           },
         ]}
       >
-        <Ionicons name="reader-outline" size={20} color="#059669" />
+        <Ionicons
+          name={
+            item.kind === 'image'
+              ? 'image-outline'
+              : item.kind === 'pdf'
+                ? 'document-outline'
+                : 'reader-outline'
+          }
+          size={20}
+          color={
+            item.kind === 'image'
+              ? '#2563EB'
+              : item.kind === 'pdf'
+                ? '#DC2626'
+                : '#059669'
+          }
+        />
       </View>
 
       <View style={{ flex: 1 }}>
         <ThemedText style={styles.fileName}>{item.name}</ThemedText>
 
-        <ThemedText style={styles.fileType}>TEXT</ThemedText>
+        <ThemedText style={styles.fileType}>
+          {item.kind === 'image'
+            ? 'IMAGE'
+            : item.kind === 'pdf'
+              ? 'PDF'
+              : 'TEXT'}
+        </ThemedText>
       </View>
 
       <Pressable
@@ -497,7 +645,23 @@ export default function VaultScreen() {
                   style={styles.gridFile}
                   onPress={() => setSelectedFile(item)}
                 >
-                  <Ionicons name="reader-outline" size={22} color="#059669" />
+                  <Ionicons
+                    name={
+                      item.kind === 'image'
+                        ? 'image-outline'
+                        : item.kind === 'pdf'
+                          ? 'document-outline'
+                          : 'reader-outline'
+                    }
+                    size={22}
+                    color={
+                      item.kind === 'image'
+                        ? '#2563EB'
+                        : item.kind === 'pdf'
+                          ? '#DC2626'
+                          : '#059669'
+                    }
+                  />
 
                   <ThemedText numberOfLines={1} style={styles.gridFileName}>
                     {item.name}
@@ -506,17 +670,27 @@ export default function VaultScreen() {
               )}
             />
 
-            <Pressable style={styles.addFileBtn} onPress={() => {}}>
-              <Ionicons name="add" size={18} color="#fff" />
+            <Pressable
+              style={[styles.addFileBtn, uploading && { opacity: 0.7 }]}
+              disabled={uploading}
+              onPress={handleAddFile}
+            >
+              {uploading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Ionicons name="add" size={18} color="#fff" />
+              )}
 
-              <ThemedText style={styles.addFileBtnText}>Add File</ThemedText>
+              <ThemedText style={styles.addFileBtnText}>
+                {uploading ? 'Uploading…' : 'Add File'}
+              </ThemedText>
             </Pressable>
 
             <Modal visible={!!selectedFile} transparent animationType="fade">
               <View style={styles.modal}>
                 <Pressable
                   style={styles.overlay}
-                  onPress={() => setSelectedText(null)}
+                  onPress={() => setSelectedFile(null)}
                 />
 
                 <View style={styles.textBox}>
@@ -530,11 +704,30 @@ export default function VaultScreen() {
                     </Pressable>
                   </View>
 
-                  <ScrollView>
-                    <ThemedText style={styles.textContent}>
-                      {selectedFile?.content}
-                    </ThemedText>
-                  </ScrollView>
+                  {previewLoading ? (
+                    <ActivityIndicator color="#2563EB" />
+                  ) : selectedFile?.kind === 'image' && previewUri ? (
+                    <Image
+                      source={{ uri: previewUri }}
+                      style={styles.previewImage}
+                      resizeMode="contain"
+                    />
+                  ) : selectedFile?.kind === 'pdf' && previewUri ? (
+                    <Pressable
+                      style={styles.saveRenameBtn}
+                      onPress={() => WebBrowser.openBrowserAsync(previewUri)}
+                    >
+                      <ThemedText style={styles.saveRenameText}>
+                        Open PDF
+                      </ThemedText>
+                    </Pressable>
+                  ) : (
+                    <ScrollView>
+                      <ThemedText style={styles.textContent}>
+                        {previewText ?? selectedFile?.content ?? ''}
+                      </ThemedText>
+                    </ScrollView>
+                  )}
                 </View>
               </View>
             </Modal>
@@ -919,6 +1112,13 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     marginLeft: 6,
+  },
+
+  previewImage: {
+    width: '100%',
+    height: 320,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
   },
 
   folderFooter: {
