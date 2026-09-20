@@ -34,10 +34,17 @@ import BottomSheet from '@/components/sheet';
 //import { db } from "@/lib/db"
 
 import { createCase, getCases, updateCase } from '@/lib/db';
+import {
+  DEFAULT_FLOOR_ID,
+  FLOORS,
+  caseMatchesFloor,
+  getFloorById,
+  normalizeFloorId,
+  type FloorId,
+} from '@/lib/floors';
 
 //const db = SQLite.openDatabaseSync("app.db")
 
-const floorPlan = require('../../assets/images/LGSUniFloorPlan.png');
 const logo = require('../../assets/images/LGS-logo.png');
 
 const defaultCoords = {
@@ -169,6 +176,28 @@ export default function HomeScreen() {
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [selectedMapCase, setSelectedMapCase] = useState<any | null>(null);
 
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+  const [selectedMaintenanceType, setSelectedMaintenanceType] = useState('');
+  const [selectedFloor, setSelectedFloor] =
+    useState<FloorId>(DEFAULT_FLOOR_ID);
+  const [caseFloor, setCaseFloor] = useState<FloorId>(DEFAULT_FLOOR_ID);
+
+  const activeFloorPlan = getFloorById(selectedFloor).image;
+  const floorCases = openCases.filter((c) =>
+    caseMatchesFloor(c, selectedFloor),
+  );
+
+  function handleFloorChange(floorId: FloorId) {
+    setSelectedFloor(floorId);
+    setSelectedMapCase((prev: any) =>
+      prev && caseMatchesFloor(prev, floorId) ? prev : null,
+    );
+    if (updatingLocation) {
+      setSelectedCoords(null);
+    }
+    setMapRefreshKey((prev) => prev + 1);
+  }
+
   async function saveLocation(x: number, y: number, label: string) {
     const newCase = await createCase({
       title: `${incidentType} Case`,
@@ -185,11 +214,14 @@ export default function HomeScreen() {
 
       locationLabel: label,
 
+      floor: selectedFloor,
+
       feed: '',
 
       chat: '',
     });
 
+    setCaseFloor(selectedFloor);
     setCurrentVaultCaseId(newCase._id ?? newCase.id);
 
     await loadOpenCases();
@@ -281,11 +313,14 @@ export default function HomeScreen() {
 
       locationLabel: '',
 
+      floor: selectedFloor,
+
       chat: '',
 
       feed: '',
     });
 
+    setCaseFloor(selectedFloor);
     setCurrentVaultCaseId(newCase._id ?? newCase.id);
 
     await loadOpenCases();
@@ -321,6 +356,9 @@ export default function HomeScreen() {
       caseData.locationLabel || caseData.title.split(' in ')[1] || '',
     );
 
+    setSelectedFloor(normalizeFloorId(caseData.floor));
+    setCaseFloor(normalizeFloorId(caseData.floor));
+
     setConfirmedCoords({
       x: Number(caseData.locationX ?? defaultCoords.x),
       y: Number(caseData.locationY ?? defaultCoords.y),
@@ -329,6 +367,7 @@ export default function HomeScreen() {
     console.log('CASE OPENED');
     console.log('locationX:', caseData.locationX);
     console.log('locationY:', caseData.locationY);
+    console.log('floor:', caseData.floor);
   }
 
   async function handleCloseCase() {
@@ -511,8 +550,11 @@ export default function HomeScreen() {
           <View style={[{ flex: 1 }, isDesktop && styles.desktopRow]}>
             <View style={[{ flex: 1 }, isDesktop && { flex: 3 }]}>
               <DashboardMap
-                cases={openCases}
+                cases={floorCases}
                 selectedCase={selectedMapCase}
+                floorPlan={activeFloorPlan}
+                selectedFloor={selectedFloor}
+                onFloorChange={handleFloorChange}
                 onMarkerPress={setSelectedMapCase}
                 onView={openExistingCase}
               />
@@ -542,6 +584,13 @@ export default function HomeScreen() {
 
                 <Text style={styles.sheetSubHeading}>
                   Updated: {formatDate(selectedMapCase.lastUpdatedAt)}
+                </Text>
+
+                <Text style={styles.sheetSubHeading}>
+                  Floor: {getFloorById(selectedMapCase.floor).label}
+                  {selectedMapCase.locationLabel
+                    ? ` · ${selectedMapCase.locationLabel}`
+                    : ''}
                 </Text>
 
                 <Pressable
@@ -600,6 +649,9 @@ export default function HomeScreen() {
                       <Text style={styles.caseTitleCard}>{item.title}</Text>
 
                       <Text style={styles.caseDateCard}>
+                        {getFloorById(item.floor).label}
+                        {item.locationLabel ? ` · ${item.locationLabel}` : ''}
+                        {' · '}
                         Updated {formatDate(item.lastUpdatedAt)}
                       </Text>
                     </Pressable>
@@ -616,18 +668,52 @@ export default function HomeScreen() {
               style={[styles.mapContainer, isDesktop && styles.desktopCaseRow]}
             >
               <View style={[{ flex: 1 }, isDesktop && { flex: 3 }]}>
-                <IntruderMap
-                  key={mapRefreshKey}
-                  floorPlan={floorPlan}
-                  updateMode={updatingLocation}
-                  selectedCoords={selectedCoords || confirmedCoords}
-                  showMarker={selectedCoords !== null || locationConfirmed}
-                  onMapPress={(coords) => {
-                    if (updatingLocation) {
-                      setSelectedCoords(coords);
+                <View style={{ flex: 1 }}>
+                  <IntruderMap
+                    key={`${mapRefreshKey}-${selectedFloor}`}
+                    floorPlan={activeFloorPlan}
+                    updateMode={updatingLocation}
+                    selectedCoords={selectedCoords || confirmedCoords}
+                    showMarker={
+                      updatingLocation
+                        ? selectedCoords !== null
+                        : locationConfirmed && selectedFloor === caseFloor
                     }
-                  }}
-                />
+                    onMapPress={(coords) => {
+                      if (updatingLocation) {
+                        setSelectedCoords(coords);
+                      }
+                    }}
+                  />
+
+                  <View style={styles.caseFloorSelector}>
+                    <Text style={styles.caseFloorTitle}>Floor</Text>
+                    <View style={styles.caseFloorRow}>
+                      {FLOORS.map((floor) => {
+                        const active = selectedFloor === floor.id;
+                        return (
+                          <Pressable
+                            key={floor.id}
+                            onPress={() => handleFloorChange(floor.id)}
+                            style={[
+                              styles.caseFloorChip,
+                              active && styles.caseFloorChipActive,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.caseFloorChipText,
+                                active && styles.caseFloorChipTextActive,
+                              ]}
+                            >
+                              {floor.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </View>
               </View>
 
               {/* Desktop: case actions sidebar */}
@@ -918,7 +1004,13 @@ export default function HomeScreen() {
                   setQuestionAnswers(['', '']);
 
                   setShowSituationModal(false);
-                  setShowQuestionModal(true);
+
+                  if (item.label === 'Maintenance') {
+                    setSelectedMaintenanceType('');
+                    setShowMaintenanceModal(true);
+                  } else {
+                    setShowQuestionModal(true);
+                  }
                 }}
               >
                 <View style={styles.situationLeft}>
@@ -948,6 +1040,115 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+
+
+
+
+
+      <Modal visible={showMaintenanceModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>
+                What type of maintenance is needed?
+              </Text>
+
+              <Text style={styles.modalSubtitle}>
+                Choose the option that best describes the issue
+              </Text>
+
+              <View style={styles.maintenanceGrid}>
+                {[
+                  {
+                    label: 'Plumbing',
+                    icon: '🚰',
+                  },
+                  {
+                    label: 'Electrical',
+                    icon: '⚡',
+                  },
+                  {
+                    label: 'Heating',
+                    icon: '🌡️',
+                  },
+                  {
+                    label: 'Structural',
+                    icon: '🏗️',
+            },
+          ].map((item) => {
+            const selected = selectedMaintenanceType === item.label;
+
+            return (
+              <Pressable
+                key={item.label}
+                style={[
+                  styles.maintenanceOption,
+                  selected && styles.maintenanceOptionSelected,
+                ]}
+                onPress={() => {
+                  setSelectedMaintenanceType(item.label);
+                }}
+              >
+                <Text style={styles.maintenanceIcon}>{item.icon}</Text>
+
+                <Text
+                  style={[
+                    styles.maintenanceOptionText,
+                    selected && styles.maintenanceOptionTextSelected,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+
+                {selected && (
+                  <Text style={styles.maintenanceCheck}>✓</Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Pressable
+          style={[
+            styles.modalButton,
+            {
+              backgroundColor: selectedMaintenanceType
+                ? '#16A34A'
+                : '#9CA3AF',
+              marginTop: 18,
+              opacity: selectedMaintenanceType ? 1 : 0.6,
+            },
+          ]}
+          disabled={!selectedMaintenanceType}
+          onPress={() => {
+            setShowMaintenanceModal(false);
+            setShowQuestionModal(true);
+          }}
+        >
+          <Text style={styles.modalButtonText}>Continue</Text>
+        </Pressable>
+
+            <Pressable
+              style={styles.backButton}
+                onPress={() => {
+                  setShowMaintenanceModal(false);
+                  setShowSituationModal(true);
+                }}
+                >
+                <Text style={styles.backButtonText}>Back</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+
+
+
+
+
+
+
 
       <Modal visible={showQuestionModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -1096,6 +1297,8 @@ export default function HomeScreen() {
 
                 setIntruderLocation(cleanLabel);
 
+                setCaseFloor(selectedFloor);
+
                 if (currentVaultCaseId) {
                   await updateCase(
                     currentVaultCaseId.toString(),
@@ -1104,6 +1307,7 @@ export default function HomeScreen() {
                       locationX: coords.x,
                       locationY: coords.y,
                       locationLabel: cleanLabel,
+                      floor: selectedFloor,
                       lastUpdatedAt: Date.now(),
                     },
                   );
@@ -1718,5 +1922,112 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontWeight: '700',
     fontSize: 16,
+  },
+
+  maintenanceGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  justifyContent: 'space-between',
+  gap: 12,
+  marginTop: 18,
+},
+
+maintenanceOption: {
+  width: '47%',
+  minHeight: 125,
+  backgroundColor: '#FFFFFF',
+  borderWidth: 2,
+  borderColor: '#E5E7EB',
+  borderRadius: 16,
+  padding: 14,
+  alignItems: 'center',
+  justifyContent: 'center',
+  position: 'relative',
+},
+
+maintenanceOptionSelected: {
+  backgroundColor: '#DCFCE7',
+  borderColor: '#16A34A',
+},
+
+maintenanceIcon: {
+  fontSize: 32,
+  marginBottom: 10,
+},
+
+maintenanceOptionText: {
+  color: '#1F2937',
+  fontSize: 15,
+  fontWeight: '700',
+  textAlign: 'center',
+},
+
+maintenanceOptionTextSelected: {
+  color: '#166534',
+},
+
+maintenanceCheck: {
+  position: 'absolute',
+  top: 8,
+  right: 10,
+  color: '#16A34A',
+  fontSize: 18,
+  fontWeight: '800',
+},
+
+  caseFloorSelector: {
+    position: 'absolute',
+    top: 16,
+    right: 12,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    zIndex: 999,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+
+  caseFloorTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+
+  caseFloorRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  caseFloorChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+  },
+
+  caseFloorChipActive: {
+    backgroundColor: '#DBEAFE',
+    borderColor: '#2563EB',
+  },
+
+  caseFloorChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+
+  caseFloorChipTextActive: {
+    color: '#1D4ED8',
   },
 });

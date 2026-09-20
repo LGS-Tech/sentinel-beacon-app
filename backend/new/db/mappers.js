@@ -77,6 +77,7 @@ function caseToApi(row) {
     locationX: row.location_x,
     locationY: row.location_y,
     locationLabel: row.location_label,
+    floor: row.floor ?? "1",
     feed: row.feed ?? "",
     chat: row.chat ?? "",
     category: row.category,

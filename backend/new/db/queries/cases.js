@@ -11,6 +11,7 @@ const CASE_SELECT = `
     c.location_x,
     c.location_y,
     c.location_label,
+    c.floor,
     c.feed,
     c.category,
     c.description,
@@ -121,6 +122,7 @@ function buildCaseFields(body) {
     location_x: pick(body, "locationX", "location_x"),
     location_y: pick(body, "locationY", "location_y"),
     location_label: pick(body, "locationLabel", "location_label"),
+    floor: pick(body, "floor", "floor"),
     feed: pick(body, "feed", "feed"),
     category,
     description: pick(body, "description", "description"),
@@ -151,13 +153,13 @@ async function createCase(body) {
   const result = await query(
     `INSERT INTO cases (
        title, created_at, last_updated_at, status,
-       location_x, location_y, location_label, feed,
+       location_x, location_y, location_label, floor, feed,
        category, description, chat, priority,
        assigned_department_id, assigned_user_id, created_by_user_id,
        estimated_cost, police_contacted, fire_contacted,
        ambulance_contacted, maintenance_contacted
      ) VALUES (
-       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
      )
      RETURNING id`,
     [
@@ -168,6 +170,7 @@ async function createCase(body) {
       f.location_x ?? null,
       f.location_y ?? null,
       f.location_label ?? null,
+      f.floor ?? "1",
       f.feed ?? "",
       f.category ?? "Maintenance",
       f.description ?? null,
@@ -204,6 +207,7 @@ async function updateCase(id, body) {
     ["location_x", f.location_x],
     ["location_y", f.location_y],
     ["location_label", f.location_label],
+    ["floor", f.floor],
     ["feed", f.feed],
     ["category", f.category],
     ["description", f.description],

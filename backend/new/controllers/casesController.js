@@ -8,56 +8,55 @@ const {
   analyticsSummary,
 } = require("../db/queries/cases");
 
-const getAllCases = async (req, res) => {
+const getAllCases = async (req, res, next) => {
   try {
     const cases = await listCases(req.query);
     res.json(cases);
-  } catch (err) 
-  {console.error(err);
-    res.status(500).json({ error: "Failed to fetch cases" });
+  } catch (err) {
+    return next(err);
   }
 };
 
-const getCase = async (req, res) => {
+const getCase = async (req, res, next) => {
   try {
     const found = await getCaseById(req.params.id);
     if (!found) return res.status(404).json({ error: "Case not found" });
     res.json(found);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch case" });
+    return next(err);
   }
 };
 
-const createNewCase = async (req, res) => {
+const createNewCase = async (req, res, next) => {
   try {
     const created = await createCase(req.body);
     res.status(201).json(created);
   } catch (err) {
-    res.status(500).json({ error: "Failed to create case" });
+    return next(err);
   }
 };
 
-const updateExistingCase = async (req, res) => {
+const updateExistingCase = async (req, res, next) => {
   try {
     const updated = await updateCase(req.params.id, req.body);
     if (!updated) return res.status(404).json({ error: "Case not found" });
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: "Failed to update case" });
+    return next(err);
   }
 };
 
-const deleteExistingCase = async (req, res) => {
+const deleteExistingCase = async (req, res, next) => {
   try {
     const deleted = await deleteCase(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Case not found" });
     res.sendStatus(204);
   } catch (err) {
-    res.status(500).json({ error: "Failed to delete case" });
+    return next(err);
   }
 };
 
-const assignCaseToUser = async (req, res) => {
+const assignCaseToUser = async (req, res, next) => {
   try {
     const { caseId, userId, departmentId } = req.body;
     
@@ -71,15 +70,15 @@ const assignCaseToUser = async (req, res) => {
     if (!assigned) return res.status(404).json({ error: "Case or User not found" });
     res.json(assigned);
   } catch (err) {
-    res.status(500).json({ error: "Failed to assign case" });
+    return next(err);
   }
 }
-const getAnalyticsSummary = async (req, res) => {
+const getAnalyticsSummary = async (req, res, next) => {
   try {
     const summary = await analyticsSummary();
     res.json(summary);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch analytics summary" });
+    return next(err);
   }
 }
 

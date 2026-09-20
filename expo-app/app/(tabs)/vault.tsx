@@ -42,6 +42,7 @@ type CaseItem = {
   locationX?: number;
   locationY?: number;
   locationLabel?: string;
+  floor?: string;
   feed?: string;
   chat?: string;
   files: FileItem[];
@@ -94,6 +95,7 @@ const loadCases = async (): Promise<CaseItem[]> => {
         locationX: row.locationX,
         locationY: row.locationY,
         locationLabel: row.locationLabel,
+        floor: row.floor,
         feed: row.feed,
         chat: row.chat,
         files,
@@ -102,7 +104,7 @@ const loadCases = async (): Promise<CaseItem[]> => {
   );
 
   return cases;
-};
+}
 
 export default function VaultScreen() {
   const { width } = useWindowDimensions();
@@ -526,6 +528,9 @@ const handleAddFile = async (caseId: string) => {
 
             {expandedCase?.locationLabel && (
               <ThemedText>Location: {expandedCase.locationLabel}</ThemedText>
+            )}
+            {expandedCase?.floor && (
+              <ThemedText>Floor: {expandedCase.floor}</ThemedText>
             )}
 
             <FlatList
