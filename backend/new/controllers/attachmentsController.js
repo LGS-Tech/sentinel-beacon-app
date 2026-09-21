@@ -147,14 +147,24 @@ const removeCaseAttachment = async (req, res) => {
       return res.status(404).json({ error: "Attachment not found" });
     }
 
-    if (row.storage_provider === "r2" || row.storage_provider === "s3") {
-      await r2.deleteObject(row.storage_url);
-    }
-
+    // Confirm Postgres metadata is gone before touching R2. Deleting the
+    // object first could leave a row pointing at a missing file.
     const removed = await deleteAttachment(caseId, attachmentId);
     if (!removed) {
       return res.status(404).json({ error: "Attachment not found" });
     }
+
+    if (row.storage_provider === "r2" || row.storage_provider === "s3") {
+      try {
+        await r2.deleteObject(row.storage_url);
+      } catch (storageErr) {
+        console.error(
+          "R2 delete after metadata removal failed:",
+          storageErr.name || "Error"
+        );
+      }
+    }
+
     res.sendStatus(204);
   } catch (err) {
     return clientError(res, err, 500, "Failed to remove attachment");

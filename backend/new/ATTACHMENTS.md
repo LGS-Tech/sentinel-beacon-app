@@ -12,7 +12,7 @@ Base path: **`/cases/:caseId/attachments`** (JWT required)
 | POST | `/cases/:caseId/attachments` | Multipart upload (`file`) to R2, then insert metadata |
 | GET | `/cases/:caseId/attachments/:attachmentId` | Get one attachment (metadata + content path) |
 | GET | `/cases/:caseId/attachments/:attachmentId/content` | Stream the file through the API (auth required) |
-| DELETE | `/cases/:caseId/attachments/:attachmentId` | Delete R2 object and metadata |
+| DELETE | `/cases/:caseId/attachments/:attachmentId` | Delete Postgres metadata first, then the R2 object |
 
 Allowed types: **TXT, PDF, JPG, PNG**. Max size: **10 MB**.
 
@@ -67,6 +67,8 @@ R2 env vars (server only, see `.env.example`):
 Do not put these in Expo / GitHub Pages env.
 
 `GET /health` includes `"storage": { "ready": true, "provider": "r2" }` when those vars are set. It does not echo secrets or the bucket name.
+
+Delete order: PostgreSQL metadata is removed first. Only after that succeeds does the API delete the R2 object. If object storage then fails, the client still gets `204` (the row is gone) and an orphaned object may remain in the bucket. The reverse order is worse: a DB failure would leave metadata pointing at a deleted file.
 
 ## Database
 
