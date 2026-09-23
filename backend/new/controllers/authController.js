@@ -16,6 +16,7 @@ function getJwtSecret() {
   return secret;
 }
 
+const CURRENT_TERMS_VERSION = "v1";
 const signup = async (req, res, next) => {
   const {
     username,
@@ -27,6 +28,8 @@ const signup = async (req, res, next) => {
     authorisation,
     collegeId,
     yearSemester,
+    termsAccepted,
+
   } = req.body;
 
   if (!username || !password || !email || !name) {
@@ -35,8 +38,15 @@ const signup = async (req, res, next) => {
     });
   }
 
+  if (termsAccepted !== true) {
+    return res.status(400).json({
+      error: "You must accept the terms and conditions to register.",
+    });
+  }
+
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const newUser = await createUser({
       username,
       password: hashedPassword,
@@ -47,6 +57,9 @@ const signup = async (req, res, next) => {
       authorisation,
       collegeId,
       yearSemester,
+      termsAcceptedAt: new Date().toISOString(),
+      termsVersion: CURRENT_TERMS_VERSION,
+
     });
 
     res.status(201).json({
@@ -54,6 +67,11 @@ const signup = async (req, res, next) => {
       user: userToPublicApi(newUser),
     });
   } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({
+        error: 'An account with that username or email already exists.',
+      });
+    }
     return next(err);
   }
 };
