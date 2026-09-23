@@ -41,6 +41,8 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
   const step2Ready = useMemo(
     () => Boolean(username.trim() && password && confirmPassword),
     [username, password, confirmPassword],
@@ -105,6 +107,7 @@ export default function RegisterPage() {
         phone: phone.trim() || undefined,
         collegeId: collegeId.trim() || undefined,
         yearSemester: year.trim() || undefined,
+        termsAccepted,
       });
       router.replace('/(tabs)');
     } catch (e) {
@@ -277,12 +280,29 @@ export default function RegisterPage() {
             />
 
             <Pressable
+              style={styles.termsRow}
+              onPress={() => setTermsAccepted(!termsAccepted)}
+              disabled={busy}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  termsAccepted && styles.checkboxChecked,
+                ]}
+              />
+              <Text style={styles.termsText}>
+                I accept the Terms & Conditions
+              </Text>
+            </Pressable>
+
+
+            <Pressable
               style={[
                 styles.nextButton,
-                (busy || !step2Ready) && { opacity: 0.7 },
+                (busy || !step2Ready || !termsAccepted) && { opacity: 0.7 },
               ]}
               onPress={onCreateAccount}
-              disabled={busy}
+              disabled={busy || !termsAccepted}
             >
               {busy ? (
                 <ActivityIndicator color="#FFFFFF" />
@@ -487,4 +507,30 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginBottom: 30,
   },
+
+
+    termsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderWidth: 1,
+      borderColor: '#888',
+      borderRadius: 4,
+      marginRight: 10,
+    },
+
+    checkboxChecked: {
+      backgroundColor: '#D71920',
+      borderColor: '#D71920',
+    },
+
+    termsText: {
+      fontSize: 14,
+      color: '#333',
+    },
 });
