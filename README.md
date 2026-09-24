@@ -105,6 +105,7 @@ docker compose logs -f     # DB logs
 docker compose down        # stop Postgres
 npm run db:ping            # quick connectivity check
 npm run db:smoke           # data-layer smoke test
+npm run db:smoke-departments  # departments API smoke test
 npm run db:hash-seeds      # bcrypt-hash demo user passwords
 ```
 
@@ -117,7 +118,7 @@ npm run db:hash-seeds      # bcrypt-hash demo user passwords
 | `case_events` | Feed and assignment history |
 | `case_attachments` | File/image metadata (URL only) |
 
-API routes: `/cases`, `/users`, `/auth/login`, `/auth/signup`, `/cases/:id/attachments`
+API routes: `/cases`, `/users`, `/departments`, `/auth/login`, `/auth/signup`, `/cases/:id/attachments`
 
 ### Demo hosting (GitHub Pages + Render)
 

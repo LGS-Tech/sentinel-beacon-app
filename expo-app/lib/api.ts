@@ -22,6 +22,14 @@ export type User = {
   phone?: string;
 };
 
+export type Department = {
+  id: number;
+  name: string;
+  slug: string;
+  kind: "facilities" | "it" | "engineering" | "security" | "medical" | "other";
+  isActive: boolean;
+};
+
 export type HealthStatus = {
   ok: boolean;
   message: string;
@@ -196,6 +204,18 @@ async function request<T>(
     throw error;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+export async function getDepartments(): Promise<Department[]> {
+  return request<Department[]>(API_URL, "/departments");
+}
+
+export async function getDepartment(id: number): Promise<Department | null> {
+  try {
+    return await request<Department>(API_URL, `/departments/${id}`);
+  } catch {
+    return null;
   }
 }
 

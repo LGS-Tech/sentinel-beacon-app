@@ -13,6 +13,7 @@
     "db:ping": "node scripts/ping-postgres.js",
     "db:smoke": "node scripts/smoke-data-layer.js",
     "db:smoke-attachments": "node scripts/smoke-attachments.js",
+    "db:smoke-departments": "node scripts/smoke-departments-api.js",
     "db:hash-seeds": "node scripts/hashSeedPasswords.js"
   },
   "keywords": [],

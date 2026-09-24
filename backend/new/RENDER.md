@@ -85,6 +85,7 @@ Do **not** commit real secrets. Local `.env` can keep `localhost` / LAN IP for d
 curl https://YOUR-SERVICE.onrender.com/health
 curl https://YOUR-SERVICE.onrender.com/cases/analytics
 curl https://YOUR-SERVICE.onrender.com/cases
+curl -H "Authorization: Bearer TOKEN" https://YOUR-SERVICE.onrender.com/departments
 curl -X POST https://YOUR-SERVICE.onrender.com/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"jimstevens@gmail.com","password":"London588"}'
