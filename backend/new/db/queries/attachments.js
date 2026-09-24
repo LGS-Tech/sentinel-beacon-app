@@ -33,12 +33,16 @@ async function getAttachmentById(id) {
   return attachmentToApi(result.rows[0]);
 }
 
-async function getAttachmentForCase(caseId, attachmentId) {
+async function getAttachmentRowForCase(caseId, attachmentId) {
   const result = await query(
     `${ATTACHMENT_SELECT} WHERE a.case_id = $1 AND a.id = $2`,
     [caseId, attachmentId]
   );
-  return attachmentToApi(result.rows[0]);
+  return result.rows[0] || null;
+}
+
+async function getAttachmentForCase(caseId, attachmentId) {
+  return attachmentToApi(await getAttachmentRowForCase(caseId, attachmentId));
 }
 
 function buildAttachmentFields(body) {
@@ -85,19 +89,22 @@ async function createAttachment(caseId, body) {
 }
 
 async function deleteAttachment(caseId, attachmentId) {
-  const result = await query(
+  const existing = await getAttachmentRowForCase(caseId, attachmentId);
+  if (!existing) return null;
+
+  await query(
     `DELETE FROM case_attachments
-     WHERE case_id = $1 AND id = $2
-     RETURNING id`,
+     WHERE case_id = $1 AND id = $2`,
     [caseId, attachmentId]
   );
-  return result.rowCount > 0;
+  return existing;
 }
 
 module.exports = {
   listAttachmentsByCaseId,
   getAttachmentById,
   getAttachmentForCase,
+  getAttachmentRowForCase,
   createAttachment,
   deleteAttachment,
 };

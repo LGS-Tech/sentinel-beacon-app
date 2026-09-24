@@ -1,32 +1,32 @@
 # Case attachments API
 
-Metadata-only attachments linked to Postgres `cases`. **No binary storage in PostgreSQL** — the client (or a future upload service) stores the file and sends a `storageUrl` reference.
+Authenticated Vault files. **Bytes go to Cloudflare R2. PostgreSQL stores metadata only.** The API never writes files to the Render disk, and R2 credentials never leave the server.
 
-## Endpoints (after merge with Core API)
+## Endpoints
 
-Base path: **`/cases/:caseId/attachments`**
+Base path: **`/cases/:caseId/attachments`** (JWT required)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/cases/:caseId/attachments` | List attachments for a case |
-| POST | `/cases/:caseId/attachments` | Register an attachment reference |
-| GET | `/cases/:caseId/attachments/:attachmentId` | Get one attachment |
-| DELETE | `/cases/:caseId/attachments/:attachmentId` | Remove attachment metadata |
+| GET | `/cases/:caseId/attachments` | List attachment metadata for a case |
+| POST | `/cases/:caseId/attachments` | Multipart upload (`file`) to R2, then insert metadata |
+| GET | `/cases/:caseId/attachments/:attachmentId` | Get one attachment (metadata + content path) |
+| GET | `/cases/:caseId/attachments/:attachmentId/content` | Stream the file through the API (auth required) |
+| DELETE | `/cases/:caseId/attachments/:attachmentId` | Delete Postgres metadata first, then the R2 object |
 
-### POST body (JSON)
+Allowed types: **TXT, PDF, JPG, PNG**. Max size: **10 MB**.
 
-```json
-{
-  "filename": "broken-tap.jpg",
-  "mimeType": "image/jpeg",
-  "storageUrl": "https://cdn.example.com/vault/case-123/broken-tap.jpg",
-  "storageProvider": "external",
-  "fileSizeBytes": 245760,
-  "uploadedByUserId": 7
-}
+### POST (multipart)
+
+Field name: `file`
+
+```bash
+curl -X POST "$API/cases/$CASE_ID/attachments" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@broken-tap.jpg;type=image/jpeg"
 ```
 
-Required: `filename`, `storageUrl`.
+JSON body uploads (client-supplied URLs) are rejected. The server chooses the R2 object key.
 
 ### Response shape
 
@@ -36,8 +36,8 @@ Required: `filename`, `storageUrl`.
   "caseId": "uuid",
   "filename": "broken-tap.jpg",
   "mimeType": "image/jpeg",
-  "storageUrl": "https://...",
-  "storageProvider": "external",
+  "storageUrl": "/cases/uuid/attachments/uuid/content",
+  "storageProvider": "r2",
   "fileSizeBytes": 245760,
   "uploadedByUserId": 7,
   "uploadedByName": "Aisha Khan",
@@ -45,34 +45,39 @@ Required: `filename`, `storageUrl`.
 }
 ```
 
-## Merge with `feature/core-api-auth`
+`storageUrl` is an API path, not a public R2 URL. Open files by fetching that path with the same Bearer token. Postgres stores the private object key; that key is not returned to clients.
 
-In `routes/casesRoutes.js`, **before** `router.get("/:id", getCase)`:
+Upload failures return a controlled JSON error (`400` / `413` / `502` / `503`) — they do not crash the API.
 
-```js
-const caseAttachmentsRoutes = require("./caseAttachmentsRoutes");
-router.use("/:caseId/attachments", caseAttachmentsRoutes);
-```
+## Storage
 
-Then wrap with `authenticate` (same as other case routes) once auth middleware is final.
+| Layer | What it holds |
+|-------|----------------|
+| Cloudflare R2 | File bytes (private bucket) |
+| PostgreSQL `case_attachments` | filename, MIME type, size, provider, object key, uploader |
+| Render disk | nothing |
 
-Update root `/` endpoint list to include attachments if desired.
+R2 env vars (server only, see `.env.example`):
+
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET_NAME`
+
+Do not put these in Expo / GitHub Pages env.
+
+`GET /health` includes `"storage": { "ready": true, "provider": "r2" }` when those vars are set. It does not echo secrets or the bucket name.
+
+Delete order: PostgreSQL metadata is removed first. Only after that succeeds does the API delete the R2 object. If object storage then fails, the client still gets `204` (the row is gone) and an orphaned object may remain in the bucket. The reverse order is worse: a DB failure would leave metadata pointing at a deleted file.
 
 ## Database
 
-Table: `case_attachments` in `db/schema.sql`
+Table: `case_attachments` in `db/schema.sql`  
 Queries: `db/queries/attachments.js`
-Access: `const db = require("./db"); await db.attachments.listAttachmentsByCaseId(caseId);`
-
-Apply schema:
 
 ```bash
 cd backend/new
 npm run db:setup
+npm run smoke:vault-files
 npm run db:smoke-attachments
 ```
-
-## Coordination notes
-
-- Attachments routes are mounted on the PostgreSQL API in `server.js` (`/cases/:caseId/attachments`).
-- File upload binary handling is **out of scope** for this sprint; frontend can use a placeholder URL until Blob/S3 is chosen.

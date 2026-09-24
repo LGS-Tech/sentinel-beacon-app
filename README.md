@@ -115,7 +115,7 @@ npm run db:hash-seeds      # bcrypt-hash demo user passwords
 | `users` | Students / staff / maintainers / leads |
 | `cases` | Tickets and incidents (location, category, assignment) |
 | `case_events` | Feed and assignment history |
-| `case_attachments` | File/image metadata (URL only) |
+| `case_attachments` | Vault file metadata (bytes in Cloudflare R2) |
 
 API routes: `/cases`, `/users`, `/auth/login`, `/auth/signup`, `/cases/:id/attachments`
 

@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const db = require("./db"); //import the database connection module
+const r2 = require("./storage/r2");
 const requestLogger = require("./middleware/requestLogger");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
 
@@ -49,7 +50,7 @@ app.get("/", (_req, res) => {
   res.json({
     service: "lgs-tech-api",
     message: "LGS Tech API is running",
-    endpoints: ["/health", "/cases", "/users"],
+    endpoints: ["/health", "/cases", "/users", "/cases/:id/attachments"],
   });
 });
 
@@ -60,12 +61,14 @@ app.get("/health", async (_req, res) => {
       ok: true,
       service: "lgs-tech-api",
       database: "connected",
+      storage: r2.getStatus(),
     });
   } catch (err) {
     res.status(503).json({
       ok: false,
       service: "lgs-tech-api",
       database: "disconnected",
+      storage: r2.getStatus(),
     });
   }
 });

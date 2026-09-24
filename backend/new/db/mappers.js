@@ -3,6 +3,16 @@
  * (camelCase + Mongo-style `_id` on cases, spaced phone key on users).
  */
 
+const { contentPath } = require("../storage/vaultFiles");
+
+function clientStorageUrl(row) {
+  if (!row) return null;
+  if (row.storage_provider === "r2" || row.storage_provider === "s3") {
+    return contentPath(row.case_id, row.id);
+  }
+  return row.storage_url;
+}
+
 function attachmentToApi(row) {
   if (!row) return null;
 
@@ -11,7 +21,7 @@ function attachmentToApi(row) {
     caseId: row.case_id,
     filename: row.filename,
     mimeType: row.mime_type,
-    storageUrl: row.storage_url,
+    storageUrl: clientStorageUrl(row),
     storageProvider: row.storage_provider,
     fileSizeBytes:
       row.file_size_bytes != null ? Number(row.file_size_bytes) : null,
