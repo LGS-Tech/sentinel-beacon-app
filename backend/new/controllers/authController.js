@@ -49,6 +49,12 @@ const signup = async (req, res, next) => {
       yearSemester,
     });
 
+      const token = jwt.sign(
+    { userId: newUser.id, userType: newUser.userType, authorisation: newUser.authorisation },
+    secret,
+    { expiresIn: '1d' }
+    );
+
     res.status(201).json({
       message: "User registered successfully",
       user: userToPublicApi(newUser),

@@ -165,6 +165,7 @@ async function request<T>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const authHeaders = await getAuthHeaders();
