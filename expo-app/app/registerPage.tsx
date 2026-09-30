@@ -291,7 +291,13 @@ export default function RegisterPage() {
                 ]}
               />
               <Text style={styles.termsText}>
-                I accept the Terms & Conditions
+                I accept the{' '}
+                <Text
+                  style={styles.termsLink}
+                  onPress={() => router.push('/terms-page')}
+                >
+                  Terms & Conditions
+                </Text>
               </Text>
             </Pressable>
 
@@ -533,4 +539,10 @@ const styles = StyleSheet.create({
       fontSize: 14,
       color: '#333',
     },
+
+    termsLink: {
+  color: '#D71920',
+  fontWeight: '700',
+  textDecorationLine: 'underline',
+},
 });
