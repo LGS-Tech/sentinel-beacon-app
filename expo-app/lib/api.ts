@@ -287,6 +287,7 @@ export type SignupPayload = {
   authorisation?: number;
   collegeId?: string;
   yearSemester?: string;
+  termsAccepted?: boolean;
 };
 
 type SignupResponse = { message?: string; user: User };
@@ -318,9 +319,12 @@ export async function loginWithEmailPassword(
 export async function signupWithEmailPassword(
   payload: SignupPayload
 ): Promise<User> {
-  const { username, password, email, name } = payload;
+  const { username, password, email, name, termsAccepted } = payload;
   if (!username?.trim() || !password || !email?.trim() || !name?.trim()) {
     throw new Error("Username, password, email, and name are required.");
+  }
+  if (termsAccepted !== true) {
+    throw new Error("You must accept the terms and conditions to sign up.");
   }
 
   await request<SignupResponse>(API_URL, "/auth/signup", {
@@ -335,6 +339,7 @@ export async function signupWithEmailPassword(
       authorisation: payload.authorisation,
       collegeId: payload.collegeId?.trim() || undefined,
       yearSemester: payload.yearSemester?.trim() || undefined,
+      termsAccepted,
     }),
   });
 
