@@ -269,6 +269,8 @@ export default function HomeScreen() {
   }, [caseActive]);
 
   async function openCase(type: string) {
+    setCurrentVaultCaseId(null);
+
     clearFeed();
 
     setIncidentType(type);
@@ -283,7 +285,6 @@ export default function HomeScreen() {
 
     addFeedItem(`Mr C Wallace started a new ${type.toLowerCase()} case`);
 
-    updateVaultCaseData();
     loadOpenCases();
 
     const answers = questionAnswers.filter(
@@ -295,7 +296,6 @@ export default function HomeScreen() {
 
       addFeedItem(`${question}: ${answer}`);
 
-      updateVaultCaseData();
       loadOpenCases();
     });
 
