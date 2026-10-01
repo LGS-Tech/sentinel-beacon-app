@@ -53,9 +53,27 @@ const createNewUser = async (req, res, next) => {
   }
 };
 
+// Role/status fields: only a lead may change them, and never on their own record.
+const PRIVILEGED_USER_FIELDS = [
+  "userType",
+  "user_type",
+  "authorisation",
+  "isActive",
+  "is_active",
+];
+
 const updateExistingUser = async (req, res, next) => {
   try {
     const body = { ...req.body };
+
+    const isLead = req.user?.userType === "lead";
+    const isSelf = Number(req.user?.userId) === Number(req.params.id);
+    if (!isLead || isSelf) {
+      for (const field of PRIVILEGED_USER_FIELDS) {
+        delete body[field];
+      }
+    }
+
     if (body.password) {
       body.password = await bcrypt.hash(body.password, 10);
     }
