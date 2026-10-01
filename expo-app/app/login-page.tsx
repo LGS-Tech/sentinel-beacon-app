@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   SafeAreaView,
@@ -12,6 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 
 import { loginWithEmailPassword } from '@/lib/api';
 
@@ -26,7 +26,7 @@ export default function LoginPage() {
 
   async function onLogin() {
     if (!email.trim() || !password) {
-      Alert.alert('Missing details', 'Enter email and password.');
+      showAlert('Missing details', 'Enter email and password.');
       return;
     }
 
@@ -35,7 +35,7 @@ export default function LoginPage() {
       await loginWithEmailPassword(email, password);
       router.replace('/(tabs)');
     } catch (e) {
-      Alert.alert(
+      showAlert(
         'Login failed',
         e instanceof Error
           ? e.message

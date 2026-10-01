@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 
 import {
-  Alert,
   Image,
   Modal,
   Pressable,
@@ -14,6 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 
 import ChatSheet from '@/components/chat';
 
@@ -371,7 +371,7 @@ export default function HomeScreen() {
   }
 
   async function handleCloseCase() {
-    Alert.alert('Close Case', 'Are you sure you want to close this case?', [
+    showAlert('Close Case', 'Are you sure you want to close this case?', [
       {
         text: 'Cancel',
         style: 'cancel',

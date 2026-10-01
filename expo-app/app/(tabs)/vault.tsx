@@ -4,7 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import {
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -14,6 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 
 import { deleteCase, getCases, updateCase } from '@/lib/db';
 
@@ -142,7 +142,7 @@ export default function VaultScreen() {
   };
 
   const handleDeleteCase = (caseId: string) => {
-    Alert.alert(
+    showAlert(
       'Delete Folder',
       'Are you sure you want to permanently delete this folder?',
       [
