@@ -43,6 +43,8 @@ function withoutActorFields(body) {
   return copy;
 }
 
+const CLOSED_STATUSES = ["CLOSED", "RESOLVED"];
+
 const createNewCase = async (req, res, next) => {
   try {
     const created = await createCase({
@@ -57,10 +59,29 @@ const createNewCase = async (req, res, next) => {
 
 const updateExistingCase = async (req, res, next) => {
   try {
-    const updated = await updateCase(
-      req.params.id,
-      withoutActorFields(req.body)
-    );
+    const changes = withoutActorFields(req.body);
+
+    // The server owns closed_at / closed_by_user_id; they follow the status.
+    delete changes.closedAt;
+    delete changes.closed_at;
+
+    if (changes.status !== undefined) {
+      const existing = await getCaseById(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Case not found" });
+
+      const wasClosed = CLOSED_STATUSES.includes(existing.status);
+      const willBeClosed = CLOSED_STATUSES.includes(changes.status);
+
+      if (willBeClosed && !wasClosed) {
+        changes.closedAt = Date.now();
+        changes.closedByUserId = req.user.userId;
+      } else if (wasClosed && !willBeClosed) {
+        changes.closedAt = null;
+        changes.closedByUserId = null;
+      }
+    }
+
+    const updated = await updateCase(req.params.id, changes);
     if (!updated) return res.status(404).json({ error: "Case not found" });
     res.json(updated);
   } catch (err) {
