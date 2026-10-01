@@ -27,9 +27,28 @@ const getCase = async (req, res, next) => {
   }
 };
 
+// Who created/closed a case comes from the session, never from the request body.
+const ACTOR_FIELDS = [
+  "createdByUserId",
+  "created_by_user_id",
+  "closedByUserId",
+  "closed_by_user_id",
+];
+
+function withoutActorFields(body) {
+  const copy = { ...body };
+  for (const field of ACTOR_FIELDS) {
+    delete copy[field];
+  }
+  return copy;
+}
+
 const createNewCase = async (req, res, next) => {
   try {
-    const created = await createCase(req.body);
+    const created = await createCase({
+      ...withoutActorFields(req.body),
+      createdByUserId: req.user.userId,
+    });
     res.status(201).json(created);
   } catch (err) {
     return next(err);
@@ -38,7 +57,10 @@ const createNewCase = async (req, res, next) => {
 
 const updateExistingCase = async (req, res, next) => {
   try {
-    const updated = await updateCase(req.params.id, req.body);
+    const updated = await updateCase(
+      req.params.id,
+      withoutActorFields(req.body)
+    );
     if (!updated) return res.status(404).json({ error: "Case not found" });
     res.json(updated);
   } catch (err) {
