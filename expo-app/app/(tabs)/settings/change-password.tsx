@@ -2,7 +2,6 @@ import { MaterialIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { showAlert } from "@/lib/alert";
 
 import {
   SettingsColors,
@@ -57,19 +57,19 @@ export default function ChangePasswordScreen() {
 
   async function onSave() {
     if (!currentPassword) {
-      Alert.alert("Missing password", "Enter your current password.");
+      showAlert("Missing password", "Enter your current password.");
       return;
     }
     if (!nextPassword.trim() || nextPassword.length < 6) {
-      Alert.alert("Weak password", "Use at least 6 characters.");
+      showAlert("Weak password", "Use at least 6 characters.");
       return;
     }
     if (nextPassword === currentPassword) {
-      Alert.alert("Same password", "Choose a different password from your current one.");
+      showAlert("Same password", "Choose a different password from your current one.");
       return;
     }
     if (nextPassword !== confirmPassword) {
-      Alert.alert("Mismatch", "New password and confirmation do not match.");
+      showAlert("Mismatch", "New password and confirmation do not match.");
       return;
     }
 
@@ -79,18 +79,18 @@ export default function ChangePasswordScreen() {
       const id = getCurrentUserId();
       const user = await getUser(id);
       if (!user) {
-        Alert.alert("Offline", "Could not load your account from the API.");
+        showAlert("Offline", "Could not load your account from the API.");
         return;
       }
       if (!user.email) {
-        Alert.alert("Error", "Account email is missing.");
+        showAlert("Error", "Account email is missing.");
         return;
       }
 
       try {
         await loginWithEmailPassword(user.email, currentPassword);
       } catch {
-        Alert.alert("Incorrect", "Current password is wrong.");
+        showAlert("Incorrect", "Current password is wrong.");
         return;
       }
 
@@ -98,9 +98,9 @@ export default function ChangePasswordScreen() {
       setCurrentPassword("");
       setNextPassword("");
       setConfirmPassword("");
-      Alert.alert("Updated", "Password saved to the PostgreSQL API.");
+      showAlert("Updated", "Password saved to the PostgreSQL API.");
     } catch (e) {
-      Alert.alert(
+      showAlert(
         "Failed",
         e instanceof Error ? e.message : "Could not update password."
       );

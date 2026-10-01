@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { showAlert } from "@/lib/alert";
 import { useFocusEffect } from "expo-router";
 
 import {
@@ -99,11 +99,11 @@ export default function ProfileScreen() {
 
   async function onSave() {
     if (userId == null) {
-      Alert.alert("Offline", "Connect to the backend API to save profile changes.");
+      showAlert("Offline", "Connect to the backend API to save profile changes.");
       return;
     }
     if (!name.trim() || !email.trim()) {
-      Alert.alert("Missing details", "Name and email are required.");
+      showAlert("Missing details", "Name and email are required.");
       return;
     }
 
@@ -120,9 +120,9 @@ export default function ProfileScreen() {
       });
       applyUser(updated);
       setDirty(false);
-      Alert.alert("Saved", "Profile updated on the PostgreSQL API.");
+      showAlert("Saved", "Profile updated on the PostgreSQL API.");
     } catch (e) {
-      Alert.alert(
+      showAlert(
         "Save failed",
         e instanceof Error ? e.message : "Unable to update profile."
       );

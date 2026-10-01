@@ -1,4 +1,9 @@
-import { getAuthToken } from "./api";
+import {
+  getAuthToken,
+  handleAuthFailure,
+  isAuthFailure,
+  SESSION_EXPIRED_MESSAGE,
+} from "./api";
 
 const API =
   (process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000").replace(
@@ -29,6 +34,10 @@ async function requestJson(path: string, init?: RequestInit) {
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
+    if (isAuthFailure(path, response.status, text)) {
+      await handleAuthFailure();
+      throw new Error(SESSION_EXPIRED_MESSAGE);
+    }
     throw new Error(
       `API ${path} failed (${response.status})${text ? `: ${text}` : ""}`
     );

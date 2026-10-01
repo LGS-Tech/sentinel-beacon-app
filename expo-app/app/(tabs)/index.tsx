@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 
 import {
-  Alert,
   Image,
   Modal,
   Pressable,
@@ -14,6 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 
 import ChatSheet from '@/components/chat';
 
@@ -269,6 +269,8 @@ export default function HomeScreen() {
   }, [caseActive]);
 
   async function openCase(type: string) {
+    setCurrentVaultCaseId(null);
+
     clearFeed();
 
     setIncidentType(type);
@@ -278,11 +280,11 @@ export default function HomeScreen() {
     setUpdatingLocation(true);
     setLocationConfirmed(false);
     setSelectedCoords(null);
+    setIntruderLocation('');
     setShowDashboard(false);
 
     addFeedItem(`Mr C Wallace started a new ${type.toLowerCase()} case`);
 
-    updateVaultCaseData();
     loadOpenCases();
 
     const answers = questionAnswers.filter(
@@ -294,12 +296,21 @@ export default function HomeScreen() {
 
       addFeedItem(`${question}: ${answer}`);
 
-      updateVaultCaseData();
       loadOpenCases();
     });
 
+    const descriptionIndex = (caseQuestions[type] || []).findIndex(
+      (item) => item.type === 'text',
+    );
+    const description =
+      descriptionIndex >= 0
+        ? (questionAnswers[descriptionIndex] || '').trim()
+        : '';
+
     const newCase = await createCase({
       title: `${type} Case`,
+
+      description: description || undefined,
 
       createdAt: Date.now(),
 
@@ -371,7 +382,7 @@ export default function HomeScreen() {
   }
 
   async function handleCloseCase() {
-    Alert.alert('Close Case', 'Are you sure you want to close this case?', [
+    showAlert('Close Case', 'Are you sure you want to close this case?', [
       {
         text: 'Cancel',
         style: 'cancel',
@@ -394,15 +405,23 @@ export default function HomeScreen() {
             .join('\n');
 
           if (currentVaultCaseId) {
-            await updateCase(
-              currentVaultCaseId.toString(),
+            try {
+              await updateCase(
+                currentVaultCaseId.toString(),
 
-              {
-                status: 'CLOSED',
-                feed: feedHistory,
-                lastUpdatedAt: Date.now(),
-              },
-            );
+                {
+                  status: 'CLOSED',
+                  feed: feedHistory,
+                  lastUpdatedAt: Date.now(),
+                },
+              );
+            } catch (e) {
+              showAlert(
+                'Could not close case',
+                e instanceof Error ? e.message : 'Please try again.',
+              );
+              return;
+            }
           }
 
           setCaseActive(false);
@@ -793,7 +812,10 @@ export default function HomeScreen() {
                     ]}
                     disabled={!selectedCoords}
                     onPress={() => {
-                      if (selectedCoords) setShowLabelModal(true);
+                      if (selectedCoords) {
+                        setLocationInput(intruderLocation);
+                        setShowLabelModal(true);
+                      }
                     }}
                   >
                     <Text style={styles.deskBtnText}>Confirm Location</Text>
@@ -815,6 +837,7 @@ export default function HomeScreen() {
                 disabled={!selectedCoords}
                 onPress={() => {
                   if (selectedCoords) {
+                    setLocationInput(intruderLocation);
                     setShowLabelModal(true);
                   }
                 }}
