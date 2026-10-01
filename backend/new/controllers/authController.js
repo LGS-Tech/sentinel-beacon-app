@@ -69,17 +69,17 @@ const login = async (req, res, next) => {
   try {
     const user = await getUserByEmail(email);
     if (!user) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const stored = user.password ?? "";
     if (!stored.startsWith("$2")) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const valid = await bcrypt.compare(password, stored);
     if (!valid) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
     await recordLogin(user.id);
