@@ -24,7 +24,6 @@ const signup = async (req, res, next) => {
     name,
     phone,
     role,
-    authorisation,
     collegeId,
     yearSemester,
   } = req.body;
@@ -44,7 +43,9 @@ const signup = async (req, res, next) => {
       name,
       phone,
       role,
-      authorisation,
+      // Self-signup never picks its own access level; body values are ignored.
+      authorisation: 2,
+      userType: "staff",
       collegeId,
       yearSemester,
     });
