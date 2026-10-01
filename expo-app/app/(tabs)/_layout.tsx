@@ -13,7 +13,12 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getAuthToken, hydrateSession } from '@/lib/api';
+import {
+  clearSession,
+  getAuthToken,
+  hydrateSession,
+  isTokenExpired,
+} from '@/lib/api';
 
 function DesktopTabBar({ state, descriptors, navigation }: any) {
   const colorScheme = useColorScheme();
@@ -136,9 +141,14 @@ export default function TabLayout() {
     (async () => {
       await hydrateSession();
       const token = await getAuthToken();
+      const expired = token ? isTokenExpired(token) : false;
+
+      if (expired) {
+        await clearSession();
+      }
 
       if (active) {
-        setAuthenticated(Boolean(token));
+        setAuthenticated(Boolean(token) && !expired);
         setCheckingSession(false);
       }
     })();

@@ -405,15 +405,23 @@ export default function HomeScreen() {
             .join('\n');
 
           if (currentVaultCaseId) {
-            await updateCase(
-              currentVaultCaseId.toString(),
+            try {
+              await updateCase(
+                currentVaultCaseId.toString(),
 
-              {
-                status: 'CLOSED',
-                feed: feedHistory,
-                lastUpdatedAt: Date.now(),
-              },
-            );
+                {
+                  status: 'CLOSED',
+                  feed: feedHistory,
+                  lastUpdatedAt: Date.now(),
+                },
+              );
+            } catch (e) {
+              showAlert(
+                'Could not close case',
+                e instanceof Error ? e.message : 'Please try again.',
+              );
+              return;
+            }
           }
 
           setCaseActive(false);

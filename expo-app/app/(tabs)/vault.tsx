@@ -156,7 +156,15 @@ export default function VaultScreen() {
           style: 'destructive',
 
           onPress: async () => {
-            await deleteCase(caseId);
+            try {
+              await deleteCase(caseId);
+            } catch (e) {
+              showAlert(
+                'Could not delete folder',
+                e instanceof Error ? e.message : 'Please try again.',
+              );
+              return;
+            }
 
             refreshVault();
           },
