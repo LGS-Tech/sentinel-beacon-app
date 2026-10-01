@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { authenticate } = require("../middleware/auth");
+const { validateUuidParam } = require("../middleware/validateUuid");
 const caseAttachmentsRoutes = require("./caseAttachmentsRoutes");
 
 const {
@@ -14,6 +15,9 @@ const {
 } = require("../controllers/casesController");
 
 router.use(authenticate);
+
+router.param("id", validateUuidParam);
+router.param("caseId", validateUuidParam);
 
 router.get("/", getAllCases);
 router.get("/analytics", getAnalyticsSummary);
