@@ -298,8 +298,18 @@ export default function HomeScreen() {
       loadOpenCases();
     });
 
+    const descriptionIndex = (caseQuestions[type] || []).findIndex(
+      (item) => item.type === 'text',
+    );
+    const description =
+      descriptionIndex >= 0
+        ? (questionAnswers[descriptionIndex] || '').trim()
+        : '';
+
     const newCase = await createCase({
       title: `${type} Case`,
+
+      description: description || undefined,
 
       createdAt: Date.now(),
 
