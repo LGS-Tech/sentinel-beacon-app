@@ -278,6 +278,7 @@ export default function HomeScreen() {
     setUpdatingLocation(true);
     setLocationConfirmed(false);
     setSelectedCoords(null);
+    setIntruderLocation('');
     setShowDashboard(false);
 
     addFeedItem(`Mr C Wallace started a new ${type.toLowerCase()} case`);
@@ -803,7 +804,10 @@ export default function HomeScreen() {
                     ]}
                     disabled={!selectedCoords}
                     onPress={() => {
-                      if (selectedCoords) setShowLabelModal(true);
+                      if (selectedCoords) {
+                        setLocationInput(intruderLocation);
+                        setShowLabelModal(true);
+                      }
                     }}
                   >
                     <Text style={styles.deskBtnText}>Confirm Location</Text>
@@ -825,6 +829,7 @@ export default function HomeScreen() {
                 disabled={!selectedCoords}
                 onPress={() => {
                   if (selectedCoords) {
+                    setLocationInput(intruderLocation);
                     setShowLabelModal(true);
                   }
                 }}
