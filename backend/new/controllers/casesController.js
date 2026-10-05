@@ -7,10 +7,15 @@ const {
   assignCase,
   analyticsSummary,
 } = require("../db/queries/cases");
+const {
+  caseScope,
+  canViewCase,
+  canModifyCase,
+} = require("../utils/casePolicy");
 
 const getAllCases = async (req, res, next) => {
   try {
-    const cases = await listCases(req.query);
+    const cases = await listCases({ ...req.query, ...caseScope(req.user) });
     res.json(cases);
   } catch (err) {
     return next(err);
@@ -20,7 +25,9 @@ const getAllCases = async (req, res, next) => {
 const getCase = async (req, res, next) => {
   try {
     const found = await getCaseById(req.params.id);
-    if (!found) return res.status(404).json({ error: "Case not found" });
+    if (!canViewCase(req.user, found)) {
+      return res.status(404).json({ error: "Case not found" });
+    }
     res.json(found);
   } catch (err) {
     return next(err);
@@ -59,6 +66,14 @@ const createNewCase = async (req, res, next) => {
 
 const updateExistingCase = async (req, res, next) => {
   try {
+    const existing = await getCaseById(req.params.id);
+    if (!canViewCase(req.user, existing)) {
+      return res.status(404).json({ error: "Case not found" });
+    }
+    if (!canModifyCase(req.user, existing)) {
+      return res.status(403).json({ error: "Forbidden: Insufficient permissions" });
+    }
+
     const changes = withoutActorFields(req.body);
 
     // The server owns closed_at / closed_by_user_id; they follow the status.
@@ -66,9 +81,6 @@ const updateExistingCase = async (req, res, next) => {
     delete changes.closed_at;
 
     if (changes.status !== undefined) {
-      const existing = await getCaseById(req.params.id);
-      if (!existing) return res.status(404).json({ error: "Case not found" });
-
       const wasClosed = CLOSED_STATUSES.includes(existing.status);
       const willBeClosed = CLOSED_STATUSES.includes(changes.status);
 
