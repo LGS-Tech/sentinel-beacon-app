@@ -11,8 +11,6 @@ const {
   deleteExistingCase,
   assignCaseToUser,
   getAnalyticsSummary,
-  viewCaseReport,
-  downloadCaseReport,
 } = require("../controllers/casesController");
 
 router.use(authenticate);
@@ -25,8 +23,6 @@ router.get("/:id", getCase);
 router.post("/", createNewCase);
 router.put("/:id", updateExistingCase);
 router.delete("/:id", deleteExistingCase);
-router.get('/:id/report/view', viewCaseReport);
-router.get('/:id/report/download', downloadCaseReport);
 
 module.exports = router;
 
