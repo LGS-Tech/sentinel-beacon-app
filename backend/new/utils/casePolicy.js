@@ -5,10 +5,13 @@
  * - student: sees cases they created or are assigned to; modifies only cases they created
  * - staff / maintainer / lead: full list/view/create/update/close
  * - delete: lead only; analytics and assign: maintainer + lead
+ * - creating users: only a lead may create a lead/maintainer or grant authorisation 1
  *
  * caseScope(user) is the single place where list filters derive from the
  * session — add an organisation filter there when tenants exist.
  */
+
+const { pick } = require("../db/mappers");
 
 const ROLES = Object.freeze({
   STUDENT: "student",
@@ -51,6 +54,18 @@ function canModifyCase(user, found) {
   return found.createdByUserId === Number(user?.userId);
 }
 
+const ELEVATED_USER_TYPES = [ROLES.MAINTAINER, ROLES.LEAD];
+
+// Resolves fields the same way the users query layer does (camel before snake).
+function canCreateUser(actor, body) {
+  if (actor?.userType === ROLES.LEAD) return true;
+  const userType = pick(body, "userType", "user_type");
+  const authorisation = pick(body, "authorisation", "authorisation");
+  if (ELEVATED_USER_TYPES.includes(userType)) return false;
+  if (Number(authorisation) === 1) return false;
+  return true;
+}
+
 module.exports = {
   ROLES,
   CASE_DELETE_ROLES,
@@ -59,4 +74,5 @@ module.exports = {
   caseScope,
   canViewCase,
   canModifyCase,
+  canCreateUser,
 };

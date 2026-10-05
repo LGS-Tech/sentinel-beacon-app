@@ -7,6 +7,7 @@ const {
   updateUser,
   deleteUser
 } = require("../db/queries/users");
+const { canCreateUser } = require("../utils/casePolicy");
 
 // [READ ALL] GET /api/users
 const getAllUsers = async (req, res, next) => {
@@ -36,6 +37,12 @@ const createNewUser = async (req, res, next) => {
   if (!username || !password || !email) {
     return res.status(400).json({
       error: "username, password, and email are required",
+    });
+  }
+
+  if (!canCreateUser(req.user, req.body)) {
+    return res.status(403).json({
+      error: "Forbidden: only a lead can create leads, maintainers or authorisation 1",
     });
   }
 
