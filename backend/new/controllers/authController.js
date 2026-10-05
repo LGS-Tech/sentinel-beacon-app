@@ -7,6 +7,7 @@ const {
   recordLogin,
 } = require("../db/queries/users");
 const { userToPublicApi } = require("../db/mappers");
+const { ROLES } = require("../utils/casePolicy");
 
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
@@ -45,7 +46,7 @@ const signup = async (req, res, next) => {
       role,
       // Self-signup never picks its own access level; body values are ignored.
       authorisation: 2,
-      userType: "staff",
+      userType: ROLES.STUDENT,
       collegeId,
       yearSemester,
     });
