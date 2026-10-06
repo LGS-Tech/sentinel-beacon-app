@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
 
 export type User = {
   id: number;
@@ -134,6 +135,7 @@ export async function persistSession(id: number, token?: string): Promise<void> 
   await AsyncStorage.setItem(SESSION_KEY, String(id));
   if (token) {
     authToken = token;
+    authFailureHandled = false;
     await AsyncStorage.setItem(TOKEN_KEY, token);
   }
 }
@@ -143,6 +145,50 @@ export async function clearSession(): Promise<void> {
   authToken = null;
   sessionHydrated = true;
   await AsyncStorage.multiRemove([SESSION_KEY, TOKEN_KEY]);
+}
+
+/**
+ * Client-side expiry check (UX only, the server stays the authority).
+ * If the token cannot be decoded, report "not expired" and let the server decide.
+ */
+export function isTokenExpired(token: string): boolean {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload || typeof atob !== "function") return false;
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const { exp } = JSON.parse(atob(padded)) as { exp?: number };
+    return typeof exp === "number" && exp * 1000 <= Date.now();
+  } catch {
+    return false;
+  }
+}
+
+const INVALID_TOKEN_MESSAGE = "Invalid or expired token";
+export const SESSION_EXPIRED_MESSAGE = "Session expired. Please sign in again.";
+
+/** 401, or the backend's invalid-token 403. A permission 403 is a normal error. */
+export function isAuthFailure(
+  path: string,
+  status: number,
+  bodyText: string
+): boolean {
+  if (path.startsWith("/auth/")) return false;
+  if (status === 401) return true;
+  return (
+    status === 403 &&
+    errorMessageFromBody(bodyText, status) === INVALID_TOKEN_MESSAGE
+  );
+}
+
+let authFailureHandled = false;
+
+/** Clears the session and sends the user to login, once per signed-in session. */
+export async function handleAuthFailure(): Promise<void> {
+  if (authFailureHandled) return;
+  authFailureHandled = true;
+  await clearSession();
+  router.replace("/login-page");
 }
 
 /** Render free-tier cold starts often exceed 8s; keep auth usable. */
@@ -182,6 +228,10 @@ async function request<T>(
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
+      if (isAuthFailure(path, res.status, text)) {
+        await handleAuthFailure();
+        throw new Error(SESSION_EXPIRED_MESSAGE);
+      }
       throw new Error(errorMessageFromBody(text, res.status));
     }
 

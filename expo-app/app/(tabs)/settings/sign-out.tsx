@@ -2,13 +2,13 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { showAlert } from "@/lib/alert";
 import { useFocusEffect } from "expo-router";
 
 import {
@@ -59,7 +59,7 @@ export default function SignOutScreen() {
       await clearSession();
       router.replace("/login-page");
     } catch (e) {
-      Alert.alert(
+      showAlert(
         "Sign out failed",
         e instanceof Error ? e.message : "Could not clear session."
       );

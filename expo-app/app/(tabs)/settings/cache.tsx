@@ -1,13 +1,13 @@
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { showAlert } from "@/lib/alert";
 import { useFocusEffect } from "expo-router";
 
 import {
@@ -46,7 +46,7 @@ export default function CacheScreen() {
   );
 
   async function onClear() {
-    Alert.alert(
+    showAlert(
       "Clear local cache?",
       "This removes ticket preferences, notification settings, and appearance choices. Your login session will stay active.",
       [
@@ -60,14 +60,14 @@ export default function CacheScreen() {
               const cleared = await clearAppCache();
               await refresh();
               await load();
-              Alert.alert(
+              showAlert(
                 "Cache cleared",
                 cleared.length > 0
                   ? `Removed: ${cleared.join(", ")}`
                   : "Nothing to clear."
               );
             } catch (e) {
-              Alert.alert(
+              showAlert(
                 "Failed",
                 e instanceof Error ? e.message : "Could not clear cache."
               );
