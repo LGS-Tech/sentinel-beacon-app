@@ -1,7 +1,7 @@
 //-vault - needs an exposql update for storing pics and videos, live feed messages need reading
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import {
   FlatList,
@@ -118,10 +118,6 @@ export default function VaultScreen() {
   const GRID_COLUMNS = 1;
   const PREVIEW_ROWS = 2;
   const PREVIEW_COUNT = GRID_COLUMNS * PREVIEW_ROWS;
-
-  useEffect(() => {
-    refreshVault();
-  }, []);
 
   useFocusEffect(
     React.useCallback(() => {

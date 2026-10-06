@@ -1,8 +1,11 @@
 //dashboard - specialised prompts to be added for each case type
 //the continue button needs to be inactivated until prompts have been selecteed
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+
+import { useFocusEffect } from 'expo-router';
 
 import {
+  AppState,
   Image,
   Modal,
   Pressable,
@@ -33,6 +36,7 @@ import BottomSheet from '@/components/sheet';
 
 //import { db } from "@/lib/db"
 
+import { getAuthToken } from '@/lib/api';
 import { createCase, getCases, updateCase } from '@/lib/db';
 import {
   DEFAULT_FLOOR_ID,
@@ -182,6 +186,8 @@ export default function HomeScreen() {
     useState<FloorId>(DEFAULT_FLOOR_ID);
   const [caseFloor, setCaseFloor] = useState<FloorId>(DEFAULT_FLOOR_ID);
 
+  const inFlightCases = useRef<Promise<void> | null>(null);
+
   const activeFloorPlan = getFloorById(selectedFloor).image;
   const floorCases = openCases.filter((c) =>
     caseMatchesFloor(c, selectedFloor),
@@ -249,24 +255,46 @@ export default function HomeScreen() {
   }
 
   useEffect(() => {
-    loadOpenCases();
-  }, []);
-
-  useEffect(() => {
     if (!caseActive) {
       loadOpenCases();
     }
   }, [caseActive]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!caseActive) {
-        loadOpenCases();
+  // poll only while this tab is focused, the app is in the foreground and the user is signed in
+  useFocusEffect(
+    useCallback(() => {
+      if (caseActive) {
+        return;
       }
-    }, 1000);
 
-    return () => clearInterval(interval);
-  }, [caseActive]);
+      const tick = async () => {
+        if (AppState.currentState !== 'active') {
+          return;
+        }
+
+        if (!(await getAuthToken())) {
+          return;
+        }
+
+        loadOpenCases();
+      };
+
+      tick();
+
+      const interval = setInterval(tick, 5000);
+
+      const subscription = AppState.addEventListener('change', (state) => {
+        if (state === 'active') {
+          tick();
+        }
+      });
+
+      return () => {
+        clearInterval(interval);
+        subscription.remove();
+      };
+    }, [caseActive]),
+  );
 
   async function openCase(type: string) {
     setCurrentVaultCaseId(null);
@@ -452,17 +480,19 @@ export default function HomeScreen() {
     setShowSituationModal(true);
   }
 
-  async function loadOpenCases() {
+  function loadOpenCases() {
+    if (!inFlightCases.current) {
+      inFlightCases.current = fetchOpenCases().finally(() => {
+        inFlightCases.current = null;
+      });
+    }
+
+    return inFlightCases.current;
+  }
+
+  async function fetchOpenCases() {
     try {
       const rows = await getCases();
-
-      console.log(
-        rows.map((c: { id: any; _id: any; title: any }) => ({
-          id: c.id,
-          _id: c._id,
-          title: c.title,
-        })),
-      );
 
       setOpenCases(rows.filter((c: any) => c.status === 'ACTIVE'));
     } catch (error) {
