@@ -11,6 +11,7 @@ const {
   caseScope,
   canViewCase,
   canModifyCase,
+  canAssign,
 } = require("../utils/casePolicy");
 
 const getAllCases = async (req, res, next) => {
@@ -50,12 +51,24 @@ function withoutActorFields(body) {
   return copy;
 }
 
+// Only roles that may assign cases can set the assignee; for others it is dropped.
+const ASSIGNEE_FIELDS = ["assignedUserId", "assigned_user_id"];
+
+function withoutAssigneeUnlessAllowed(user, body) {
+  if (canAssign(user)) return body;
+  const copy = { ...body };
+  for (const field of ASSIGNEE_FIELDS) {
+    delete copy[field];
+  }
+  return copy;
+}
+
 const CLOSED_STATUSES = ["CLOSED", "RESOLVED"];
 
 const createNewCase = async (req, res, next) => {
   try {
     const created = await createCase({
-      ...withoutActorFields(req.body),
+      ...withoutAssigneeUnlessAllowed(req.user, withoutActorFields(req.body)),
       status: "ACTIVE",
       createdByUserId: req.user.userId,
     });
@@ -75,7 +88,10 @@ const updateExistingCase = async (req, res, next) => {
       return res.status(403).json({ error: "Forbidden: Insufficient permissions" });
     }
 
-    const changes = withoutActorFields(req.body);
+    const changes = withoutAssigneeUnlessAllowed(
+      req.user,
+      withoutActorFields(req.body)
+    );
 
     // The server owns closed_at / closed_by_user_id; they follow the status.
     delete changes.closedAt;
