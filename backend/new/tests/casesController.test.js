@@ -145,3 +145,46 @@ for (const userType of ["maintainer", "lead"]) {
     assert.equal(updateCaseArgs.assignedUserId, 5);
   });
 }
+
+for (const userType of ["student", "staff"]) {
+  const user = { userId: 7, userType };
+
+  test(`POST /cases as ${userType} drops assignedDepartmentId`, async () => {
+    await postCase(
+      { title: "Test", assignedDepartmentId: 2, assigned_department_id: 2 },
+      user
+    );
+    assert.equal("assignedDepartmentId" in createCaseArgs, false);
+    assert.equal("assigned_department_id" in createCaseArgs, false);
+    assert.equal(createCaseArgs.title, "Test");
+  });
+
+  test(`PUT /cases/:id as ${userType} drops assignedDepartmentId`, async () => {
+    await putCase(
+      { title: "Renamed", assignedDepartmentId: 2, assigned_department_id: 2 },
+      user
+    );
+    assert.equal("assignedDepartmentId" in updateCaseArgs, false);
+    assert.equal("assigned_department_id" in updateCaseArgs, false);
+    assert.equal(updateCaseArgs.title, "Renamed");
+  });
+}
+
+for (const userType of ["maintainer", "lead"]) {
+  const user = { userId: 7, userType };
+
+  test(`POST /cases as ${userType} keeps assignedDepartmentId`, async () => {
+    await postCase({ title: "Test", assignedDepartmentId: 2 }, user);
+    assert.equal(createCaseArgs.assignedDepartmentId, 2);
+  });
+
+  test(`POST /cases as ${userType} keeps assigned_department_id`, async () => {
+    await postCase({ title: "Test", assigned_department_id: 2 }, user);
+    assert.equal(createCaseArgs.assigned_department_id, 2);
+  });
+
+  test(`PUT /cases/:id as ${userType} keeps assignedDepartmentId`, async () => {
+    await putCase({ assignedDepartmentId: 2 }, user);
+    assert.equal(updateCaseArgs.assignedDepartmentId, 2);
+  });
+}

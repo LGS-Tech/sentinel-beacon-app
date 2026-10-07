@@ -51,8 +51,14 @@ function withoutActorFields(body) {
   return copy;
 }
 
-// Only roles that may assign cases can set the assignee; for others it is dropped.
-const ASSIGNEE_FIELDS = ["assignedUserId", "assigned_user_id"];
+// Only roles that may assign cases can set the assignee (user or department);
+// for others it is dropped.
+const ASSIGNEE_FIELDS = [
+  "assignedUserId",
+  "assigned_user_id",
+  "assignedDepartmentId",
+  "assigned_department_id",
+];
 
 function withoutAssigneeUnlessAllowed(user, body) {
   if (canAssign(user)) return body;

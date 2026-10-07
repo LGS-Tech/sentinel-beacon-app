@@ -5,7 +5,8 @@
  * - student: sees cases they created or are assigned to; modifies only cases they created
  * - staff / maintainer / lead: full list/view/create/update/close
  * - delete: lead only; analytics and assign: maintainer + lead
- *   (assign covers POST /cases/assign and assignedUserId on create/update)
+ *   (assign covers POST /cases/assign and assignedUserId /
+ *   assignedDepartmentId on create/update)
  * - creating users: only a lead may create a lead/maintainer or grant authorisation 1
  *
  * caseScope(user) is the single place where list filters derive from the
@@ -55,7 +56,7 @@ function canModifyCase(user, found) {
   return found.createdByUserId === Number(user?.userId);
 }
 
-// Who may set a case's assignee, on any route.
+// Who may set a case's assignee (user or department), on any route.
 function canAssign(user) {
   return CASE_ASSIGN_ROLES.includes(user?.userType);
 }
