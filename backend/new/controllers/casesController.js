@@ -56,6 +56,7 @@ const createNewCase = async (req, res, next) => {
   try {
     const created = await createCase({
       ...withoutActorFields(req.body),
+      status: "ACTIVE",
       createdByUserId: req.user.userId,
     });
     res.status(201).json(created);
