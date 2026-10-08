@@ -27,9 +27,34 @@ const getCase = async (req, res, next) => {
   }
 };
 
+// Who created/closed a case comes from the session, never from the request body.
+const ACTOR_FIELDS = [
+  "createdByUserId",
+  "created_by_user_id",
+  "closedByUserId",
+  "closed_by_user_id",
+];
+
+function withoutActorFields(body) {
+  const copy = { ...body };
+  for (const field of ACTOR_FIELDS) {
+    delete copy[field];
+  }
+  return copy;
+}
+
+const CLOSED_STATUSES = ["CLOSED", "RESOLVED"];
+
 const createNewCase = async (req, res, next) => {
   try {
-    const created = await createCase(req.body);
+    const fields = withoutActorFields(req.body);
+    delete fields.closedAt;
+    delete fields.closed_at;
+    const created = await createCase({
+      ...fields,
+      status: "ACTIVE",
+      createdByUserId: req.user.userId,
+    });
     res.status(201).json(created);
   } catch (err) {
     return next(err);
@@ -38,7 +63,29 @@ const createNewCase = async (req, res, next) => {
 
 const updateExistingCase = async (req, res, next) => {
   try {
-    const updated = await updateCase(req.params.id, req.body);
+    const changes = withoutActorFields(req.body);
+
+    // The server owns closed_at / closed_by_user_id; they follow the status.
+    delete changes.closedAt;
+    delete changes.closed_at;
+
+    if (changes.status !== undefined) {
+      const existing = await getCaseById(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Case not found" });
+
+      const wasClosed = CLOSED_STATUSES.includes(existing.status);
+      const willBeClosed = CLOSED_STATUSES.includes(changes.status);
+
+      if (willBeClosed && !wasClosed) {
+        changes.closedAt = Date.now();
+        changes.closedByUserId = req.user.userId;
+      } else if (wasClosed && !willBeClosed) {
+        changes.closedAt = null;
+        changes.closedByUserId = null;
+      }
+    }
+
+    const updated = await updateCase(req.params.id, changes);
     if (!updated) return res.status(404).json({ error: "Case not found" });
     res.json(updated);
   } catch (err) {

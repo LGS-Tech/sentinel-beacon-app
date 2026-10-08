@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router({ mergeParams: true });
 const { authenticate } = require("../middleware/auth");
+const { validateUuidParam } = require("../middleware/validateUuid");
 
 const {
   listCaseAttachments,
@@ -10,6 +11,8 @@ const {
 } = require("../controllers/attachmentsController");
 
 router.use(authenticate);
+
+router.param("attachmentId", validateUuidParam);
 
 router.get("/", listCaseAttachments);
 router.post("/", addCaseAttachment);
