@@ -7,10 +7,16 @@ const {
   assignCase,
   analyticsSummary,
 } = require("../db/queries/cases");
+const {
+  caseScope,
+  canViewCase,
+  canModifyCase,
+  canAssign,
+} = require("../utils/casePolicy");
 
 const getAllCases = async (req, res, next) => {
   try {
-    const cases = await listCases(req.query);
+    const cases = await listCases({ ...req.query, ...caseScope(req.user) });
     res.json(cases);
   } catch (err) {
     return next(err);
@@ -20,7 +26,9 @@ const getAllCases = async (req, res, next) => {
 const getCase = async (req, res, next) => {
   try {
     const found = await getCaseById(req.params.id);
-    if (!found) return res.status(404).json({ error: "Case not found" });
+    if (!canViewCase(req.user, found)) {
+      return res.status(404).json({ error: "Case not found" });
+    }
     res.json(found);
   } catch (err) {
     return next(err);
@@ -43,6 +51,24 @@ function withoutActorFields(body) {
   return copy;
 }
 
+// Only roles that may assign cases can set the assignee (user or department);
+// for others it is dropped.
+const ASSIGNEE_FIELDS = [
+  "assignedUserId",
+  "assigned_user_id",
+  "assignedDepartmentId",
+  "assigned_department_id",
+];
+
+function withoutAssigneeUnlessAllowed(user, body) {
+  if (canAssign(user)) return body;
+  const copy = { ...body };
+  for (const field of ASSIGNEE_FIELDS) {
+    delete copy[field];
+  }
+  return copy;
+}
+
 const CLOSED_STATUSES = ["CLOSED", "RESOLVED"];
 
 const createNewCase = async (req, res, next) => {
@@ -51,7 +77,7 @@ const createNewCase = async (req, res, next) => {
     delete fields.closedAt;
     delete fields.closed_at;
     const created = await createCase({
-      ...fields,
+      ...withoutAssigneeUnlessAllowed(req.user, fields),
       status: "ACTIVE",
       createdByUserId: req.user.userId,
     });
@@ -63,16 +89,24 @@ const createNewCase = async (req, res, next) => {
 
 const updateExistingCase = async (req, res, next) => {
   try {
-    const changes = withoutActorFields(req.body);
+    const existing = await getCaseById(req.params.id);
+    if (!canViewCase(req.user, existing)) {
+      return res.status(404).json({ error: "Case not found" });
+    }
+    if (!canModifyCase(req.user, existing)) {
+      return res.status(403).json({ error: "Forbidden: Insufficient permissions" });
+    }
+
+    const changes = withoutAssigneeUnlessAllowed(
+      req.user,
+      withoutActorFields(req.body)
+    );
 
     // The server owns closed_at / closed_by_user_id; they follow the status.
     delete changes.closedAt;
     delete changes.closed_at;
 
     if (changes.status !== undefined) {
-      const existing = await getCaseById(req.params.id);
-      if (!existing) return res.status(404).json({ error: "Case not found" });
-
       const wasClosed = CLOSED_STATUSES.includes(existing.status);
       const willBeClosed = CLOSED_STATUSES.includes(changes.status);
 

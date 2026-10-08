@@ -65,6 +65,7 @@ async function listCases(filters = {}) {
     assignedUserId,
     assignedDepartmentId,
     createdByUserId,
+    visibleToUserId,
     openOnly,
   } = filters;
 
@@ -89,6 +90,13 @@ async function listCases(filters = {}) {
   if (createdByUserId != null) {
     params.push(createdByUserId);
     clauses.push(`c.created_by_user_id = $${params.length}`);
+  }
+  // Access scope (see utils/casePolicy.js): ANDed with the filters above.
+  if (visibleToUserId != null) {
+    params.push(visibleToUserId);
+    clauses.push(
+      `(c.created_by_user_id = $${params.length} OR c.assigned_user_id = $${params.length})`
+    );
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
