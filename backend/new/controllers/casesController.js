@@ -47,8 +47,11 @@ const CLOSED_STATUSES = ["CLOSED", "RESOLVED"];
 
 const createNewCase = async (req, res, next) => {
   try {
+    const fields = withoutActorFields(req.body);
+    delete fields.closedAt;
+    delete fields.closed_at;
     const created = await createCase({
-      ...withoutActorFields(req.body),
+      ...fields,
       status: "ACTIVE",
       createdByUserId: req.user.userId,
     });
