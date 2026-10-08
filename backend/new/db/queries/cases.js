@@ -1,5 +1,9 @@
 const { query } = require("../pool");
 const { caseToApi, eventToApi, nowMs, pick } = require("../mappers");
+const {
+  appendOrganizationFilter,
+  resolveOrganizationId,
+} = require("../orgScope");
 
 const CASE_SELECT = `
   SELECT
@@ -29,7 +33,8 @@ const CASE_SELECT = `
     c.police_contacted,
     c.fire_contacted,
     c.ambulance_contacted,
-    c.maintenance_contacted
+    c.maintenance_contacted,
+    c.organization_id
   FROM cases c
   LEFT JOIN departments d ON d.id = c.assigned_department_id
   LEFT JOIN users au ON au.id = c.assigned_user_id
@@ -66,7 +71,9 @@ async function listCases(filters = {}) {
     assignedDepartmentId,
     createdByUserId,
     openOnly,
+    organizationId,
   } = filters;
+  appendOrganizationFilter(clauses, params, organizationId, "c.organization_id");
 
   if (openOnly) {
     clauses.push(`c.status IN ('ACTIVE', 'IN_PROGRESS')`);
@@ -99,8 +106,14 @@ async function listCases(filters = {}) {
   return result.rows.map(caseToApi);
 }
 
-async function getCaseById(id) {
-  const result = await query(`${CASE_SELECT} WHERE c.id = $1`, [id]);
+async function getCaseById(id, organizationId) {
+  const params = [id];
+  const clauses = ["c.id = $1"];
+  appendOrganizationFilter(clauses, params, organizationId, "c.organization_id");
+  const result = await query(
+    `${CASE_SELECT} WHERE ${clauses.join(" AND ")}`,
+    params
+  );
   return caseToApi(result.rows[0]);
 }
 
@@ -145,10 +158,11 @@ function buildCaseFields(body) {
   };
 }
 
-async function createCase(body) {
+async function createCase(body, organizationId) {
   const f = buildCaseFields(body);
   const createdAt = f.created_at ?? nowMs();
   const lastUpdated = f.last_updated_at ?? createdAt;
+  const orgId = await resolveOrganizationId(organizationId);
 
   const result = await query(
     `INSERT INTO cases (
@@ -157,9 +171,9 @@ async function createCase(body) {
        category, description, chat, priority,
        assigned_department_id, assigned_user_id, created_by_user_id,
        estimated_cost, police_contacted, fire_contacted,
-       ambulance_contacted, maintenance_contacted
+       ambulance_contacted, maintenance_contacted, organization_id
      ) VALUES (
-       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
      )
      RETURNING id`,
     [
@@ -184,6 +198,7 @@ async function createCase(body) {
       Boolean(f.fire_contacted),
       Boolean(f.ambulance_contacted),
       Boolean(f.maintenance_contacted),
+      orgId,
     ]
   );
 
@@ -196,7 +211,7 @@ async function createCase(body) {
   return getCaseById(created.id);
 }
 
-async function updateCase(id, body) {
+async function updateCase(id, body, organizationId) {
   const f = buildCaseFields(body);
   const sets = ["last_updated_at = $1"];
   const params = [nowMs()];
@@ -233,16 +248,25 @@ async function updateCase(id, body) {
   }
 
   params.push(id);
+  const idParam = params.length;
+  const clauses = [`id = $${idParam}`];
+  appendOrganizationFilter(clauses, params, organizationId, "organization_id");
   const result = await query(
-    `UPDATE cases SET ${sets.join(", ")} WHERE id = $${params.length} RETURNING id`,
+    `UPDATE cases SET ${sets.join(", ")} WHERE ${clauses.join(" AND ")} RETURNING id`,
     params
   );
   if (!result.rowCount) return null;
   return getCaseById(id);
 }
 
-async function deleteCase(id) {
-  const result = await query(`DELETE FROM cases WHERE id = $1`, [id]);
+async function deleteCase(id, organizationId) {
+  const params = [id];
+  const clauses = ["id = $1"];
+  appendOrganizationFilter(clauses, params, organizationId, "organization_id");
+  const result = await query(
+    `DELETE FROM cases WHERE ${clauses.join(" AND ")}`,
+    params
+  );
   return result.rowCount > 0;
 }
 
@@ -351,9 +375,14 @@ async function listCaseEvents(caseId) {
   return result.rows.map(eventToApi);
 }
 
-async function analyticsSummary() {
+async function analyticsSummary(organizationId) {
+  const params = [];
+  const clauses = [];
+  appendOrganizationFilter(clauses, params, organizationId, "organization_id");
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const [overview, byCategory, hotspots, services] = await Promise.all([
-    query(`
+    query(
+      `
       SELECT
         COUNT(*) FILTER (WHERE status IN ('ACTIVE', 'IN_PROGRESS'))::int AS active,
         COUNT(*) FILTER (WHERE status IN ('CLOSED', 'RESOLVED'))::int AS closed,
@@ -363,29 +392,44 @@ async function analyticsSummary() {
           0
         )::bigint AS avg_duration_ms
       FROM cases
-    `),
-    query(`
+      ${where}
+    `,
+      params
+    ),
+    query(
+      `
       SELECT category, COUNT(*)::int AS count
       FROM cases
+      ${where}
       GROUP BY category
       ORDER BY count DESC
-    `),
-    query(`
+    `,
+      params
+    ),
+    query(
+      `
       SELECT COALESCE(NULLIF(location_label, ''), '(unlabelled)') AS label,
              COUNT(*)::int AS count
       FROM cases
+      ${where}
       GROUP BY 1
       ORDER BY count DESC
       LIMIT 10
-    `),
-    query(`
+    `,
+      params
+    ),
+    query(
+      `
       SELECT
         COUNT(*) FILTER (WHERE police_contacted)::int AS police,
         COUNT(*) FILTER (WHERE fire_contacted)::int AS fire,
         COUNT(*) FILTER (WHERE ambulance_contacted)::int AS ambulance,
         COUNT(*) FILTER (WHERE maintenance_contacted)::int AS maintenance
       FROM cases
-    `),
+      ${where}
+    `,
+      params
+    ),
   ]);
 
   return {

@@ -1,5 +1,9 @@
 const { query } = require("../pool");
-const { userToApi, nowMs, pick } = require("../mappers");
+const { userToApi, pick } = require("../mappers");
+const {
+  appendOrganizationFilter,
+  resolveOrganizationId,
+} = require("../orgScope");
 
 const USER_SELECT = `
   SELECT
@@ -19,12 +23,18 @@ const USER_SELECT = `
     u.is_active,
     u.last_login_at,
     u.created_at,
-    u.updated_at
+    u.updated_at,
+    u.organization_id
   FROM users u
   LEFT JOIN departments d ON d.id = u.department_id
 `;
 
-async function listUsers({ userType, departmentId, activeOnly = true } = {}) {
+async function listUsers({
+  userType,
+  departmentId,
+  activeOnly = true,
+  organizationId,
+} = {}) {
   const clauses = [];
   const params = [];
 
@@ -39,6 +49,7 @@ async function listUsers({ userType, departmentId, activeOnly = true } = {}) {
     params.push(departmentId);
     clauses.push(`u.department_id = $${params.length}`);
   }
+  appendOrganizationFilter(clauses, params, organizationId, "u.organization_id");
 
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const result = await query(
@@ -48,8 +59,14 @@ async function listUsers({ userType, departmentId, activeOnly = true } = {}) {
   return result.rows.map(userToApi);
 }
 
-async function getUserById(id) {
-  const result = await query(`${USER_SELECT} WHERE u.id = $1`, [id]);
+async function getUserById(id, organizationId) {
+  const params = [id];
+  const clauses = ["u.id = $1"];
+  appendOrganizationFilter(clauses, params, organizationId, "u.organization_id");
+  const result = await query(
+    `${USER_SELECT} WHERE ${clauses.join(" AND ")}`,
+    params
+  );
   return userToApi(result.rows[0]);
 }
 
@@ -87,17 +104,19 @@ function buildUserFields(body) {
   };
 }
 
-async function createUser(body) {
+async function createUser(body, organizationId) {
   const f = buildUserFields(body);
   if (!f.username || !f.password || !f.email) {
     throw new Error("username, password, and email are required");
   }
+  const orgId = await resolveOrganizationId(organizationId);
 
   const result = await query(
     `INSERT INTO users (
        username, password, email, name, phone, role, authorisation,
-       college_id, department_id, year_semester, user_type, is_active
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       college_id, department_id, year_semester, user_type, is_active,
+       organization_id
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      RETURNING id`,
     [
       f.username,
@@ -112,6 +131,7 @@ async function createUser(body) {
       f.year_semester ?? null,
       f.user_type ?? "staff",
       f.is_active !== false,
+      orgId,
     ]
   );
   return getUserById(result.rows[0].id);
@@ -153,8 +173,14 @@ async function updateUser(id, body) {
   return getUserById(id);
 }
 
-async function deleteUser(id) {
-  const result = await query(`DELETE FROM users WHERE id = $1`, [id]);
+async function deleteUser(id, organizationId) {
+  const params = [id];
+  const clauses = ["id = $1"];
+  appendOrganizationFilter(clauses, params, organizationId, "organization_id");
+  const result = await query(
+    `DELETE FROM users WHERE ${clauses.join(" AND ")}`,
+    params
+  );
   return result.rowCount > 0;
 }
 
@@ -166,8 +192,8 @@ async function recordLogin(id) {
   return getUserById(id);
 }
 
-async function listAssignableUsers() {
-  return listUsers({ userType: "maintainer" });
+async function listAssignableUsers(organizationId) {
+  return listUsers({ userType: "maintainer", organizationId });
 }
 
 module.exports = {

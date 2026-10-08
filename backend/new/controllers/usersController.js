@@ -7,11 +7,12 @@ const {
   updateUser,
   deleteUser
 } = require("../db/queries/users");
+const { omitClientOrganisation } = require("../db/orgScope");
 
 // [READ ALL] GET /api/users
 const getAllUsers = async (req, res, next) => {
   try {
-    const users = await listUsers(req.query);
+    const users = await listUsers(omitClientOrganisation(req.query));
     const safeUsers = users.map(({ password, ...rest }) => rest);
     res.json(safeUsers);
   } catch (err) {

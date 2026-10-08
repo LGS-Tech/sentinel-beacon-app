@@ -7,10 +7,11 @@ const {
   assignCase,
   analyticsSummary,
 } = require("../db/queries/cases");
+const { omitClientOrganisation } = require("../db/orgScope");
 
 const getAllCases = async (req, res, next) => {
   try {
-    const cases = await listCases(req.query);
+    const cases = await listCases(omitClientOrganisation(req.query));
     res.json(cases);
   } catch (err) {
     return next(err);

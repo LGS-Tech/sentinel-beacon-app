@@ -18,6 +18,7 @@ function attachmentToApi(row) {
     uploadedByUserId: row.uploaded_by_user_id,
     uploadedByName: row.uploaded_by_name ?? null,
     createdAt: row.created_at != null ? Number(row.created_at) : null,
+    organizationId: row.organization_id ?? null,
   };
 }
 
@@ -49,6 +50,7 @@ function userToApi(row) {
     lastLoginAt: row.last_login_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    organizationId: row.organization_id ?? null,
   };
 }
 
@@ -60,6 +62,7 @@ function departmentToApi(row) {
     slug: row.slug,
     kind: row.kind,
     isActive: row.is_active,
+    organizationId: row.organization_id ?? null,
   };
 }
 
@@ -97,6 +100,18 @@ function caseToApi(row) {
     fireContacted: row.fire_contacted,
     ambulanceContacted: row.ambulance_contacted,
     maintenanceContacted: row.maintenance_contacted,
+    organizationId: row.organization_id ?? null,
+  };
+}
+
+function organisationToApi(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    isActive: row.is_active,
+    createdAt: row.created_at,
   };
 }
 
@@ -129,6 +144,7 @@ module.exports = {
   attachmentToApi,
   userToApi,
   departmentToApi,
+  organisationToApi,
   caseToApi,
   eventToApi,
   nowMs,
