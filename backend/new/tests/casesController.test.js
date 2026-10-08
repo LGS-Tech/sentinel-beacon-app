@@ -81,8 +81,11 @@ beforeEach(() => {
 });
 
 test("POST /cases with status CLOSED creates an ACTIVE case", async () => {
-  await postCase({ title: "Test", status: "CLOSED", closedAt: 123 });
+  await postCase({ title: "Test", status: "CLOSED", closedAt: 123, closed_at: 123, closedByUserId: 999 });
   assert.equal(createCaseArgs.status, "ACTIVE");
+  assert.equal(createCaseArgs.closedAt, undefined);
+  assert.equal(createCaseArgs.closed_at, undefined);
+  assert.equal(createCaseArgs.closedByUserId, undefined);
 });
 
 test("POST /cases with status RESOLVED creates an ACTIVE case", async () => {

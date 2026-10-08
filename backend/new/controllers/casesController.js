@@ -73,8 +73,11 @@ const CLOSED_STATUSES = ["CLOSED", "RESOLVED"];
 
 const createNewCase = async (req, res, next) => {
   try {
+    const fields = withoutActorFields(req.body);
+    delete fields.closedAt;
+    delete fields.closed_at;
     const created = await createCase({
-      ...withoutAssigneeUnlessAllowed(req.user, withoutActorFields(req.body)),
+      ...withoutAssigneeUnlessAllowed(req.user, fields),
       status: "ACTIVE",
       createdByUserId: req.user.userId,
     });

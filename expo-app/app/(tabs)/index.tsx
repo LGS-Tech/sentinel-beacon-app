@@ -1,9 +1,11 @@
 //dashboard - specialised prompts to be added for each case type
 //the continue button needs to be inactivated until prompts have been selecteed
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+
+import { useFocusEffect } from 'expo-router';
 
 import {
-  Alert,
+  AppState,
   Image,
   Modal,
   Pressable,
@@ -14,6 +16,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 
 import ChatSheet from '@/components/chat';
 
@@ -33,6 +36,7 @@ import BottomSheet from '@/components/sheet';
 
 //import { db } from "@/lib/db"
 
+import { getAuthToken } from '@/lib/api';
 import { createCase, getCases, updateCase } from '@/lib/db';
 import {
   DEFAULT_FLOOR_ID,
@@ -182,6 +186,8 @@ export default function HomeScreen() {
     useState<FloorId>(DEFAULT_FLOOR_ID);
   const [caseFloor, setCaseFloor] = useState<FloorId>(DEFAULT_FLOOR_ID);
 
+  const inFlightCases = useRef<Promise<void> | null>(null);
+
   const activeFloorPlan = getFloorById(selectedFloor).image;
   const floorCases = openCases.filter((c) =>
     caseMatchesFloor(c, selectedFloor),
@@ -249,26 +255,50 @@ export default function HomeScreen() {
   }
 
   useEffect(() => {
-    loadOpenCases();
-  }, []);
-
-  useEffect(() => {
     if (!caseActive) {
       loadOpenCases();
     }
   }, [caseActive]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!caseActive) {
-        loadOpenCases();
+  // poll only while this tab is focused, the app is in the foreground and the user is signed in
+  useFocusEffect(
+    useCallback(() => {
+      if (caseActive) {
+        return;
       }
-    }, 1000);
 
-    return () => clearInterval(interval);
-  }, [caseActive]);
+      const tick = async () => {
+        if (AppState.currentState !== 'active') {
+          return;
+        }
+
+        if (!(await getAuthToken())) {
+          return;
+        }
+
+        loadOpenCases();
+      };
+
+      tick();
+
+      const interval = setInterval(tick, 5000);
+
+      const subscription = AppState.addEventListener('change', (state) => {
+        if (state === 'active') {
+          tick();
+        }
+      });
+
+      return () => {
+        clearInterval(interval);
+        subscription.remove();
+      };
+    }, [caseActive]),
+  );
 
   async function openCase(type: string) {
+    setCurrentVaultCaseId(null);
+
     clearFeed();
 
     setIncidentType(type);
@@ -278,11 +308,11 @@ export default function HomeScreen() {
     setUpdatingLocation(true);
     setLocationConfirmed(false);
     setSelectedCoords(null);
+    setIntruderLocation('');
     setShowDashboard(false);
 
     addFeedItem(`Mr C Wallace started a new ${type.toLowerCase()} case`);
 
-    updateVaultCaseData();
     loadOpenCases();
 
     const answers = questionAnswers.filter(
@@ -294,12 +324,21 @@ export default function HomeScreen() {
 
       addFeedItem(`${question}: ${answer}`);
 
-      updateVaultCaseData();
       loadOpenCases();
     });
 
+    const descriptionIndex = (caseQuestions[type] || []).findIndex(
+      (item) => item.type === 'text',
+    );
+    const description =
+      descriptionIndex >= 0
+        ? (questionAnswers[descriptionIndex] || '').trim()
+        : '';
+
     const newCase = await createCase({
       title: `${type} Case`,
+
+      description: description || undefined,
 
       createdAt: Date.now(),
 
@@ -371,7 +410,7 @@ export default function HomeScreen() {
   }
 
   async function handleCloseCase() {
-    Alert.alert('Close Case', 'Are you sure you want to close this case?', [
+    showAlert('Close Case', 'Are you sure you want to close this case?', [
       {
         text: 'Cancel',
         style: 'cancel',
@@ -394,15 +433,23 @@ export default function HomeScreen() {
             .join('\n');
 
           if (currentVaultCaseId) {
-            await updateCase(
-              currentVaultCaseId.toString(),
+            try {
+              await updateCase(
+                currentVaultCaseId.toString(),
 
-              {
-                status: 'CLOSED',
-                feed: feedHistory,
-                lastUpdatedAt: Date.now(),
-              },
-            );
+                {
+                  status: 'CLOSED',
+                  feed: feedHistory,
+                  lastUpdatedAt: Date.now(),
+                },
+              );
+            } catch (e) {
+              showAlert(
+                'Could not close case',
+                e instanceof Error ? e.message : 'Please try again.',
+              );
+              return;
+            }
           }
 
           setCaseActive(false);
@@ -433,17 +480,19 @@ export default function HomeScreen() {
     setShowSituationModal(true);
   }
 
-  async function loadOpenCases() {
+  function loadOpenCases() {
+    if (!inFlightCases.current) {
+      inFlightCases.current = fetchOpenCases().finally(() => {
+        inFlightCases.current = null;
+      });
+    }
+
+    return inFlightCases.current;
+  }
+
+  async function fetchOpenCases() {
     try {
       const rows = await getCases();
-
-      console.log(
-        rows.map((c: { id: any; _id: any; title: any }) => ({
-          id: c.id,
-          _id: c._id,
-          title: c.title,
-        })),
-      );
 
       setOpenCases(rows.filter((c: any) => c.status === 'ACTIVE'));
     } catch (error) {
@@ -793,7 +842,10 @@ export default function HomeScreen() {
                     ]}
                     disabled={!selectedCoords}
                     onPress={() => {
-                      if (selectedCoords) setShowLabelModal(true);
+                      if (selectedCoords) {
+                        setLocationInput(intruderLocation);
+                        setShowLabelModal(true);
+                      }
                     }}
                   >
                     <Text style={styles.deskBtnText}>Confirm Location</Text>
@@ -815,6 +867,7 @@ export default function HomeScreen() {
                 disabled={!selectedCoords}
                 onPress={() => {
                   if (selectedCoords) {
+                    setLocationInput(intruderLocation);
                     setShowLabelModal(true);
                   }
                 }}

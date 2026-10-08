@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -12,6 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 
 import { signupWithEmailPassword } from '@/lib/api';
 
@@ -61,15 +61,15 @@ export default function RegisterPage() {
 
   function onNextPersonal() {
     if (!fullName.trim()) {
-      Alert.alert('Missing details', 'Enter your full name.');
+      showAlert('Missing details', 'Enter your full name.');
       return;
     }
     if (!email.trim()) {
-      Alert.alert('Missing details', 'Enter your university email.');
+      showAlert('Missing details', 'Enter your university email.');
       return;
     }
     if (!email.includes('@')) {
-      Alert.alert('Invalid email', 'Enter a valid email address.');
+      showAlert('Invalid email', 'Enter a valid email address.');
       return;
     }
     if (!username.trim()) {
@@ -80,18 +80,18 @@ export default function RegisterPage() {
 
   async function onCreateAccount() {
     if (!username.trim()) {
-      Alert.alert('Missing details', 'Enter a username.');
+      showAlert('Missing details', 'Enter a username.');
       return;
     }
     if (password.length < MIN_PASSWORD_LENGTH) {
-      Alert.alert(
+      showAlert(
         'Weak password',
         `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
       );
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Password mismatch', 'Password and confirmation do not match.');
+      showAlert('Password mismatch', 'Password and confirmation do not match.');
       return;
     }
 
@@ -108,7 +108,7 @@ export default function RegisterPage() {
       });
       router.replace('/(tabs)');
     } catch (e) {
-      Alert.alert(
+      showAlert(
         'Sign up failed',
         e instanceof Error
           ? e.message
