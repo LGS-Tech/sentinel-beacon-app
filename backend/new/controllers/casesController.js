@@ -7,6 +7,7 @@ const {
   assignCase,
   analyticsSummary,
 } = require("../db/queries/cases");
+const { omitClientOrganisation } = require("../db/orgScope");
 const {
   caseScope,
   canViewCase,
@@ -16,7 +17,10 @@ const {
 
 const getAllCases = async (req, res, next) => {
   try {
-    const cases = await listCases({ ...req.query, ...caseScope(req.user) });
+    const cases = await listCases({
+      ...omitClientOrganisation(req.query),
+      ...caseScope(req.user),
+    });
     res.json(cases);
   } catch (err) {
     return next(err);

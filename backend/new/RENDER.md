@@ -92,6 +92,31 @@ curl -X POST https://YOUR-SERVICE.onrender.com/auth/login \
 
 `/health` should return `"database":"postgresql"` and `"status":"connected"`.
 
+## Backup before any plan or database change
+
+Take a private `pg_dump` **before** changing the Render Postgres plan, storage, or replacing the instance. Do not commit the dump or the connection string, and do not paste either into issues or chat.
+
+1. In the Render dashboard, confirm the workspace that owns the database, the current plan, status, and who pays the bill. Production should sit in an LGS-controlled workspace. A service cannot be assumed to move between workspaces.
+2. Put the **external** connection string in your shell only (environment variable, not a file in this repo).
+3. Dump from a machine that has PostgreSQL client tools:
+
+```bash
+pg_dump --format=custom --no-owner --file=lgs-tech-prechange.dump "$DATABASE_URL"
+pg_restore --list lgs-tech-prechange.dump
+```
+
+PowerShell:
+
+```powershell
+pg_dump --format=custom --no-owner --file=lgs-tech-prechange.dump $env:DATABASE_URL
+pg_restore --list lgs-tech-prechange.dump
+```
+
+4. Confirm the dump file exists and `pg_restore --list` prints a table of contents. Copy the file to private storage, then delete the local copy.
+5. After a plan change, check `GET /health` (`"database":"postgresql"`, `"status":"connected"`), log in, and read a case. Keep that evidence private.
+
+If the database is not in the workspace that should own billing, write the migration plan and keep this dump until a restore has been proven. Do not drop the current database as part of that check.
+
 ## Local development
 
 ```bash
