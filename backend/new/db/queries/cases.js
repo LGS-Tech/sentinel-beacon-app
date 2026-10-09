@@ -264,7 +264,7 @@ async function updateCase(id, body, organizationId) {
     params
   );
   if (!result.rowCount) return null;
-  return getCaseById(id);
+  return getCaseById(id, organizationId);
 }
 
 async function deleteCase(id, organizationId) {
@@ -278,8 +278,11 @@ async function deleteCase(id, organizationId) {
   return result.rowCount > 0;
 }
 
-async function assignCase(id, { departmentId, userId, actorUserId } = {}) {
-  const existing = await getCaseById(id);
+async function assignCase(
+  id,
+  { departmentId, userId, actorUserId, organizationId } = {}
+) {
+  const existing = await getCaseById(id, organizationId);
   if (!existing) return null;
 
   const nextStatus =
@@ -287,21 +290,27 @@ async function assignCase(id, { departmentId, userId, actorUserId } = {}) {
       ? existing.status
       : "IN_PROGRESS";
 
-  const updated = await updateCase(id, {
-    assignedDepartmentId: departmentId ?? existing.assignedDepartmentId,
-    assignedUserId: userId ?? existing.assignedUserId,
-    status: nextStatus,
-  });
+  const updated = await updateCase(
+    id,
+    {
+      assignedDepartmentId: departmentId ?? existing.assignedDepartmentId,
+      assignedUserId: userId ?? existing.assignedUserId,
+      status: nextStatus,
+    },
+    organizationId
+  );
 
   const parts = [];
   if (departmentId != null) parts.push(`department ${departmentId}`);
   if (userId != null) parts.push(`user ${userId}`);
+  if (!updated) return null;
+
   await addCaseEvent(id, {
     eventType: "assignment",
     message: `Assigned to ${parts.join(" / ") || "unspecified"}`,
     userId: actorUserId ?? null,
   });
-  return getCaseById(updated.id);
+  return getCaseById(updated.id, organizationId);
 }
 
 async function closeCase(id, { actorUserId, status = "CLOSED" } = {}) {

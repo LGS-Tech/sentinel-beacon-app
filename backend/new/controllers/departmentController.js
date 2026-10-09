@@ -3,6 +3,7 @@ const {
   getDepartmentById,
   getDepartmentByName,
 } = require("../db/queries/departments");
+const { requireRequestOrganization } = require("../db/orgScope");
 
 function parseActiveOnly(value) {
   if (value === undefined || value === null || value === "") {
@@ -24,8 +25,14 @@ function parseDepartmentId(raw) {
 // GET /departments
 const getAllDepartments = async (req, res, next) => {
   try {
+    const organizationId = requireRequestOrganization(req, res);
+    if (organizationId == null) return;
+
     if (req.query.name) {
-      const found = await getDepartmentByName(String(req.query.name));
+      const found = await getDepartmentByName(
+        String(req.query.name),
+        organizationId
+      );
       if (!found) {
         return res.status(404).json({ error: "Department not found" });
       }
@@ -34,6 +41,7 @@ const getAllDepartments = async (req, res, next) => {
 
     const departments = await listDepartments({
       activeOnly: parseActiveOnly(req.query.activeOnly),
+      organizationId,
     });
     res.json(departments);
   } catch (err) {
@@ -44,12 +52,15 @@ const getAllDepartments = async (req, res, next) => {
 // GET /departments/:id
 const getDepartment = async (req, res, next) => {
   try {
+    const organizationId = requireRequestOrganization(req, res);
+    if (organizationId == null) return;
+
     const id = parseDepartmentId(req.params.id);
     if (id == null) {
       return res.status(400).json({ error: "Invalid department id" });
     }
 
-    const found = await getDepartmentById(id);
+    const found = await getDepartmentById(id, organizationId);
     if (!found) {
       return res.status(404).json({ error: "Department not found" });
     }

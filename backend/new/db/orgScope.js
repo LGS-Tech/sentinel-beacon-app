@@ -1,7 +1,7 @@
 /**
- * Organisation id helpers for the data layer.
- * Callers pass organizationId from trusted server code (later: the session).
- * Do not forward a client-supplied organisation id into these helpers.
+ * Organisation id helpers.
+ * HTTP routes must pass organizationId from the authenticated user (JWT),
+ * never from the request body or query string.
  */
 const { query } = require("./pool");
 
@@ -39,6 +39,24 @@ function appendOrganizationFilter(clauses, params, organizationId, column) {
   clauses.push(`${column} = $${params.length}`);
 }
 
+function organizationIdFromUser(user) {
+  if (!user || typeof user !== "object") return null;
+  const raw = user.organizationId ?? user.organisationId;
+  if (raw == null || raw === "") return null;
+  const id = typeof raw === "number" ? raw : Number(String(raw).trim());
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return id;
+}
+
+function requireRequestOrganization(req, res) {
+  const organizationId = organizationIdFromUser(req.user);
+  if (organizationId == null) {
+    res.status(403).json({ error: "Organisation access is required" });
+    return null;
+  }
+  return organizationId;
+}
+
 function omitClientOrganisation(source) {
   if (!source || typeof source !== "object") return {};
   const {
@@ -56,5 +74,7 @@ module.exports = {
   parseOrganizationId,
   resolveOrganizationId,
   appendOrganizationFilter,
+  organizationIdFromUser,
+  requireRequestOrganization,
   omitClientOrganisation,
 };

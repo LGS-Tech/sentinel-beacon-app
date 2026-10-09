@@ -72,7 +72,16 @@ async function main() {
   const ping = await db.pool.ping();
   console.log("ping", ping.now);
 
-  const listed = await db.departments.listDepartments({ activeOnly: true });
+  const demo = await db.organisations.getDefaultOrganisation();
+  assert(demo && demo.id, "default organisation lgs-demo is missing");
+  const session = {
+    user: { userId: 1, userType: "lead", organizationId: demo.id },
+  };
+
+  const listed = await db.departments.listDepartments({
+    activeOnly: true,
+    organizationId: demo.id,
+  });
   console.log(
     "departments",
     listed.length,
@@ -87,40 +96,78 @@ async function main() {
     );
   }
 
-  const byId = await db.departments.getDepartmentById(1);
+  const byId = await db.departments.getDepartmentById(1, demo.id);
   assertDepartmentShape(byId, "getById:1");
   assert(byId.name === "Facilities", "id 1 should be Facilities");
 
-  const byName = await db.departments.getDepartmentByName("it support");
+  const byName = await db.departments.getDepartmentByName("it support", demo.id);
   assertDepartmentShape(byName, "getByName");
   assert(byName.slug === "it-support", "IT Support slug");
 
-  const missing = await db.departments.getDepartmentById(999999);
+  const missing = await db.departments.getDepartmentById(999999, demo.id);
   assert(missing == null, "unknown id should map to null");
 
-  const listRes = await invoke(getAllDepartments, { query: {} });
+  const listRes = await invoke(getAllDepartments, { query: { organizationId: 999999 }, ...session });
   assert(listRes.statusCode === 200, "GET /departments should be 200");
   assert(Array.isArray(listRes.body), "GET /departments should return an array");
   listRes.body.forEach((dept) => assertDepartmentShape(dept, `http-list:${dept.id}`));
   console.log("controller GET /departments", listRes.body.length);
 
-  const oneRes = await invoke(getDepartment, { params: { id: "2" } });
+  const oneRes = await invoke(getDepartment, { params: { id: "2" }, ...session });
   assert(oneRes.statusCode === 200, "GET /departments/2 should be 200");
   assertDepartmentShape(oneRes.body, "http-get:2");
   assert(oneRes.body.name === "IT Support", "id 2 should be IT Support");
   console.log("controller GET /departments/2", oneRes.body.name);
 
-  const badId = await invoke(getDepartment, { params: { id: "abc" } });
+  const badId = await invoke(getDepartment, { params: { id: "abc" }, ...session });
   assert(badId.statusCode === 400, "non-integer id should be 400");
 
-  const notFound = await invoke(getDepartment, { params: { id: "999999" } });
+  const notFound = await invoke(getDepartment, { params: { id: "999999" }, ...session });
   assert(notFound.statusCode === 404, "unknown id should be 404");
 
   const byNameRes = await invoke(getAllDepartments, {
-    query: { name: "Medical" },
+    query: { name: "Medical", organizationId: 999999 },
+    ...session,
   });
   assert(byNameRes.statusCode === 200, "GET /departments?name=Medical should be 200");
   assert(byNameRes.body.kind === "medical", "Medical kind");
+
+  const missingOrg = await invoke(getAllDepartments, { query: {} });
+  assert(missingOrg.statusCode === 403, "missing organisation should be 403");
+
+  const stamp = Date.now();
+  const other = await db.organisations.createOrganisation({
+    name: `Dept Smoke ${stamp}`,
+    slug: `dept-smoke-${stamp}`,
+  });
+  let otherDepartment = null;
+  try {
+    otherDepartment = await db.departments.createDepartment({
+      name: `Other Dept ${stamp}`,
+      slug: `other-dept-${stamp}`,
+      kind: "other",
+      organizationId: other.id,
+    });
+    const hidden = await invoke(getDepartment, {
+      params: { id: String(otherDepartment.id) },
+      ...session,
+    });
+    assert(
+      hidden.statusCode === 404,
+      "a user must not read another organisation's department"
+    );
+    const visible = await invoke(getDepartment, {
+      params: { id: String(otherDepartment.id) },
+      user: { userId: 1, userType: "lead", organizationId: other.id },
+    });
+    assert(visible.statusCode === 200, "same-organisation department read should work");
+    assert(visible.body.id === otherDepartment.id, "same-org department id");
+  } finally {
+    if (otherDepartment) {
+      await db.departments.deleteDepartment(otherDepartment.id, other.id);
+    }
+    await db.organisations.deleteOrganisation(other.id);
+  }
 
   const smokeUrl = process.env.DEPARTMENTS_SMOKE_URL;
   const smokeToken = process.env.DEPARTMENTS_SMOKE_TOKEN;

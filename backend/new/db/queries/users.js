@@ -137,7 +137,7 @@ async function createUser(body, organizationId) {
   return getUserById(result.rows[0].id);
 }
 
-async function updateUser(id, body) {
+async function updateUser(id, body, organizationId) {
   const f = buildUserFields(body);
   const sets = ["updated_at = NOW()"];
   const params = [];
@@ -165,12 +165,15 @@ async function updateUser(id, body) {
   }
 
   params.push(id);
+  const idParam = params.length;
+  const clauses = [`id = $${idParam}`];
+  appendOrganizationFilter(clauses, params, organizationId, "organization_id");
   const result = await query(
-    `UPDATE users SET ${sets.join(", ")} WHERE id = $${params.length} RETURNING id`,
+    `UPDATE users SET ${sets.join(", ")} WHERE ${clauses.join(" AND ")} RETURNING id`,
     params
   );
   if (!result.rowCount) return null;
-  return getUserById(id);
+  return getUserById(id, organizationId);
 }
 
 async function deleteUser(id, organizationId) {

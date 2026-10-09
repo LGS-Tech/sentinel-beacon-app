@@ -44,21 +44,29 @@ function mockRes() {
   };
 }
 
-async function postCase(body, user = { userId: 7 }) {
+async function postCase(body, user = {}) {
   const res = mockRes();
   let nextError;
-  await createNewCase({ body, user }, res, (err) => {
-    nextError = err;
-  });
+  await createNewCase(
+    { body, user: { userId: 7, organizationId: 1, ...user } },
+    res,
+    (err) => {
+      nextError = err;
+    }
+  );
   assert.equal(nextError, undefined);
   return res;
 }
 
-async function putCase(body, user) {
+async function putCase(body, user = {}) {
   const res = mockRes();
   let nextError;
   await updateExistingCase(
-    { body, user, params: { id: "test-case-id" } },
+    {
+      body,
+      user: { userId: 7, organizationId: 1, ...user },
+      params: { id: "test-case-id" },
+    },
     res,
     (err) => {
       nextError = err;

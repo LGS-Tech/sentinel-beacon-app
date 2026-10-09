@@ -288,7 +288,7 @@ CREATE TABLE IF NOT EXISTS case_events (
 CREATE INDEX IF NOT EXISTS idx_case_events_case_id ON case_events (case_id, created_at);
 
 -- ---------------------------------------------------------------------------
--- Case attachments (metadata only — binary stored outside Postgres)
+-- Case attachments (metadata only — file bytes live in Cloudflare R2)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS case_attachments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -297,7 +297,7 @@ CREATE TABLE IF NOT EXISTS case_attachments (
   mime_type TEXT,
   storage_url TEXT NOT NULL,
   storage_provider TEXT NOT NULL DEFAULT 'external'
-    CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'other')),
+    CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'r2', 'other')),
   file_size_bytes BIGINT,
   uploaded_by_user_id INTEGER REFERENCES users (id),
   created_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
@@ -312,7 +312,7 @@ CREATE INDEX IF NOT EXISTS idx_case_attachments_uploaded_by
 -- ---------------------------------------------------------------------------
 -- Organisations (data-layer tenancy)
 -- There is no floors table. cases.floor is isolated by cases.organization_id.
--- HTTP must not choose the organisation; later auth passes organizationId in.
+-- HTTP must not choose the organisation. Routes use organizationId from the JWT.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS organisations (
   id SERIAL PRIMARY KEY,
@@ -436,3 +436,26 @@ CREATE INDEX IF NOT EXISTS idx_cases_organization_id
   ON cases (organization_id);
 CREATE INDEX IF NOT EXISTS idx_case_attachments_organization_id
   ON case_attachments (organization_id);
+
+-- Existing databases may still have the pre-R2 storage_provider check.
+DO $$
+DECLARE
+  constraint_row record;
+BEGIN
+  FOR constraint_row IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'case_attachments'::regclass
+      AND contype = 'c'
+      AND pg_get_constraintdef(oid) ILIKE '%storage_provider%'
+  LOOP
+    EXECUTE format(
+      'ALTER TABLE case_attachments DROP CONSTRAINT %I',
+      constraint_row.conname
+    );
+  END LOOP;
+
+  ALTER TABLE case_attachments
+    ADD CONSTRAINT case_attachments_storage_provider_check
+    CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'r2', 'other'));
+END $$;
