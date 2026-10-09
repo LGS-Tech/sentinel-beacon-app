@@ -7,32 +7,47 @@ const {
   updateUser,
   deleteUser
 } = require("../db/queries/users");
+const { canCreateUser } = require("../utils/casePolicy");
 
 // [READ ALL] GET /api/users
-const getAllUsers = async (req, res) => {
+const getAllUsers = async (req, res, next) => {
   try {
     const users = await listUsers(req.query);
     const safeUsers = users.map(({ password, ...rest }) => rest);
     res.json(safeUsers);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch users" });
+    return next(err);
   }
 };
 
-const getUser = async (req, res) => {
+const getUser = async (req, res, next) => {
   try {
     const found = await getUserById(req.params.id);
     if (!found) return res.status(404).json({ error: "User not found" });
     const { password, ...safeUser } = found;
     res.json(safeUser);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch user" });
+    return next(err);
   }
 };
 
-const createNewUser = async (req, res) => {
+const createNewUser = async (req, res, next) => {
+  const { username, password, email } = req.body;
+
+  if (!username || !password || !email) {
+    return res.status(400).json({
+      error: "username, password, and email are required",
+    });
+  }
+
+  if (!canCreateUser(req.user, req.body)) {
+    return res.status(403).json({
+      error: "Forbidden: only a lead can create leads, maintainers or authorisation 1",
+    });
+  }
+
   try {
-    const hashedPassword = await bcrypt.hash(req.body.password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
     const created = await createUser({ ...req.body, password: hashedPassword });
 
     if (created && created.password) {
@@ -41,13 +56,31 @@ const createNewUser = async (req, res) => {
 
     res.status(201).json(created);
   } catch (err) {
-    res.status(500).json({ error: err.message || "Failed to create user" });
+    return next(err);
   }
 };
 
-const updateExistingUser = async (req, res) => {
+// Role/status fields: only a lead may change them, and never on their own record.
+const PRIVILEGED_USER_FIELDS = [
+  "userType",
+  "user_type",
+  "authorisation",
+  "isActive",
+  "is_active",
+];
+
+const updateExistingUser = async (req, res, next) => {
   try {
     const body = { ...req.body };
+
+    const isLead = req.user?.userType === "lead";
+    const isSelf = Number(req.user?.userId) === Number(req.params.id);
+    if (!isLead || isSelf) {
+      for (const field of PRIVILEGED_USER_FIELDS) {
+        delete body[field];
+      }
+    }
+
     if (body.password) {
       body.password = await bcrypt.hash(body.password, 10);
     }
@@ -61,18 +94,18 @@ const updateExistingUser = async (req, res) => {
 
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: "Failed to update user" });
+    return next(err);
   }
 };
 
 // [DELETE] DELETE /api/users/:id
-const deleteExistingUser = async (req, res) => {
+const deleteExistingUser = async (req, res, next) => {
   try {
     const deleted = await deleteUser(req.params.id);
     if (!deleted) return res.status(404).json({ error: "User not found" });
     res.sendStatus(204); // 204 means success with no content to return
   } catch (err) {
-    res.status(500).json({ error: "Failed to delete user" });
+    return next(err);
   }
 };
 

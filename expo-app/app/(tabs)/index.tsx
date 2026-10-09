@@ -1,9 +1,12 @@
 //dashboard - specialised prompts to be added for each case type
 //the continue button needs to be inactivated until prompts have been selecteed
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useFocusEffect } from 'expo-router';
+
+import { showAlert } from '@/lib/alert';
 import {
-  Alert,
+  AppState,
   Image,
   Modal,
   Pressable,
@@ -33,11 +36,12 @@ import BottomSheet from '@/components/sheet';
 
 //import { db } from "@/lib/db"
 
+import { getAuthToken } from '@/lib/api';
 import { createCase, getCases, updateCase } from '@/lib/db';
 import {
+  caseMatchesFloor,
   DEFAULT_FLOOR_ID,
   FLOORS,
-  caseMatchesFloor,
   getFloorById,
   normalizeFloorId,
   type FloorId,
@@ -178,9 +182,21 @@ export default function HomeScreen() {
 
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [selectedMaintenanceType, setSelectedMaintenanceType] = useState('');
+  const [showFireModal, setShowFireModal] = useState(false);
+  const [selectedFireType, setSelectedFireType] = useState('');
+  const [showIntruderModal, setShowIntruderModal] = useState(false);
+  const [selectedIntruderType, setSelectedIntruderType] = useState('');
+  const [showInjuryModal, setShowInjuryModal] = useState(false);
+  const [selectedInjuryType, setSelectedInjuryType] = useState('');
   const [selectedFloor, setSelectedFloor] =
     useState<FloorId>(DEFAULT_FLOOR_ID);
   const [caseFloor, setCaseFloor] = useState<FloorId>(DEFAULT_FLOOR_ID);
+
+  const questionsComplete = (caseQuestions[selectedCaseType] || []).every(
+    (question, index) => questionAnswers[index]?.trim().length > 0
+  );    
+
+  const inFlightCases = useRef<Promise<void> | null>(null);
 
   const activeFloorPlan = getFloorById(selectedFloor).image;
   const floorCases = openCases.filter((c) =>
@@ -249,26 +265,74 @@ export default function HomeScreen() {
   }
 
   useEffect(() => {
-    loadOpenCases();
-  }, []);
-
-  useEffect(() => {
     if (!caseActive) {
       loadOpenCases();
     }
   }, [caseActive]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!caseActive) {
-        loadOpenCases();
+  // poll only while this tab is focused, the app is in the foreground and the user is signed in
+  useFocusEffect(
+    useCallback(() => {
+      if (caseActive) {
+        return;
       }
-    }, 1000);
 
-    return () => clearInterval(interval);
-  }, [caseActive]);
+      const tick = async () => {
+        if (AppState.currentState !== 'active') {
+          return;
+        }
+
+        if (!(await getAuthToken())) {
+          return;
+        }
+
+        loadOpenCases();
+      };
+
+      tick();
+
+      const interval = setInterval(tick, 5000);
+
+      const subscription = AppState.addEventListener('change', (state) => {
+        if (state === 'active') {
+          tick();
+        }
+      });
+
+      return () => {
+        clearInterval(interval);
+        subscription.remove();
+      };
+    }, [caseActive]),
+  );
+
+
+
+  function getSelectedIncidentSubtype() {
+  if (selectedCaseType === 'Fire') {
+    return selectedFireType;
+  }
+
+  if (selectedCaseType === 'Intruder') {
+    return selectedIntruderType;
+  }
+
+  if (selectedCaseType === 'Injury') {
+    return selectedInjuryType;
+  }
+
+  if (selectedCaseType === 'Maintenance') {
+    return selectedMaintenanceType;
+  }
+
+  return '';
+}
+
+
 
   async function openCase(type: string) {
+    setCurrentVaultCaseId(null);
+
     clearFeed();
 
     setIncidentType(type);
@@ -278,11 +342,11 @@ export default function HomeScreen() {
     setUpdatingLocation(true);
     setLocationConfirmed(false);
     setSelectedCoords(null);
+    setIntruderLocation('');
     setShowDashboard(false);
 
     addFeedItem(`Mr C Wallace started a new ${type.toLowerCase()} case`);
 
-    updateVaultCaseData();
     loadOpenCases();
 
     const answers = questionAnswers.filter(
@@ -294,12 +358,29 @@ export default function HomeScreen() {
 
       addFeedItem(`${question}: ${answer}`);
 
-      updateVaultCaseData();
       loadOpenCases();
     });
 
+    const descriptionIndex = (caseQuestions[type] || []).findIndex(
+      (item) => item.type === 'text',
+    );
+    const description =
+      descriptionIndex >= 0
+        ? (questionAnswers[descriptionIndex] || '').trim()
+        : '';
+
+
+
+
+    
+    const subtype = getSelectedIncidentSubtype();
+    const caseTitle = subtype
+      ? `${type} — ${subtype}`
+      : `${type} Case`;    
     const newCase = await createCase({
-      title: `${type} Case`,
+      title: caseTitle,
+
+      description: description || undefined,
 
       createdAt: Date.now(),
 
@@ -371,7 +452,7 @@ export default function HomeScreen() {
   }
 
   async function handleCloseCase() {
-    Alert.alert('Close Case', 'Are you sure you want to close this case?', [
+    showAlert('Close Case', 'Are you sure you want to close this case?', [
       {
         text: 'Cancel',
         style: 'cancel',
@@ -394,15 +475,23 @@ export default function HomeScreen() {
             .join('\n');
 
           if (currentVaultCaseId) {
-            await updateCase(
-              currentVaultCaseId.toString(),
+            try {
+              await updateCase(
+                currentVaultCaseId.toString(),
 
-              {
-                status: 'CLOSED',
-                feed: feedHistory,
-                lastUpdatedAt: Date.now(),
-              },
-            );
+                {
+                  status: 'CLOSED',
+                  feed: feedHistory,
+                  lastUpdatedAt: Date.now(),
+                },
+              );
+            } catch (e) {
+              showAlert(
+                'Could not close case',
+                e instanceof Error ? e.message : 'Please try again.',
+              );
+              return;
+            }
           }
 
           setCaseActive(false);
@@ -433,17 +522,19 @@ export default function HomeScreen() {
     setShowSituationModal(true);
   }
 
-  async function loadOpenCases() {
+  function loadOpenCases() {
+    if (!inFlightCases.current) {
+      inFlightCases.current = fetchOpenCases().finally(() => {
+        inFlightCases.current = null;
+      });
+    }
+
+    return inFlightCases.current;
+  }
+
+  async function fetchOpenCases() {
     try {
       const rows = await getCases();
-
-      console.log(
-        rows.map((c: { id: any; _id: any; title: any }) => ({
-          id: c.id,
-          _id: c._id,
-          title: c.title,
-        })),
-      );
 
       setOpenCases(rows.filter((c: any) => c.status === 'ACTIVE'));
     } catch (error) {
@@ -793,7 +884,10 @@ export default function HomeScreen() {
                     ]}
                     disabled={!selectedCoords}
                     onPress={() => {
-                      if (selectedCoords) setShowLabelModal(true);
+                      if (selectedCoords) {
+                        setLocationInput(intruderLocation);
+                        setShowLabelModal(true);
+                      }
                     }}
                   >
                     <Text style={styles.deskBtnText}>Confirm Location</Text>
@@ -815,6 +909,7 @@ export default function HomeScreen() {
                 disabled={!selectedCoords}
                 onPress={() => {
                   if (selectedCoords) {
+                    setLocationInput(intruderLocation);
                     setShowLabelModal(true);
                   }
                 }}
@@ -1008,8 +1103,15 @@ export default function HomeScreen() {
                   if (item.label === 'Maintenance') {
                     setSelectedMaintenanceType('');
                     setShowMaintenanceModal(true);
-                  } else {
-                    setShowQuestionModal(true);
+                  } else if (item.label === 'Fire') {
+                    setSelectedFireType('');
+                    setShowFireModal(true);
+                  } else if (item.label === 'Intruder') {
+                    setSelectedIntruderType('');
+                    setShowIntruderModal(true);
+                  } else if (item.label === 'Injury') {
+                    setSelectedInjuryType('');
+                    setShowInjuryModal(true);
                   }
                 }}
               >
@@ -1143,6 +1245,315 @@ export default function HomeScreen() {
       </Modal>
 
 
+      <Modal visible={showFireModal} transparent animationType="fade">
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalBox}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.modalTitle}>
+          What type of fire incident is this?
+        </Text>
+
+        <Text style={styles.modalSubtitle}>
+          Choose the option that best describes the situation
+        </Text>
+
+        <View style={styles.specialisedGrid}>
+          {[
+            {
+              label: 'Fire',
+              icon: '🔥',
+            },
+            {
+              label: 'Smoke',
+              icon: '💨',
+            },
+            {
+              label: 'Fire alarm',
+              icon: '🚨',
+            },
+            {
+              label: 'Burning smell',
+              icon: '👃',
+            },
+            {
+              label: 'Other',
+              icon: '⚠️',
+            },
+          ].map((item) => {
+            const selected = selectedFireType === item.label;
+
+            return (
+              <Pressable
+                key={item.label}
+                style={[
+                  styles.specialisedOption,
+                  selected && styles.fireOptionSelected,
+                ]}
+                onPress={() => setSelectedFireType(item.label)}
+              >
+                <Text style={styles.specialisedIcon}>{item.icon}</Text>
+
+                <Text
+                  style={[
+                    styles.specialisedOptionText,
+                    selected && styles.fireOptionTextSelected,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+
+                {selected && (
+                  <Text style={styles.specialisedCheck}>✓</Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Pressable
+          style={[
+            styles.modalButton,
+            {
+              backgroundColor: selectedFireType ? '#DC2626' : '#9CA3AF',
+              marginTop: 18,
+              opacity: selectedFireType ? 1 : 0.6,
+            },
+          ]}
+          disabled={!selectedFireType}
+          onPress={() => {
+            setShowFireModal(false);
+            setShowQuestionModal(true);
+          }}
+        >
+          <Text style={styles.modalButtonText}>Continue</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.backButton}
+          onPress={() => {
+            setShowFireModal(false);
+            setShowSituationModal(true);
+          }}
+        >
+          <Text style={styles.backButtonText}>Back</Text>
+        </Pressable>
+      </ScrollView>
+    </View>
+  </View>
+</Modal>
+
+
+<Modal visible={showIntruderModal} transparent animationType="fade">
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalBox}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.modalTitle}>
+          What type of security incident is this?
+        </Text>
+
+        <Text style={styles.modalSubtitle}>
+          Choose the option that best describes the situation
+        </Text>
+
+        <View style={styles.specialisedGrid}>
+          {[
+            {
+              label: 'Intruder',
+              icon: '🚨',
+            },
+            {
+              label: 'Unauthorised person',
+              icon: '🚷',
+            },
+            {
+              label: 'Suspicious behaviour',
+              icon: '👀',
+            },
+            {
+              label: 'Forced entry',
+              icon: '🚪',
+            },
+            {
+              label: 'Other',
+              icon: '⚠️',
+            },
+          ].map((item) => {
+            const selected = selectedIntruderType === item.label;
+
+            return (
+              <Pressable
+                key={item.label}
+                style={[
+                  styles.specialisedOption,
+                  selected && styles.intruderOptionSelected,
+                ]}
+                onPress={() => setSelectedIntruderType(item.label)}
+              >
+                <Text style={styles.specialisedIcon}>{item.icon}</Text>
+
+                <Text
+                  style={[
+                    styles.specialisedOptionText,
+                    selected && styles.intruderOptionTextSelected,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+
+                {selected && (
+                  <Text style={styles.specialisedCheck}>✓</Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Pressable
+          style={[
+            styles.modalButton,
+            {
+              backgroundColor: selectedIntruderType
+                ? '#EA580C'
+                : '#9CA3AF',
+              marginTop: 18,
+              opacity: selectedIntruderType ? 1 : 0.6,
+            },
+          ]}
+          disabled={!selectedIntruderType}
+          onPress={() => {
+            setShowIntruderModal(false);
+            setShowQuestionModal(true);
+          }}
+        >
+          <Text style={styles.modalButtonText}>Continue</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.backButton}
+          onPress={() => {
+            setShowIntruderModal(false);
+            setShowSituationModal(true);
+          }}
+        >
+          <Text style={styles.backButtonText}>Back</Text>
+        </Pressable>
+      </ScrollView>
+    </View>
+  </View>
+</Modal>
+
+
+
+<Modal visible={showInjuryModal} transparent animationType="fade">
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalBox}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.modalTitle}>
+          What type of injury has occurred?
+        </Text>
+
+        <Text style={styles.modalSubtitle}>
+          Choose the option that best describes the injury
+        </Text>
+
+        <View style={styles.specialisedGrid}>
+          {[
+            {
+              label: 'Minor injury',
+              icon: '🩹',
+            },
+            {
+              label: 'Serious injury',
+              icon: '🚑',
+            },
+            {
+              label: 'Head injury',
+              icon: '🧠',
+            },
+            {
+              label: 'Burn',
+              icon: '🔥',
+            },
+            {
+              label: 'Medical emergency',
+              icon: '🏥',
+            },
+            {
+              label: 'Other',
+              icon: '⚠️',
+            },
+          ].map((item) => {
+            const selected = selectedInjuryType === item.label;
+
+            return (
+              <Pressable
+                key={item.label}
+                style={[
+                  styles.specialisedOption,
+                  selected && styles.injuryOptionSelected,
+                ]}
+                onPress={() => setSelectedInjuryType(item.label)}
+              >
+                <Text style={styles.specialisedIcon}>{item.icon}</Text>
+
+                <Text
+                  style={[
+                    styles.specialisedOptionText,
+                    selected && styles.injuryOptionTextSelected,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+
+                {selected && (
+                  <Text style={styles.specialisedCheck}>✓</Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Pressable
+          style={[
+            styles.modalButton,
+            {
+              backgroundColor: selectedInjuryType
+                ? '#16A34A'
+                : '#9CA3AF',
+              marginTop: 18,
+              opacity: selectedInjuryType ? 1 : 0.6,
+            },
+          ]}
+          disabled={!selectedInjuryType}
+          onPress={() => {
+            setShowInjuryModal(false);
+            setShowQuestionModal(true);
+          }}
+        >
+          <Text style={styles.modalButtonText}>Continue</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.backButton}
+          onPress={() => {
+            setShowInjuryModal(false);
+            setShowSituationModal(true);
+          }}
+        >
+          <Text style={styles.backButtonText}>Back</Text>
+        </Pressable>
+      </ScrollView>
+    </View>
+  </View>
+</Modal>
+
+
+
+
+
+
+
+
 
 
 
@@ -1229,10 +1640,12 @@ export default function HomeScreen() {
                 style={[
                   styles.modalButton,
                   {
-                    backgroundColor: '#64c982',
+                    backgroundColor: questionsComplete ? '#16A34A' : '#9CA3AF',
                     marginTop: 10,
+                    opacity: questionsComplete ? 1 : 0.6,
                   },
                 ]}
+                disabled={!questionsComplete}
                 onPress={() => {
                   setShowQuestionModal(false);
 
@@ -1975,6 +2388,74 @@ maintenanceCheck: {
   fontWeight: '800',
 },
 
+specialisedGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  justifyContent: 'space-between',
+  gap: 12,
+  marginTop: 18,
+},
+
+specialisedOption: {
+  width: '47%',
+  minHeight: 125,
+  backgroundColor: '#FFFFFF',
+  borderWidth: 2,
+  borderColor: '#E5E7EB',
+  borderRadius: 16,
+  padding: 14,
+  alignItems: 'center',
+  justifyContent: 'center',
+  position: 'relative',
+},
+
+specialisedIcon: {
+  fontSize: 32,
+  marginBottom: 10,
+},
+
+specialisedOptionText: {
+  color: '#1F2937',
+  fontSize: 14,
+  fontWeight: '700',
+  textAlign: 'center',
+},
+
+specialisedCheck: {
+  position: 'absolute',
+  top: 8,
+  right: 10,
+  fontSize: 18,
+  fontWeight: '800',
+},
+
+fireOptionSelected: {
+  backgroundColor: '#FEE2E2',
+  borderColor: '#DC2626',
+},
+
+fireOptionTextSelected: {
+  color: '#991B1B',
+},
+
+intruderOptionSelected: {
+  backgroundColor: '#FFEDD5',
+  borderColor: '#EA580C',
+},
+
+intruderOptionTextSelected: {
+  color: '#9A3412',
+},
+
+injuryOptionSelected: {
+  backgroundColor: '#DCFCE7',
+  borderColor: '#16A34A',
+},
+
+injuryOptionTextSelected: {
+  color: '#166534',
+},
+
   caseFloorSelector: {
     position: 'absolute',
     top: 16,
@@ -2030,4 +2511,6 @@ maintenanceCheck: {
   caseFloorChipTextActive: {
     color: '#1D4ED8',
   },
+
+  
 });

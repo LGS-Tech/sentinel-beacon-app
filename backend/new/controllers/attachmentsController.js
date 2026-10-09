@@ -4,20 +4,38 @@ const {
   createAttachment,
   deleteAttachment,
 } = require("../db/queries/attachments");
+const { getCaseById } = require("../db/queries/cases");
+const { canViewCase, canModifyCase } = require("../utils/casePolicy");
 
-const listCaseAttachments = async (req, res) => {
+// Sends 404 (case hidden from this user) or 403 (visible, not modifiable)
+// and returns false when the user may not act on the parent case.
+async function checkCaseAccess(req, res, { modify = false } = {}) {
+  const found = await getCaseById(req.params.caseId);
+  if (!canViewCase(req.user, found)) {
+    res.status(404).json({ error: "Case not found" });
+    return false;
+  }
+  if (modify && !canModifyCase(req.user, found)) {
+    res.status(403).json({ error: "Forbidden: Insufficient permissions" });
+    return false;
+  }
+  return true;
+}
+
+const listCaseAttachments = async (req, res, next) => {
   try {
+    if (!(await checkCaseAccess(req, res))) return;
     const { caseId } = req.params;
     const items = await listAttachmentsByCaseId(caseId);
     res.json(items);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to list attachments" });
+    return next(err);
   }
 };
 
-const getCaseAttachment = async (req, res) => {
+const getCaseAttachment = async (req, res, next) => {
   try {
+    if (!(await checkCaseAccess(req, res))) return;
     const { caseId, attachmentId } = req.params;
     const found = await getAttachmentForCase(caseId, attachmentId);
     if (!found) {
@@ -25,12 +43,21 @@ const getCaseAttachment = async (req, res) => {
     }
     res.json(found);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch attachment" });
+    return next(err);
   }
 };
 
-const addCaseAttachment = async (req, res) => {
+const addCaseAttachment = async (req, res, next) => {
+  const { filename, storageUrl } = req.body;
+
+  if (!filename || !storageUrl) {
+    return res.status(400).json({
+      error: "filename and storageUrl are required",
+    });
+  }
+
   try {
+    if (!(await checkCaseAccess(req, res, { modify: true }))) return;
     const { caseId } = req.params;
     const uploadedByUserId =
       req.user?.userId ?? req.user?.id ?? req.body.uploadedByUserId ?? null;
@@ -46,12 +73,13 @@ const addCaseAttachment = async (req, res) => {
 
     res.status(201).json(created);
   } catch (err) {
-    res.status(400).json({ error: err.message || "Failed to add attachment" });
+    return next(err);
   }
 };
 
-const removeCaseAttachment = async (req, res) => {
+const removeCaseAttachment = async (req, res, next) => {
   try {
+    if (!(await checkCaseAccess(req, res, { modify: true }))) return;
     const { caseId, attachmentId } = req.params;
     const removed = await deleteAttachment(caseId, attachmentId);
     if (!removed) {
@@ -59,7 +87,7 @@ const removeCaseAttachment = async (req, res) => {
     }
     res.sendStatus(204);
   } catch (err) {
-    res.status(500).json({ error: "Failed to remove attachment" });
+    return next(err);
   }
 };
 

@@ -87,7 +87,7 @@ curl https://YOUR-SERVICE.onrender.com/cases/analytics
 curl https://YOUR-SERVICE.onrender.com/cases
 curl -X POST https://YOUR-SERVICE.onrender.com/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"jimstevens@gmail.com","password":"London588"}'
+  -d '{"email":"user@example.com","password":"<demo-password>"}'
 ```
 
 `/health` should return `"database":"postgresql"` and `"status":"connected"`.

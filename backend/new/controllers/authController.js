@@ -7,6 +7,7 @@ const {
   recordLogin,
 } = require("../db/queries/users");
 const { userToPublicApi } = require("../db/mappers");
+const { ROLES } = require("../utils/casePolicy");
 
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
@@ -16,7 +17,7 @@ function getJwtSecret() {
   return secret;
 }
 
-const signup = async (req, res) => {
+const signup = async (req, res, next) => {
   const {
     username,
     password,
@@ -24,7 +25,6 @@ const signup = async (req, res) => {
     name,
     phone,
     role,
-    authorisation,
     collegeId,
     yearSemester,
   } = req.body;
@@ -44,7 +44,9 @@ const signup = async (req, res) => {
       name,
       phone,
       role,
-      authorisation,
+      // Self-signup never picks its own access level; body values are ignored.
+      authorisation: 2,
+      userType: ROLES.STUDENT,
       collegeId,
       yearSemester,
     });
@@ -54,12 +56,11 @@ const signup = async (req, res) => {
       user: userToPublicApi(newUser),
     });
   } catch (err) {
-    console.error("Error during signup:", err);
-    res.status(500).json({ error: err.message || "Signup failed" });
+    return next(err);
   }
 };
 
-const login = async (req, res) => {
+const login = async (req, res, next) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -69,17 +70,17 @@ const login = async (req, res) => {
   try {
     const user = await getUserByEmail(email);
     if (!user) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const stored = user.password ?? "";
     if (!stored.startsWith("$2")) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const valid = await bcrypt.compare(password, stored);
     if (!valid) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
     await recordLogin(user.id);
@@ -100,8 +101,7 @@ const login = async (req, res) => {
       user: userToPublicApi(user),
     });
   } catch (err) {
-    console.error("Error during login:", err);
-    res.status(500).json({ error: err.message || "Login failed" });
+    return next(err);
   }
 };
 

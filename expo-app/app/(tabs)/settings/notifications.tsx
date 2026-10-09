@@ -1,13 +1,13 @@
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { showAlert } from "@/lib/alert";
 import { useFocusEffect } from "expo-router";
 
 import { SettingsToggleRow } from "@/components/settings-toggle-row";
@@ -88,7 +88,7 @@ export default function NotificationsScreen() {
   async function resetDefaults() {
     setPrefs({ ...defaultNotificationPrefs });
     await saveNotificationPrefs({ ...defaultNotificationPrefs });
-    Alert.alert("Reset", "Notification preferences restored to defaults.");
+    showAlert("Reset", "Notification preferences restored to defaults.");
   }
 
   if (!prefs) {

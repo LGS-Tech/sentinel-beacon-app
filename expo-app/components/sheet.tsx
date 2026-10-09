@@ -94,7 +94,7 @@ export default function BottomSheet({
         {Platform.OS === 'web' && (
           <View style={styles.webHeader}>
             <Pressable style={styles.webCloseBtn} onPress={onClose}>
-              <Text style={styles.webCloseBtnText}>\u2715</Text>
+              <Text style={styles.webCloseBtnText}>{'\u2715'}</Text>
             </Pressable>
           </View>
         )}

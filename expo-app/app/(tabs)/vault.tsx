@@ -6,7 +6,6 @@ import * as Sharing from 'expo-sharing';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import {
-  Alert,
   FlatList,
   Modal,
   Platform,
@@ -17,6 +16,7 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 
 import { deleteCase, getCases, updateCase } from '@/lib/db';
 
@@ -175,10 +175,6 @@ export default function VaultScreen() {
   const PREVIEW_ROWS = 2;
   const PREVIEW_COUNT = GRID_COLUMNS * PREVIEW_ROWS;
 
-  useEffect(() => {
-    refreshVault();
-  }, []);
-
   useFocusEffect(
     React.useCallback(() => {
       async function load() {
@@ -198,7 +194,7 @@ export default function VaultScreen() {
   };
 
   const handleDeleteCase = (caseId: string) => {
-    Alert.alert(
+    showAlert(
       'Delete Folder',
       'Are you sure you want to permanently delete this folder?',
       [
@@ -212,7 +208,15 @@ export default function VaultScreen() {
           style: 'destructive',
 
           onPress: async () => {
-            await deleteCase(caseId);
+            try {
+              await deleteCase(caseId);
+            } catch (e) {
+              showAlert(
+                'Could not delete folder',
+                e instanceof Error ? e.message : 'Please try again.',
+              );
+              return;
+            }
 
             refreshVault();
           },
