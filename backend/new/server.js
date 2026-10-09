@@ -49,7 +49,7 @@ app.get("/", (_req, res) => {
   res.json({
     service: "lgs-tech-api",
     message: "LGS Tech API is running",
-    endpoints: ["/health", "/cases", "/users"],
+    endpoints: ["/health", "/cases", "/users", "/departments"],
   });
 });
 
