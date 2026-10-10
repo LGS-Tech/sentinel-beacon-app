@@ -1,7 +1,9 @@
 // Vault lists case folders and uploaded TXT/PDF/JPG/PNG files from the API.
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useMemo, useState } from 'react';
+import * as Sharing from 'expo-sharing';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import {
   ActivityIndicator,
@@ -9,12 +11,13 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   useWindowDimensions,
-  View,
+  View
 } from 'react-native';
 import { showAlert } from '@/lib/alert';
 import * as WebBrowser from 'expo-web-browser';
@@ -80,6 +83,52 @@ function mapAttachment(row: CaseAttachment, caseId: string): FileItem {
   };
 }
 
+const generateReportText = (row: any): string => {
+  const caseId = String(row._id ?? row.id);
+  const createdDate = row.createdAt ? new Date(row.createdAt).toLocaleString() : 'N/A';
+  const updatedDate = row.lastUpdatedAt ? new Date(row.lastUpdatedAt).toLocaleString() : 'N/A';
+
+  return `==================================================
+CASE REPORT: ${caseId}
+==================================================
+Title:        ${row.title || "N/A"}
+Status:       ${row.status || "Unknown"}
+Priority:     ${row.priority || "N/A"}
+Category:     ${row.category || "N/A"}
+
+Department:   ${row.assignedDepartmentName || row.assignedDepartmentId || "N/A"}
+Assigned To:  ${row.assignedUserName || row.assignedUserId || "Unassigned"}
+
+Created by:   ${row.createdByName || row.createdById || "Unknown"}
+Created at:   ${createdDate}
+Last Updated: ${updatedDate}
+
+Location:     ${row.locationLabel || "N/A"}
+Location X:   ${row.locationX || "N/A"}
+Location Y:   ${row.locationY || "N/A"}
+Floor:        ${row.floor || "N/A"}
+
+DESCRIPTION:
+--------------------------------------------------
+${row.description || "No description provided."}
+==================================================
+
+Estimated Cost: ${row.estimatedCost || "Unknown"}
+
+Police Contacted: ${row.policeContacted || "N/A"}
+Fire Department Contacted: ${row.fireContacted || "N/A"}
+Ambulance Contacted: ${row.ambulanceContacted || "N/A"}
+Maintenance Contacted: ${row.maintenanceContacted || "N/A"}
+--------------------------------------------------
+
+Closed by: ${row.closedByName || row.closedById || "N/A"}
+Closed at: ${row.closedAt || "N/A"}
+
+
+Last Sync:   ${new Date().toISOString()}
+`.trim();
+};
+
 function generatedFiles(row: any): FileItem[] {
   const id = String(row._id ?? row.id);
   return [
@@ -94,6 +143,12 @@ function generatedFiles(row: any): FileItem[] {
       name: 'live-feed.txt',
       kind: 'text',
       content: row.feed || 'No live feed data',
+    },
+    {
+      id: `report-${id}`,
+      name: 'report.txt',
+      kind: 'text',
+      content: generateReportText(row),
     },
   ];
 }
@@ -290,6 +345,50 @@ export default function VaultScreen() {
       ],
     );
   };
+  
+  const handleNativeDownload = async (file: FileItem | null) => {
+  if (!file || !file.content) return;
+
+  try {
+    if (Platform.OS === 'web') {
+      // Web RAM download
+      const blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } else {
+      // Native iOS / Android sandbox download
+      const baseDirectory =
+        (FileSystem as any).documentDirectory ??
+        (FileSystem as any).cacheDirectory ??
+        '';
+      const fileUri = `${baseDirectory}${file.name}`;
+
+      // Write string directly from state to local disk
+      await FileSystem.writeAsStringAsync(fileUri, file.content, {
+        encoding: 'utf8' as any,
+      });
+
+      // Open native OS "Save to Files" / Share sheet
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/plain',
+          dialogTitle: `Save ${file.name}`,
+          UTI: 'public.plain-text', // iOS file type identifier
+        });
+      } else {
+        Alert.alert('File Saved', `Saved to ${fileUri}`);
+      }
+    }
+  } catch (error) {
+    Alert.alert('Download Failed', 'Unable to save file to device.');
+  }
+};
 
   const renameFile = () => {
     if (!selectedFileId || !selectedCaseId || !renameValue.trim()) return;
@@ -704,9 +803,18 @@ export default function VaultScreen() {
                       {selectedFile?.name}
                     </ThemedText>
 
-                    <Pressable onPress={() => setSelectedFile(null)}>
-                      <Ionicons name="close" size={22} color="#111827" />
-                    </Pressable>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Pressable
+                        onPress={() => handleNativeDownload(selectedFile)}
+                        hitSlop={8}
+                      >
+                        <Ionicons name="download-outline" size={22} color="#059669" />
+                      </Pressable>
+
+                      <Pressable onPress={() => setSelectedFile(null)} hitSlop={8}>
+                        <Ionicons name="close" size={22} color="#111827" />
+                      </Pressable>
+                    </View>
                   </View>
 
                   {previewLoading ? (
