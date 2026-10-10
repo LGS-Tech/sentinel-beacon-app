@@ -39,6 +39,10 @@ After linking the blueprint or updating an existing service, set in the Render d
 |-----|--------|
 | `JWT_SECRET` | **Required** — long random string for `/auth/login` |
 | `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,http://localhost:8081` |
+| `R2_ACCOUNT_ID` | Cloudflare account ID for R2 |
+| `R2_ACCESS_KEY_ID` | R2 API token access key (Object Read & Write) |
+| `R2_SECRET_ACCESS_KEY` | R2 API token secret — never commit this |
+| `R2_BUCKET_NAME` | Private R2 bucket for Vault files |
 
 `REQUIRE_AUTH` defaults to `false` for the demo; set `true` when all clients send Bearer tokens.
 
@@ -50,6 +54,10 @@ After linking the blueprint or updating an existing service, set in the Render d
 | `JWT_SECRET` | **Required** — long random string for `/auth/login` |
 | `REQUIRE_AUTH` | `false` for demo until all clients send Bearer tokens; `true` in production |
 | `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,http://localhost:8081` |
+| `R2_ACCOUNT_ID` | Cloudflare account ID for R2 |
+| `R2_ACCESS_KEY_ID` | R2 API token access key |
+| `R2_SECRET_ACCESS_KEY` | R2 API token secret — dashboard only |
+| `R2_BUCKET_NAME` | Private R2 bucket name |
 
 Render sets `PORT` automatically — do not hardcode it.
 
@@ -60,15 +68,15 @@ Render sets `PORT` automatically — do not hardcode it.
 3. Connect the repo.
 4. Set **Root Directory** = `backend/new`.
 5. Build = `npm install`. Start = `npm run db:setup && npm run db:hash-seeds && npm start`.
-6. Add `DATABASE_URL`, `JWT_SECRET`, and `ALLOWED_ORIGINS`.
-7. Deploy → copy the URL, e.g. `https://lgs-tech-api.onrender.com`.
+6. Add `DATABASE_URL`, `JWT_SECRET`, `ALLOWED_ORIGINS`, and the R2 keys (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`).
+7. Deploy → the live API is `https://sentinel-beacon-app-t6wz.onrender.com` (service `sentinel-beacon-app`, ID `srv-db4o1njbc2fs73b6kaag`).
 
 ## Point the demo frontend at Render
 
 In the static / Expo web build env (or runtime config):
 
 ```env
-EXPO_PUBLIC_API_URL=https://YOUR-SERVICE.onrender.com
+EXPO_PUBLIC_API_URL=https://sentinel-beacon-app-t6wz.onrender.com
 ```
 
 Do **not** commit real secrets. Local `.env` can keep `localhost` / LAN IP for development.
@@ -82,15 +90,41 @@ Do **not** commit real secrets. Local `.env` can keep `localhost` / LAN IP for d
 ## Smoke test after deploy
 
 ```bash
-curl https://YOUR-SERVICE.onrender.com/health
-curl https://YOUR-SERVICE.onrender.com/cases/analytics
-curl https://YOUR-SERVICE.onrender.com/cases
-curl -X POST https://YOUR-SERVICE.onrender.com/auth/login \
+curl https://sentinel-beacon-app-t6wz.onrender.com/health
+curl https://sentinel-beacon-app-t6wz.onrender.com/cases/analytics
+curl https://sentinel-beacon-app-t6wz.onrender.com/cases
+curl -H "Authorization: Bearer TOKEN" https://sentinel-beacon-app-t6wz.onrender.com/departments
+curl -X POST https://sentinel-beacon-app-t6wz.onrender.com/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"<demo-password>"}'
 ```
 
-`/health` should return `"database":"postgresql"` and `"status":"connected"`.
+`/health` should return `"database":"connected"` and `"storage": { "ready": true, "provider": "r2" }` once R2 env vars are set.
+
+## Backup before any plan or database change
+
+Take a private `pg_dump` **before** changing the Render Postgres plan, storage, or replacing the instance. Do not commit the dump or the connection string, and do not paste either into issues or chat.
+
+1. In the Render dashboard, confirm the workspace that owns the database, the current plan, status, and who pays the bill. Production should sit in an LGS-controlled workspace. A service cannot be assumed to move between workspaces.
+2. Put the **external** connection string in your shell only (environment variable, not a file in this repo).
+3. Dump from a machine that has PostgreSQL client tools:
+
+```bash
+pg_dump --format=custom --no-owner --file=lgs-tech-prechange.dump "$DATABASE_URL"
+pg_restore --list lgs-tech-prechange.dump
+```
+
+PowerShell:
+
+```powershell
+pg_dump --format=custom --no-owner --file=lgs-tech-prechange.dump $env:DATABASE_URL
+pg_restore --list lgs-tech-prechange.dump
+```
+
+4. Confirm the dump file exists and `pg_restore --list` prints a table of contents. Copy the file to private storage, then delete the local copy.
+5. After a plan change, check `GET /health` (`"database":"postgresql"`, `"status":"connected"`), log in, and read a case. Keep that evidence private.
+
+If the database is not in the workspace that should own billing, write the migration plan and keep this dump until a restore has been proven. Do not drop the current database as part of that check.
 
 ## Local development
 

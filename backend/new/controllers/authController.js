@@ -85,12 +85,19 @@ const login = async (req, res, next) => {
 
     await recordLogin(user.id);
 
+    if (!user.organizationId) {
+      return res.status(403).json({
+        error: "Organisation access is required",
+      });
+    }
+
     const token = jwt.sign(
       {
         userId: user.id,
         userType: user.userType,
         role: user.role,
         authorisation: user.authorisation,
+        organizationId: user.organizationId,
       },
       getJwtSecret(),
       { expiresIn: "1d" }

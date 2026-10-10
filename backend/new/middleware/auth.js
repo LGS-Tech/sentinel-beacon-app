@@ -23,7 +23,7 @@ function authenticate(req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET); //JWT TO BE ADDED
 
 // Attached the decoded payload directly to the req so subsequent middleware or route handlers can access who is making the request
-    req.user = decoded; // { userId, userType, role, authorisation }
+    req.user = decoded; // { userId, userType, role, authorisation, organizationId }
     next();
   } catch (err) {
     //If jwt.verify fails send them back

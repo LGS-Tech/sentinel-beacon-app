@@ -1,6 +1,7 @@
 const { query } = require("../pool");
 const { attachmentToApi, nowMs, pick } = require("../mappers");
 const { getCaseById } = require("./cases");
+const { appendOrganizationFilter } = require("../orgScope");
 
 const ATTACHMENT_SELECT = `
   SELECT
@@ -13,32 +14,51 @@ const ATTACHMENT_SELECT = `
     a.file_size_bytes,
     a.uploaded_by_user_id,
     u.name AS uploaded_by_name,
-    a.created_at
+    a.created_at,
+    a.organization_id
   FROM case_attachments a
   LEFT JOIN users u ON u.id = a.uploaded_by_user_id
 `;
 
-async function listAttachmentsByCaseId(caseId) {
+async function listAttachmentsByCaseId(caseId, organizationId) {
+  const params = [caseId];
+  const clauses = ["a.case_id = $1"];
+  appendOrganizationFilter(clauses, params, organizationId, "a.organization_id");
   const result = await query(
     `${ATTACHMENT_SELECT}
-     WHERE a.case_id = $1
+     WHERE ${clauses.join(" AND ")}
      ORDER BY a.created_at DESC`,
-    [caseId]
+    params
   );
   return result.rows.map(attachmentToApi);
 }
 
-async function getAttachmentById(id) {
-  const result = await query(`${ATTACHMENT_SELECT} WHERE a.id = $1`, [id]);
+async function getAttachmentById(id, organizationId) {
+  const params = [id];
+  const clauses = ["a.id = $1"];
+  appendOrganizationFilter(clauses, params, organizationId, "a.organization_id");
+  const result = await query(
+    `${ATTACHMENT_SELECT} WHERE ${clauses.join(" AND ")}`,
+    params
+  );
   return attachmentToApi(result.rows[0]);
 }
 
-async function getAttachmentForCase(caseId, attachmentId) {
+async function getAttachmentRowForCase(caseId, attachmentId, organizationId) {
+  const params = [caseId, attachmentId];
+  const clauses = ["a.case_id = $1", "a.id = $2"];
+  appendOrganizationFilter(clauses, params, organizationId, "a.organization_id");
   const result = await query(
-    `${ATTACHMENT_SELECT} WHERE a.case_id = $1 AND a.id = $2`,
-    [caseId, attachmentId]
+    `${ATTACHMENT_SELECT} WHERE ${clauses.join(" AND ")}`,
+    params
   );
-  return attachmentToApi(result.rows[0]);
+  return result.rows[0] || null;
+}
+
+async function getAttachmentForCase(caseId, attachmentId, organizationId) {
+  return attachmentToApi(
+    await getAttachmentRowForCase(caseId, attachmentId, organizationId)
+  );
 }
 
 function buildAttachmentFields(body) {
@@ -52,8 +72,8 @@ function buildAttachmentFields(body) {
   };
 }
 
-async function createAttachment(caseId, body) {
-  const existingCase = await getCaseById(caseId);
+async function createAttachment(caseId, body, organizationId) {
+  const existingCase = await getCaseById(caseId, organizationId);
   if (!existingCase) {
     return null;
   }
@@ -66,8 +86,8 @@ async function createAttachment(caseId, body) {
   const result = await query(
     `INSERT INTO case_attachments (
        case_id, filename, mime_type, storage_url, storage_provider,
-       file_size_bytes, uploaded_by_user_id, created_at
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       file_size_bytes, uploaded_by_user_id, created_at, organization_id
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      RETURNING id`,
     [
       caseId,
@@ -78,18 +98,22 @@ async function createAttachment(caseId, body) {
       f.file_size_bytes ?? null,
       f.uploaded_by_user_id ?? null,
       nowMs(),
+      existingCase.organizationId,
     ]
   );
 
   return getAttachmentById(result.rows[0].id);
 }
 
-async function deleteAttachment(caseId, attachmentId) {
+async function deleteAttachment(caseId, attachmentId, organizationId) {
+  const params = [caseId, attachmentId];
+  const clauses = ["case_id = $1", "id = $2"];
+  appendOrganizationFilter(clauses, params, organizationId, "organization_id");
   const result = await query(
     `DELETE FROM case_attachments
-     WHERE case_id = $1 AND id = $2
+     WHERE ${clauses.join(" AND ")}
      RETURNING id`,
-    [caseId, attachmentId]
+    params
   );
   return result.rowCount > 0;
 }
@@ -98,6 +122,7 @@ module.exports = {
   listAttachmentsByCaseId,
   getAttachmentById,
   getAttachmentForCase,
+  getAttachmentRowForCase,
   createAttachment,
   deleteAttachment,
 };

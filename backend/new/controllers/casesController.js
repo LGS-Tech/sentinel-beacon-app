@@ -7,6 +7,9 @@ const {
   assignCase,
   analyticsSummary,
 } = require("../db/queries/cases");
+const { omitClientOrganisation, requireRequestOrganization } = require("../db/orgScope");
+const { getUserById } = require("../db/queries/users");
+const { getDepartmentById } = require("../db/queries/departments");
 const {
   caseScope,
   canViewCase,
@@ -16,7 +19,13 @@ const {
 
 const getAllCases = async (req, res, next) => {
   try {
-    const cases = await listCases({ ...req.query, ...caseScope(req.user) });
+    const organizationId = requireRequestOrganization(req, res);
+    if (organizationId == null) return;
+    const cases = await listCases({
+      ...omitClientOrganisation(req.query),
+      ...caseScope(req.user),
+      organizationId,
+    });
     res.json(cases);
   } catch (err) {
     return next(err);
@@ -25,7 +34,9 @@ const getAllCases = async (req, res, next) => {
 
 const getCase = async (req, res, next) => {
   try {
-    const found = await getCaseById(req.params.id);
+    const organizationId = requireRequestOrganization(req, res);
+    if (organizationId == null) return;
+    const found = await getCaseById(req.params.id, organizationId);
     if (!canViewCase(req.user, found)) {
       return res.status(404).json({ error: "Case not found" });
     }
@@ -69,18 +80,61 @@ function withoutAssigneeUnlessAllowed(user, body) {
   return copy;
 }
 
+function firstDefined(body, ...keys) {
+  for (const key of keys) {
+    if (body[key] !== undefined) return body[key];
+  }
+  return undefined;
+}
+
+// Same check as POST /cases/assign: the assignee and department must belong
+// to the caller's organisation. A missing row is a 404, not a cross-org name.
+async function rejectForeignAssignment(res, organizationId, body) {
+  const userId = firstDefined(body, "assignedUserId", "assigned_user_id");
+  const departmentId = firstDefined(
+    body,
+    "assignedDepartmentId",
+    "assigned_department_id"
+  );
+
+  if (userId != null && userId !== "") {
+    const assignee = await getUserById(userId, organizationId);
+    if (!assignee) {
+      res.status(404).json({ error: "Case or User not found" });
+      return true;
+    }
+  }
+
+  if (departmentId != null && departmentId !== "") {
+    const department = await getDepartmentById(departmentId, organizationId);
+    if (!department) {
+      res.status(404).json({ error: "Case or User not found" });
+      return true;
+    }
+  }
+
+  return false;
+}
+
 const CLOSED_STATUSES = ["CLOSED", "RESOLVED"];
 
 const createNewCase = async (req, res, next) => {
   try {
-    const fields = withoutActorFields(req.body);
+    const organizationId = requireRequestOrganization(req, res);
+    if (organizationId == null) return;
+    const fields = withoutActorFields(omitClientOrganisation(req.body));
     delete fields.closedAt;
     delete fields.closed_at;
-    const created = await createCase({
-      ...withoutAssigneeUnlessAllowed(req.user, fields),
-      status: "ACTIVE",
-      createdByUserId: req.user.userId,
-    });
+    const caseFields = withoutAssigneeUnlessAllowed(req.user, fields);
+    if (await rejectForeignAssignment(res, organizationId, caseFields)) return;
+    const created = await createCase(
+      {
+        ...caseFields,
+        status: "ACTIVE",
+        createdByUserId: req.user.userId,
+      },
+      organizationId
+    );
     res.status(201).json(created);
   } catch (err) {
     return next(err);
@@ -89,7 +143,9 @@ const createNewCase = async (req, res, next) => {
 
 const updateExistingCase = async (req, res, next) => {
   try {
-    const existing = await getCaseById(req.params.id);
+    const organizationId = requireRequestOrganization(req, res);
+    if (organizationId == null) return;
+    const existing = await getCaseById(req.params.id, organizationId);
     if (!canViewCase(req.user, existing)) {
       return res.status(404).json({ error: "Case not found" });
     }
@@ -99,8 +155,9 @@ const updateExistingCase = async (req, res, next) => {
 
     const changes = withoutAssigneeUnlessAllowed(
       req.user,
-      withoutActorFields(req.body)
+      withoutActorFields(omitClientOrganisation(req.body))
     );
+    if (await rejectForeignAssignment(res, organizationId, changes)) return;
 
     // The server owns closed_at / closed_by_user_id; they follow the status.
     delete changes.closedAt;
@@ -119,7 +176,7 @@ const updateExistingCase = async (req, res, next) => {
       }
     }
 
-    const updated = await updateCase(req.params.id, changes);
+    const updated = await updateCase(req.params.id, changes, organizationId);
     if (!updated) return res.status(404).json({ error: "Case not found" });
     res.json(updated);
   } catch (err) {
@@ -129,7 +186,13 @@ const updateExistingCase = async (req, res, next) => {
 
 const deleteExistingCase = async (req, res, next) => {
   try {
-    const deleted = await deleteCase(req.params.id);
+    const organizationId = requireRequestOrganization(req, res);
+    if (organizationId == null) return;
+    const existing = await getCaseById(req.params.id, organizationId);
+    if (!canViewCase(req.user, existing)) {
+      return res.status(404).json({ error: "Case not found" });
+    }
+    const deleted = await deleteCase(req.params.id, organizationId);
     if (!deleted) return res.status(404).json({ error: "Case not found" });
     res.sendStatus(204);
   } catch (err) {
@@ -139,29 +202,46 @@ const deleteExistingCase = async (req, res, next) => {
 
 const assignCaseToUser = async (req, res, next) => {
   try {
+    const organizationId = requireRequestOrganization(req, res);
+    if (organizationId == null) return;
     const { caseId, userId, departmentId } = req.body;
-    
     const actorUserId = req.user?.id || req.user?.userId;
 
-    const assigned = await assignCase(caseId, { 
-      userId, 
-      departmentId, 
-      actorUserId 
+    if (userId != null) {
+      const assignee = await getUserById(userId, organizationId);
+      if (!assignee) {
+        return res.status(404).json({ error: "Case or User not found" });
+      }
+    }
+    if (departmentId != null) {
+      const department = await getDepartmentById(departmentId, organizationId);
+      if (!department) {
+        return res.status(404).json({ error: "Case or User not found" });
+      }
+    }
+
+    const assigned = await assignCase(caseId, {
+      userId,
+      departmentId,
+      actorUserId,
+      organizationId,
     });
     if (!assigned) return res.status(404).json({ error: "Case or User not found" });
     res.json(assigned);
   } catch (err) {
     return next(err);
   }
-}
+};
 const getAnalyticsSummary = async (req, res, next) => {
   try {
-    const summary = await analyticsSummary();
+    const organizationId = requireRequestOrganization(req, res);
+    if (organizationId == null) return;
+    const summary = await analyticsSummary(organizationId);
     res.json(summary);
   } catch (err) {
     return next(err);
   }
-}
+};
 
 module.exports = {
   getAllCases,
