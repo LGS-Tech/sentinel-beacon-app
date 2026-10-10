@@ -119,6 +119,20 @@ npm run db:hash-seeds      # bcrypt-hash demo user passwords
 
 API routes: `/cases`, `/users`, `/auth/login`, `/auth/signup`, `/cases/:id/attachments`
 
+#### Accounts: signup and provisioning
+
+Public self-registration is **off by default**. `POST /auth/signup` only works when
+`ALLOW_PUBLIC_SIGNUP` is exactly `true`; with the variable unset or set to anything
+else it returns `403 {"error":"Self-registration is disabled. Contact your administrator."}`.
+
+- Local development: `.env.example` sets `ALLOW_PUBLIC_SIGNUP=true`, so the app's
+  Create Account screen keeps working. Add the line to an existing `.env`.
+- Production (Render): `render.yaml` sets it to `"false"`. Do not enable it there.
+
+Accounts are created by an authorised person instead:
+
+- A lead or maintainer calls `POST /users` (only a lead can create leads,
+  maintainers or `authorisation: 1`).
 ### Demo hosting (GitHub Pages + Render)
 
 | Environment | Frontend | Backend API |
