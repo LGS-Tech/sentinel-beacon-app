@@ -133,6 +133,27 @@ Accounts are created by an authorised person instead:
 
 - A lead or maintainer calls `POST /users` (only a lead can create leads,
   maintainers or `authorisation: 1`).
+- Or, from `backend/new`, with the CLI — for example for the first lead:
+
+```bash
+# bash
+CREATE_USER_PASSWORD='<password>' npm run user:create -- \
+  --email jane@example.org --username jane --name "Jane Doe" --user-type lead
+```
+
+```powershell
+# Windows PowerShell
+$env:CREATE_USER_PASSWORD = '<password>'
+npm run user:create -- --email jane@example.org --username jane --name "Jane Doe" --user-type lead
+Remove-Item Env:CREATE_USER_PASSWORD
+```
+
+`--user-type` is one of `student`, `staff`, `maintainer`, `lead`. The password is
+read only from `CREATE_USER_PASSWORD` (at least 8 characters), is stored as a bcrypt
+hash and is never printed. The script refuses an email or username that already
+exists. It writes to the database in `DATABASE_URL`, so check which one your `.env`
+points at before running it.
+
 ### Demo hosting (GitHub Pages + Render)
 
 | Environment | Frontend | Backend API |
