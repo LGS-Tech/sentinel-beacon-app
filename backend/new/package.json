@@ -12,7 +12,8 @@
     "db:setup": "node scripts/setup-postgres.js",
     "db:ping": "node scripts/ping-postgres.js",
     "db:smoke": "node scripts/smoke-data-layer.js",
-    "db:smoke-attachments": "node scripts/smoke-attachments.js"
+    "db:smoke-attachments": "node scripts/smoke-attachments.js",
+    "db:seed-demo": "node scripts/seed-demo.js"
   },
   "keywords": [],
   "author": "",
