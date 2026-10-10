@@ -69,14 +69,14 @@ Render sets `PORT` automatically — do not hardcode it.
 4. Set **Root Directory** = `backend/new`.
 5. Build = `npm install`. Start = `npm run db:setup && npm run db:hash-seeds && npm start`.
 6. Add `DATABASE_URL`, `JWT_SECRET`, `ALLOWED_ORIGINS`, and the R2 keys (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`).
-7. Deploy → copy the URL, e.g. `https://lgs-tech-api.onrender.com`.
+7. Deploy → the live API is `https://sentinel-beacon-app-t6wz.onrender.com` (service `sentinel-beacon-app`, ID `srv-db4o1njbc2fs73b6kaag`).
 
 ## Point the demo frontend at Render
 
 In the static / Expo web build env (or runtime config):
 
 ```env
-EXPO_PUBLIC_API_URL=https://YOUR-SERVICE.onrender.com
+EXPO_PUBLIC_API_URL=https://sentinel-beacon-app-t6wz.onrender.com
 ```
 
 Do **not** commit real secrets. Local `.env` can keep `localhost` / LAN IP for development.
@@ -90,11 +90,11 @@ Do **not** commit real secrets. Local `.env` can keep `localhost` / LAN IP for d
 ## Smoke test after deploy
 
 ```bash
-curl https://YOUR-SERVICE.onrender.com/health
-curl https://YOUR-SERVICE.onrender.com/cases/analytics
-curl https://YOUR-SERVICE.onrender.com/cases
-curl -H "Authorization: Bearer TOKEN" https://YOUR-SERVICE.onrender.com/departments
-curl -X POST https://YOUR-SERVICE.onrender.com/auth/login \
+curl https://sentinel-beacon-app-t6wz.onrender.com/health
+curl https://sentinel-beacon-app-t6wz.onrender.com/cases/analytics
+curl https://sentinel-beacon-app-t6wz.onrender.com/cases
+curl -H "Authorization: Bearer TOKEN" https://sentinel-beacon-app-t6wz.onrender.com/departments
+curl -X POST https://sentinel-beacon-app-t6wz.onrender.com/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"<demo-password>"}'
 ```

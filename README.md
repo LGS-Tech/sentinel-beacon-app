@@ -125,7 +125,7 @@ API routes: `/cases`, `/users`, `/departments`, `/auth/login`, `/auth/signup`, `
 | Environment | Frontend | Backend API |
 |-------------|----------|-------------|
 | **Development** | `npx expo start` on your machine | Local `backend/new` → `http://localhost:3000` |
-| **Production (demo)** | GitHub Pages | Render → `https://sentinel-beacon-app.onrender.com` |
+| **Production (demo)** | GitHub Pages | Render → `https://sentinel-beacon-app-t6wz.onrender.com` |
 
 Env files in `expo-app/`:
 - `.env.development` → local API
