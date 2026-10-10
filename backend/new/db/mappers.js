@@ -49,6 +49,8 @@ function userToApi(row) {
     lastLoginAt: row.last_login_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    termsAcceptedAt: row.terms_accepted_at,
+    termsVersion: row.terms_version,
   };
 }
 

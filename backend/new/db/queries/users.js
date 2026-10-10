@@ -19,7 +19,9 @@ const USER_SELECT = `
     u.is_active,
     u.last_login_at,
     u.created_at,
-    u.updated_at
+    u.updated_at,
+    u.terms_accepted_at,
+    u.terms_version
   FROM users u
   LEFT JOIN departments d ON d.id = u.department_id
 `;
@@ -84,6 +86,8 @@ function buildUserFields(body) {
     year_semester: pick(body, "yearSemester", "year_semester"),
     user_type: pick(body, "userType", "user_type"),
     is_active: pick(body, "isActive", "is_active"),
+    terms_accepted_at: pick(body, "termsAcceptedAt", "terms_accepted_at"),
+    terms_version: pick(body, "termsVersion", "terms_version"),
   };
 }
 
@@ -96,8 +100,8 @@ async function createUser(body) {
   const result = await query(
     `INSERT INTO users (
        username, password, email, name, phone, role, authorisation,
-       college_id, department_id, year_semester, user_type, is_active
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       college_id, department_id, year_semester, user_type, is_active, terms_accepted_at, terms_version
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      RETURNING id`,
     [
       f.username,
@@ -112,6 +116,8 @@ async function createUser(body) {
       f.year_semester ?? null,
       f.user_type ?? "staff",
       f.is_active !== false,
+      f.terms_accepted_at ?? null,
+      f.terms_version ?? null,
     ]
   );
   return getUserById(result.rows[0].id);
