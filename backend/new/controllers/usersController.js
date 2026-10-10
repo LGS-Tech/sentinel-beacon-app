@@ -9,6 +9,18 @@ const {
 } = require("../db/queries/users");
 const { canCreateUser } = require("../utils/casePolicy");
 const { omitClientOrganisation, requireRequestOrganization } = require("../db/orgScope");
+const { getDepartmentById } = require("../db/queries/departments");
+
+async function rejectForeignDepartment(res, organizationId, body) {
+  const departmentId = body.departmentId ?? body.department_id;
+  if (departmentId == null || departmentId === "") return false;
+  const department = await getDepartmentById(departmentId, organizationId);
+  if (!department) {
+    res.status(404).json({ error: "Department not found" });
+    return true;
+  }
+  return false;
+}
 
 // [READ ALL] GET /api/users
 const getAllUsers = async (req, res, next) => {
@@ -57,6 +69,7 @@ const createNewUser = async (req, res, next) => {
   try {
     const organizationId = requireRequestOrganization(req, res);
     if (organizationId == null) return;
+    if (await rejectForeignDepartment(res, organizationId, req.body)) return;
     const hashedPassword = await bcrypt.hash(password, 10);
     const created = await createUser(
       { ...omitClientOrganisation(req.body), password: hashedPassword },
@@ -95,6 +108,8 @@ const updateExistingUser = async (req, res, next) => {
         delete body[field];
       }
     }
+
+    if (await rejectForeignDepartment(res, organizationId, body)) return;
 
     if (body.password) {
       body.password = await bcrypt.hash(body.password, 10);

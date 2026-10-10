@@ -224,6 +224,23 @@ test("user A cannot list or read organisation B cases", async () => {
   assert.equal(calls.some((call) => call[0] === "updateCase"), false);
 });
 
+test("create and update reject an assignee or department from another organisation", async () => {
+  const created = await run(cases.createNewCase, {
+    user: userA,
+    body: { title: "Local", assignedUserId: 99, assignedDepartmentId: 1 },
+  });
+  assert.equal(created.statusCode, 404);
+  assert.equal(calls.some((call) => call[0] === "createCase"), false);
+
+  const updated = await run(cases.updateExistingCase, {
+    user: userA,
+    params: { id: "case-a" },
+    body: { assignedDepartmentId: 50 },
+  });
+  assert.equal(updated.statusCode, 404);
+  assert.equal(calls.some((call) => call[0] === "updateCase"), false);
+});
+
 test("same-organisation case create ignores a client organisation id", async () => {
   const created = await run(cases.createNewCase, {
     user: userA,
@@ -262,6 +279,28 @@ test("user A cannot list or read organisation B users", async () => {
     body: { name: "Other", organizationId: 1 },
   });
   assert.equal(updated.statusCode, 404);
+});
+
+test("user create and self-update reject a department from another organisation", async () => {
+  const created = await run(users.createNewUser, {
+    user: userA,
+    body: {
+      username: "ada",
+      password: "secret",
+      email: "ada@example.com",
+      departmentId: 50,
+    },
+  });
+  assert.equal(created.statusCode, 404);
+  assert.equal(calls.some((call) => call[0] === "createUser"), false);
+
+  const updated = await run(users.updateExistingUser, {
+    user: { userId: 7, userType: "staff", organizationId: 1 },
+    params: { id: "7" },
+    body: { departmentId: 50 },
+  });
+  assert.equal(updated.statusCode, 404);
+  assert.equal(calls.some((call) => call[0] === "updateUser"), false);
 });
 
 test("same-organisation user create uses the session organisation", async () => {

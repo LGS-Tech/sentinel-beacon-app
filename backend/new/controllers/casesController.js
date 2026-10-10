@@ -80,6 +80,42 @@ function withoutAssigneeUnlessAllowed(user, body) {
   return copy;
 }
 
+function firstDefined(body, ...keys) {
+  for (const key of keys) {
+    if (body[key] !== undefined) return body[key];
+  }
+  return undefined;
+}
+
+// Same check as POST /cases/assign: the assignee and department must belong
+// to the caller's organisation. A missing row is a 404, not a cross-org name.
+async function rejectForeignAssignment(res, organizationId, body) {
+  const userId = firstDefined(body, "assignedUserId", "assigned_user_id");
+  const departmentId = firstDefined(
+    body,
+    "assignedDepartmentId",
+    "assigned_department_id"
+  );
+
+  if (userId != null && userId !== "") {
+    const assignee = await getUserById(userId, organizationId);
+    if (!assignee) {
+      res.status(404).json({ error: "Case or User not found" });
+      return true;
+    }
+  }
+
+  if (departmentId != null && departmentId !== "") {
+    const department = await getDepartmentById(departmentId, organizationId);
+    if (!department) {
+      res.status(404).json({ error: "Case or User not found" });
+      return true;
+    }
+  }
+
+  return false;
+}
+
 const CLOSED_STATUSES = ["CLOSED", "RESOLVED"];
 
 const createNewCase = async (req, res, next) => {
@@ -89,9 +125,11 @@ const createNewCase = async (req, res, next) => {
     const fields = withoutActorFields(omitClientOrganisation(req.body));
     delete fields.closedAt;
     delete fields.closed_at;
+    const caseFields = withoutAssigneeUnlessAllowed(req.user, fields);
+    if (await rejectForeignAssignment(res, organizationId, caseFields)) return;
     const created = await createCase(
       {
-        ...withoutAssigneeUnlessAllowed(req.user, fields),
+        ...caseFields,
         status: "ACTIVE",
         createdByUserId: req.user.userId,
       },
@@ -119,6 +157,7 @@ const updateExistingCase = async (req, res, next) => {
       req.user,
       withoutActorFields(omitClientOrganisation(req.body))
     );
+    if (await rejectForeignAssignment(res, organizationId, changes)) return;
 
     // The server owns closed_at / closed_by_user_id; they follow the status.
     delete changes.closedAt;

@@ -7,6 +7,29 @@ let createCaseArgs;
 let updateCaseArgs;
 let existingCase;
 
+const usersPath = require.resolve("../db/queries/users");
+const departmentsPath = require.resolve("../db/queries/departments");
+
+require.cache[usersPath] = {
+  id: usersPath,
+  filename: usersPath,
+  loaded: true,
+  exports: {
+    getUserById: async (id) =>
+      Number(id) === 99 ? null : { id: Number(id), userType: "staff" },
+  },
+};
+
+require.cache[departmentsPath] = {
+  id: departmentsPath,
+  filename: departmentsPath,
+  loaded: true,
+  exports: {
+    getDepartmentById: async (id) =>
+      Number(id) === 50 ? null : { id: Number(id), name: "Facilities" },
+  },
+};
+
 require.cache[queriesPath] = {
   id: queriesPath,
   filename: queriesPath,
