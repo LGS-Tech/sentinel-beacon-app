@@ -3,8 +3,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Sharing from 'expo-sharing';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
+import { showAlert } from '@/lib/alert';
 import {
   FlatList,
   Modal,
@@ -16,9 +17,8 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
-import { showAlert } from '@/lib/alert';
 
-import { deleteCase, getCases, updateCase } from '@/lib/db';
+import { deleteCase, deleteCaseAttachment, getCaseAttachments, getCases, updateCase } from '@/lib/db';
 
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -28,8 +28,9 @@ import { ThemedView } from '../../components/themed-view';
 type FileItem = {
   id: string;
   name: string;
-  type: 'text';
+  type: 'text' | 'image';
   content: string;
+  attachmentId?: string;
 };
 
 type CaseItem = {
@@ -96,12 +97,13 @@ Last Sync:   ${new Date().toISOString()}
 const loadCases = async (): Promise<CaseItem[]> => {
   const rows = await getCases();
 
-  return rows.map((row: any) => {
-    const files: FileItem[] = [
-      {
-        id: `chat-${row._id ?? row.id}`,
-        name: 'team-chat.txt',
-        type: 'text',
+  return Promise.all(
+    rows.map(async (row: any) => {
+      const files: FileItem[] = [
+        {
+          id: `chat-${row._id ?? row.id}`,
+          name: 'team-chat.txt',
+          type: 'text',
         content: row.chat || 'No chat data',
       },
 
@@ -119,6 +121,21 @@ const loadCases = async (): Promise<CaseItem[]> => {
         content: generateReportText(row),
       },
     ];
+    try{
+      const attachments = await getCaseAttachments(String(row._id ?? row.id));
+      for (const att of attachments) {
+        files.push({
+          id: att.id,
+          attachmentId: att.id,
+          name: att.filename,
+          type: att.mimeType?.startsWith('image/') ? 'image' : 'text',
+          content: att.storageURL,
+        });
+      }
+    }
+      catch{
+        // No attachments, or the request failed: skip quietly.
+      }
 
     return {
       id: String(row._id ?? row.id),
@@ -145,7 +162,7 @@ const loadCases = async (): Promise<CaseItem[]> => {
 
       files,
     };
-  });
+  }));
 };
 
 export default function VaultScreen() {
@@ -193,6 +210,31 @@ export default function VaultScreen() {
     setVaultData(cases);
   };
 
+  const handleDeleteFile = () => {
+  if (!selectedFile?.attachmentId || !expandedCase) return;
+  const caseId = expandedCase.id;
+  const attachmentId = selectedFile.attachmentId;
+
+  showAlert('Delete file', 'Delete this file permanently?', [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Delete',
+      style: 'destructive',
+      onPress: async () => {
+        try {
+          await deleteCaseAttachment(caseId, attachmentId);
+          setSelectedFile(null);
+          await refreshVault();
+        } catch (err) {
+          showAlert(
+            'Could not delete file',
+            err instanceof Error ? err.message : 'Unknown error',
+          );
+        }
+      },
+    },
+  ]);
+};
   const handleDeleteCase = (caseId: string) => {
     showAlert(
       'Delete Folder',
@@ -261,11 +303,11 @@ export default function VaultScreen() {
           UTI: 'public.plain-text', // iOS file type identifier
         });
       } else {
-        Alert.alert('File Saved', `Saved to ${fileUri}`);
+        showAlert('File Saved', `Saved to ${fileUri}`);
       }
     }
   } catch (error) {
-    Alert.alert('Download Failed', 'Unable to save file to device.');
+    showAlert('Download Failed', 'Unable to save file to device.');
   }
 };
 
@@ -636,6 +678,13 @@ export default function VaultScreen() {
                       >
                         <Ionicons name="download-outline" size={22} color="#059669" />
                       </Pressable>
+                      {selectedFile?.attachmentID &&(
+                        <Pressable onPress={handleDeleteAttachment} hitSlop={8}>
+                          <Ionicons name = "trash-outline" size={22} color="#EF4444" />
+                        </Pressable>
+                      )}
+
+
 
                       <Pressable onPress={() => setSelectedFile(null)} hitSlop={8}>
                         <Ionicons name="close" size={22} color="#111827" />
