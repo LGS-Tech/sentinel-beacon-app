@@ -80,3 +80,13 @@ export async function deleteCase(id: string) {
     method: "DELETE",
   });
 }
+
+export async function getCaseAttachments(caseId: string) {
+  return requestJson(`/cases/${caseId}/attachments`);
+}
+
+export async function deleteCaseAttachment(caseId: string, attachmentId: string) {
+  await requestJson(`/cases/${caseId}/attachments/${attachmentId}`, {
+    method: "DELETE",
+  });
+}
