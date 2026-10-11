@@ -1,3 +1,4 @@
+import { showAlert } from '@/lib/alert';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -11,7 +12,6 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { showAlert } from '@/lib/alert';
 
 import { loginWithEmailPassword } from '@/lib/api';
 
@@ -111,13 +111,6 @@ export default function LoginPage() {
           )}
         </Pressable>
 
-        {/* Create Account */}
-        <Pressable
-          style={styles.createButton}
-          onPress={() => router.push('/registerPage')}
-        >
-          <Text style={styles.createText}>Create Account</Text>
-        </Pressable>
 
         {/* Version */}
         <Text style={styles.version}>v1.0.0</Text>
