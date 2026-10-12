@@ -6,12 +6,17 @@
 function attachmentToApi(row) {
   if (!row) return null;
 
+  const storedInObjectStorage =
+    row.storage_provider === "r2" || row.storage_provider === "s3";
+
   return {
     id: row.id,
     caseId: row.case_id,
     filename: row.filename,
     mimeType: row.mime_type,
-    storageUrl: row.storage_url,
+    storageUrl: storedInObjectStorage
+      ? `/cases/${row.case_id}/attachments/${row.id}/content`
+      : row.storage_url,
     storageProvider: row.storage_provider,
     fileSizeBytes:
       row.file_size_bytes != null ? Number(row.file_size_bytes) : null,

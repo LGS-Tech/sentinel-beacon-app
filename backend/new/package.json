@@ -20,11 +20,13 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1150.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.4.0",
     "pg": "^8.22.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0"

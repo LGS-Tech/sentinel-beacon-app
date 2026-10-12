@@ -1,78 +1,21 @@
 # Case attachments API
 
-Metadata-only attachments linked to Postgres `cases`. **No binary storage in PostgreSQL** — the client (or a future upload service) stores the file and sends a `storageUrl` reference.
+Authenticated Vault PDFs. **Bytes go to Cloudflare R2. PostgreSQL stores metadata only.**
 
-## Endpoints (after merge with Core API)
+## Endpoints
 
-Base path: **`/cases/:caseId/attachments`**
+Base path: **`/cases/:caseId/attachments`** (JWT required)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/cases/:caseId/attachments` | List attachments for a case |
-| POST | `/cases/:caseId/attachments` | Register an attachment reference |
+| GET | `/cases/:caseId/attachments` | List attachment metadata for a case |
+| POST | `/cases/:caseId/attachments` | Multipart upload (`file`) of a PDF |
 | GET | `/cases/:caseId/attachments/:attachmentId` | Get one attachment |
-| DELETE | `/cases/:caseId/attachments/:attachmentId` | Remove attachment metadata |
+| GET | `/cases/:caseId/attachments/:attachmentId/content` | Stream the PDF through the API |
+| DELETE | `/cases/:caseId/attachments/:attachmentId` | Delete metadata, then the R2 object |
 
-### POST body (JSON)
+Allowed type: **PDF**. Max size: **10 MB**.
 
-```json
-{
-  "filename": "broken-tap.jpg",
-  "mimeType": "image/jpeg",
-  "storageUrl": "https://cdn.example.com/vault/case-123/broken-tap.jpg",
-  "storageProvider": "external",
-  "fileSizeBytes": 245760,
-  "uploadedByUserId": 7
-}
-```
+`storageUrl` in the JSON response is an API path, not a public R2 URL. Postgres stores the private object key.
 
-Required: `filename`, `storageUrl`.
-
-### Response shape
-
-```json
-{
-  "id": "uuid",
-  "caseId": "uuid",
-  "filename": "broken-tap.jpg",
-  "mimeType": "image/jpeg",
-  "storageUrl": "https://...",
-  "storageProvider": "external",
-  "fileSizeBytes": 245760,
-  "uploadedByUserId": 7,
-  "uploadedByName": "Aisha Khan",
-  "createdAt": 1787102249027
-}
-```
-
-## Merge with `feature/core-api-auth`
-
-In `routes/casesRoutes.js`, **before** `router.get("/:id", getCase)`:
-
-```js
-const caseAttachmentsRoutes = require("./caseAttachmentsRoutes");
-router.use("/:caseId/attachments", caseAttachmentsRoutes);
-```
-
-Then wrap with `authenticate` (same as other case routes) once auth middleware is final.
-
-Update root `/` endpoint list to include attachments if desired.
-
-## Database
-
-Table: `case_attachments` in `db/schema.sql`
-Queries: `db/queries/attachments.js`
-Access: `const db = require("./db"); await db.attachments.listAttachmentsByCaseId(caseId);`
-
-Apply schema:
-
-```bash
-cd backend/new
-npm run db:setup
-npm run db:smoke-attachments
-```
-
-## Coordination notes
-
-- Attachments routes are mounted on the PostgreSQL API in `server.js` (`/cases/:caseId/attachments`).
-- File upload binary handling is **out of scope** for this sprint; frontend can use a placeholder URL until Blob/S3 is chosen.
+R2 env vars (server only): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`.

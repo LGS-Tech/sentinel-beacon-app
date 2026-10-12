@@ -33,12 +33,16 @@ async function getAttachmentById(id) {
   return attachmentToApi(result.rows[0]);
 }
 
-async function getAttachmentForCase(caseId, attachmentId) {
+async function getAttachmentRowForCase(caseId, attachmentId) {
   const result = await query(
     `${ATTACHMENT_SELECT} WHERE a.case_id = $1 AND a.id = $2`,
     [caseId, attachmentId]
   );
-  return attachmentToApi(result.rows[0]);
+  return result.rows[0] || null;
+}
+
+async function getAttachmentForCase(caseId, attachmentId) {
+  return attachmentToApi(await getAttachmentRowForCase(caseId, attachmentId));
 }
 
 function buildAttachmentFields(body) {
@@ -98,6 +102,7 @@ module.exports = {
   listAttachmentsByCaseId,
   getAttachmentById,
   getAttachmentForCase,
+  getAttachmentRowForCase,
   createAttachment,
   deleteAttachment,
 };

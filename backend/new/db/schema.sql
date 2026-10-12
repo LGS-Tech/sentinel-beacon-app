@@ -297,7 +297,7 @@ CREATE TABLE IF NOT EXISTS case_attachments (
   mime_type TEXT,
   storage_url TEXT NOT NULL,
   storage_provider TEXT NOT NULL DEFAULT 'external'
-    CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'other')),
+    CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'r2', 'other')),
   file_size_bytes BIGINT,
   uploaded_by_user_id INTEGER REFERENCES users (id),
   created_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
@@ -308,3 +308,27 @@ CREATE INDEX IF NOT EXISTS idx_case_attachments_case_id
 
 CREATE INDEX IF NOT EXISTS idx_case_attachments_uploaded_by
   ON case_attachments (uploaded_by_user_id);
+
+-- Existing databases keep the pre-R2 check until this replaces it.
+DO $$
+DECLARE
+  constraint_name text;
+BEGIN
+  SELECT con.conname INTO constraint_name
+  FROM pg_constraint con
+  WHERE con.conrelid = 'case_attachments'::regclass
+    AND con.contype = 'c'
+    AND pg_get_constraintdef(con.oid) ILIKE '%storage_provider%'
+    AND pg_get_constraintdef(con.oid) NOT ILIKE '%''r2''%';
+
+  IF constraint_name IS NOT NULL THEN
+    EXECUTE format(
+      'ALTER TABLE case_attachments DROP CONSTRAINT %I',
+      constraint_name
+    );
+    ALTER TABLE case_attachments
+      ADD CONSTRAINT case_attachments_storage_provider_check
+      CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'r2', 'other'));
+  END IF;
+END
+$$;
