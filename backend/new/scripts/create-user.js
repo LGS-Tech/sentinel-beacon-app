@@ -2,15 +2,15 @@
  * Provision one account from the command line (no public signup needed).
  *
  * Usage (from backend/new):
- *   CREATE_USER_PASSWORD=... npm run user:create -- \
+ *   CREATE_USER_PASSWORD=... npm run user:create -- --org lgs-demo \
  *     --email jane@example.org --username jane --name "Jane Doe" --user-type staff
  *
- * Each flag can also come from the environment: CREATE_USER_EMAIL,
- * CREATE_USER_USERNAME, CREATE_USER_NAME, CREATE_USER_TYPE.
+ * Each flag can also come from the environment: CREATE_USER_ORG,
+ * CREATE_USER_EMAIL, CREATE_USER_USERNAME, CREATE_USER_NAME, CREATE_USER_TYPE.
  * The password is read ONLY from CREATE_USER_PASSWORD and is never logged.
  *
- * TODO(#64): take the organisation (id or slug) as a parameter once
- * organisations are merged; until then every account lands in the single tenant.
+ * --org is the organisation slug (see `npm run org:create`). The organisation
+ * must exist and be active; the account is created inside it.
  */
 require("dotenv").config({ quiet: true });
 
@@ -19,8 +19,10 @@ const { ROLES } = require("../utils/casePolicy");
 const USER_TYPES = Object.values(ROLES);
 const MIN_PASSWORD_LENGTH = 8;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const FLAGS = {
+  "--org": "org",
   "--email": "email",
   "--username": "username",
   "--name": "name",
@@ -53,6 +55,9 @@ function parseArgs(argv) {
 // Flags win over the environment. Throws with a message safe to print:
 // it never includes the password.
 function resolveInput(options = {}, env = process.env) {
+  const org = String(options.org ?? env.CREATE_USER_ORG ?? "")
+    .trim()
+    .toLowerCase();
   const email = String(options.email ?? env.CREATE_USER_EMAIL ?? "").trim();
   const username = String(
     options.username ?? env.CREATE_USER_USERNAME ?? ""
@@ -64,6 +69,7 @@ function resolveInput(options = {}, env = process.env) {
   const password = env.CREATE_USER_PASSWORD;
 
   const missing = [];
+  if (!org) missing.push("--org");
   if (!email) missing.push("--email");
   if (!username) missing.push("--username");
   if (!name) missing.push("--name");
@@ -72,6 +78,11 @@ function resolveInput(options = {}, env = process.env) {
     throw new Error(`Missing required value(s): ${missing.join(", ")}`);
   }
 
+  if (!SLUG_PATTERN.test(org)) {
+    throw new Error(
+      "--org must be an organisation slug (lowercase letters, digits and hyphens)"
+    );
+  }
   if (!EMAIL_PATTERN.test(email)) {
     throw new Error("--email is not a valid email address");
   }
@@ -87,7 +98,7 @@ function resolveInput(options = {}, env = process.env) {
     );
   }
 
-  return { email, username, name, userType, password };
+  return { org, email, username, name, userType, password };
 }
 
 async function main() {
@@ -98,6 +109,16 @@ async function main() {
   const db = require("../db");
 
   try {
+    const organisation = await db.organisations.getOrganisationBySlug(input.org);
+    if (!organisation) {
+      throw new Error(
+        `Organisation ${input.org} does not exist. Create it with npm run org:create`
+      );
+    }
+    if (!organisation.isActive) {
+      throw new Error(`Organisation ${input.org} is inactive`);
+    }
+
     if (await db.users.getUserByEmail(input.email)) {
       throw new Error(`A user with email ${input.email} already exists`);
     }
@@ -105,17 +126,20 @@ async function main() {
       throw new Error(`A user with username ${input.username} already exists`);
     }
 
-    const created = await db.users.createUser({
-      username: input.username,
-      password: await bcrypt.hash(input.password, 10),
-      email: input.email,
-      name: input.name,
-      userType: input.userType,
-      authorisation: input.userType === ROLES.LEAD ? 1 : 2,
-    });
+    const created = await db.users.createUser(
+      {
+        username: input.username,
+        password: await bcrypt.hash(input.password, 10),
+        email: input.email,
+        name: input.name,
+        userType: input.userType,
+        authorisation: input.userType === ROLES.LEAD ? 1 : 2,
+      },
+      organisation.id
+    );
 
     console.log(
-      `Created user id=${created.id} email=${created.email} username=${created.username} userType=${created.userType}`
+      `Created user id=${created.id} email=${created.email} username=${created.username} userType=${created.userType} org=${organisation.slug}`
     );
   } finally {
     await db.pool.pool.end();
@@ -129,4 +153,10 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, resolveInput, USER_TYPES, MIN_PASSWORD_LENGTH };
+module.exports = {
+  parseArgs,
+  resolveInput,
+  USER_TYPES,
+  MIN_PASSWORD_LENGTH,
+  SLUG_PATTERN,
+};

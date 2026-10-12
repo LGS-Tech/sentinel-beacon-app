@@ -18,7 +18,8 @@
     "db:smoke-org-access": "node scripts/smoke-org-access.js",
     "smoke:vault-files": "node scripts/smoke-vault-files.js",
     "db:hash-seeds": "node scripts/hashSeedPasswords.js",
-    "user:create": "node scripts/create-user.js"
+    "user:create": "node scripts/create-user.js",
+    "org:create": "node scripts/create-org.js"
   },
   "keywords": [],
   "author": "",

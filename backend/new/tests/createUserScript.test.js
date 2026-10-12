@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const { parseArgs, resolveInput } = require("../scripts/create-user");
 
 const VALID_OPTIONS = {
+  org: "lgs-demo",
   email: "jane@example.org",
   username: "jane",
   name: "Jane Doe",
@@ -15,6 +16,8 @@ const VALID_ENV = { CREATE_USER_PASSWORD: "long-enough-value" };
 test("parseArgs reads --flag value and --flag=value", () => {
   assert.deepEqual(
     parseArgs([
+      "--org",
+      "lgs-demo",
       "--email",
       "jane@example.org",
       "--username=jane",
@@ -48,12 +51,14 @@ test("resolveInput falls back to CREATE_USER_* environment values", () => {
     {},
     {
       ...VALID_ENV,
+      CREATE_USER_ORG: "Example-College",
       CREATE_USER_EMAIL: "sam@example.org",
       CREATE_USER_USERNAME: "sam",
       CREATE_USER_NAME: "Sam",
       CREATE_USER_TYPE: "Lead",
     }
   );
+  assert.equal(resolved.org, "example-college");
   assert.equal(resolved.email, "sam@example.org");
   assert.equal(resolved.userType, "lead");
 });
@@ -90,7 +95,7 @@ test("resolveInput refuses an unknown user type", () => {
 test("resolveInput lists every missing value", () => {
   assert.throws(
     () => resolveInput({ email: "jane@example.org" }, VALID_ENV),
-    /Missing required value\(s\): --username, --name, --user-type/
+    /Missing required value\(s\): --org, --username, --name, --user-type/
   );
 });
 
@@ -99,4 +104,33 @@ test("resolveInput refuses an invalid email", () => {
     () => resolveInput({ ...VALID_OPTIONS, email: "not-an-email" }, VALID_ENV),
     /not a valid email/
   );
+});
+
+test("resolveInput requires an organisation", () => {
+  const { org, ...withoutOrg } = VALID_OPTIONS;
+  assert.throws(
+    () => resolveInput(withoutOrg, VALID_ENV),
+    /Missing required value\(s\): --org/
+  );
+  assert.throws(
+    () => resolveInput(withoutOrg, { ...VALID_ENV, CREATE_USER_ORG: "  " }),
+    /Missing required value\(s\): --org/
+  );
+});
+
+test("resolveInput prefers --org over CREATE_USER_ORG", () => {
+  const resolved = resolveInput(VALID_OPTIONS, {
+    ...VALID_ENV,
+    CREATE_USER_ORG: "other-org",
+  });
+  assert.equal(resolved.org, "lgs-demo");
+});
+
+test("resolveInput refuses an organisation that is not a slug", () => {
+  for (const org of ["12 34", "lgs_demo", "-lgs", "lgs--demo", "1; DROP TABLE users"]) {
+    assert.throws(
+      () => resolveInput({ ...VALID_OPTIONS, org }, VALID_ENV),
+      /--org must be an organisation slug/
+    );
+  }
 });
