@@ -6,6 +6,7 @@
  */
 
 const pool = require("./pool");
+const organisations = require("./queries/organisations");
 const departments = require("./queries/departments");
 const users = require("./queries/users");
 const cases = require("./queries/cases");
@@ -13,6 +14,7 @@ const attachments = require("./queries/attachments");
 
 module.exports = {
   pool,
+  organisations,
   departments,
   users,
   cases,

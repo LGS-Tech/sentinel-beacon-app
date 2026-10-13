@@ -2,6 +2,16 @@ const path = require("path");
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
+const ALLOWED_TYPES = {
+  ".txt": "text/plain",
+  ".pdf": "application/pdf",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+};
+
+const ALLOWED_MIME = new Set(Object.values(ALLOWED_TYPES));
+
 function extensionOf(filename) {
   return path.extname(String(filename || "")).toLowerCase();
 }
@@ -9,11 +19,11 @@ function extensionOf(filename) {
 function sanitizeFilename(filename) {
   const base = path.basename(String(filename || "file")).replace(/[/\\]/g, "");
   const cleaned = base.replace(/[^\w.\-()+ ]+/g, "_").trim();
-  return (cleaned || "file.pdf").slice(0, 180);
+  return (cleaned || "file").slice(0, 180);
 }
 
 function guessMimeFromName(filename) {
-  return extensionOf(filename) === ".pdf" ? "application/pdf" : null;
+  return ALLOWED_TYPES[extensionOf(filename)] || null;
 }
 
 function normalizeMime(mimeType, filename) {
@@ -21,17 +31,11 @@ function normalizeMime(mimeType, filename) {
     .split(";")[0]
     .trim()
     .toLowerCase();
-  if (
-    raw === "application/x-pdf" ||
-    raw === "application/acrobat" ||
-    raw === "application/vnd.pdf"
-  ) {
-    return "application/pdf";
-  }
-  if (!raw || raw === "application/octet-stream" || raw === "binary/octet-stream") {
+  if (raw === "image/jpg") return "image/jpeg";
+  if (!raw || raw === "application/octet-stream") {
     return guessMimeFromName(filename);
   }
-  if (raw === "application/pdf") return raw;
+  if (ALLOWED_MIME.has(raw)) return raw;
   return guessMimeFromName(filename);
 }
 
@@ -40,11 +44,19 @@ function validateVaultFile({ originalname, mimetype, size }) {
   const ext = extensionOf(filename);
   const mimeType = normalizeMime(mimetype, filename);
 
-  if (ext !== ".pdf" || mimeType !== "application/pdf") {
+  if (!ALLOWED_TYPES[ext]) {
     return {
       ok: false,
       status: 400,
-      error: "Only PDF files can be uploaded.",
+      error: "Only TXT, PDF, JPG, and PNG files can be uploaded.",
+    };
+  }
+
+  if (!mimeType || mimeType !== ALLOWED_TYPES[ext]) {
+    return {
+      ok: false,
+      status: 400,
+      error: "File type does not match the file extension.",
     };
   }
 
@@ -78,6 +90,7 @@ function objectKey(caseId, ext) {
 
 module.exports = {
   MAX_FILE_BYTES,
+  ALLOWED_TYPES,
   sanitizeFilename,
   guessMimeFromName,
   validateVaultFile,

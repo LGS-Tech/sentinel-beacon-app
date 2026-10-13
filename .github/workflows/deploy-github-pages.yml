@@ -1,6 +1,6 @@
 # Deploy Expo static web build to GitHub Pages
 # Site: https://lgs-tech.github.io/sentinel-beacon-app/
-# API:  https://sentinel-beacon-app.onrender.com (production)
+# API:  https://sentinel-beacon-app-t6wz.onrender.com (production)
 
 name: Deploy GitHub Pages
 
@@ -44,7 +44,7 @@ jobs:
       - name: Export static web (production → Render API)
         env:
           NODE_ENV: production
-          EXPO_PUBLIC_API_URL: https://sentinel-beacon-app.onrender.com
+          EXPO_PUBLIC_API_URL: https://sentinel-beacon-app-t6wz.onrender.com
         run: npx expo export --platform web
 
       - name: Upload Pages artifact

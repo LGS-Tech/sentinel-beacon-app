@@ -1,4 +1,4 @@
-// Vault case folders: generated notes plus uploaded PDFs.
+// Vault lists case folders and uploaded TXT/PDF/JPG/PNG files from the API.
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,7 +7,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -18,10 +20,11 @@ import {
   View
 } from 'react-native';
 import { showAlert } from '@/lib/alert';
+import * as WebBrowser from 'expo-web-browser';
 
 import {
+  CaseAttachment,
   deleteCase,
-  deleteCaseAttachment,
   fetchAttachmentBlob,
   getCaseAttachments,
   getCases,
@@ -35,12 +38,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 
+type FileKind = 'text' | 'pdf' | 'image' | 'file';
+
 type FileItem = {
   id: string;
   name: string;
-  type: 'text' | 'pdf';
+  kind: FileKind;
   content?: string;
+  mimeType?: string;
   attachmentId?: string;
+  caseId?: string;
 };
 
 type CaseItem = {
@@ -57,6 +64,24 @@ type CaseItem = {
   chat?: string;
   files: FileItem[];
 };
+
+function kindFromMime(mimeType?: string | null): FileKind {
+  if (mimeType?.startsWith('image/')) return 'image';
+  if (mimeType === 'application/pdf') return 'pdf';
+  if (mimeType === 'text/plain') return 'text';
+  return 'file';
+}
+
+function mapAttachment(row: CaseAttachment, caseId: string): FileItem {
+  return {
+    id: row.id,
+    name: row.filename,
+    kind: kindFromMime(row.mimeType),
+    mimeType: row.mimeType ?? undefined,
+    attachmentId: row.id,
+    caseId,
+  };
+}
 
 const generateReportText = (row: any): string => {
   const caseId = String(row._id ?? row.id);
@@ -104,75 +129,62 @@ Last Sync:   ${new Date().toISOString()}
 `.trim();
 };
 
+function generatedFiles(row: any): FileItem[] {
+  const id = String(row._id ?? row.id);
+  return [
+    {
+      id: `chat-${id}`,
+      name: 'team-chat.txt',
+      kind: 'text',
+      content: row.chat || 'No chat data',
+    },
+    {
+      id: `feed-${id}`,
+      name: 'live-feed.txt',
+      kind: 'text',
+      content: row.feed || 'No live feed data',
+    },
+    {
+      id: `report-${id}`,
+      name: 'report.txt',
+      kind: 'text',
+      content: generateReportText(row),
+    },
+  ];
+}
+
+async function filesForCase(row: any): Promise<FileItem[]> {
+  const caseId = String(row._id ?? row.id);
+  const generated = generatedFiles(row);
+  try {
+    const attachments = await getCaseAttachments(caseId);
+    return [...generated, ...attachments.map((item) => mapAttachment(item, caseId))];
+  } catch {
+    return generated;
+  }
+}
+
 const loadCases = async (): Promise<CaseItem[]> => {
   const rows = await getCases();
 
   return Promise.all(
     rows.map(async (row: any) => {
-    const caseId = String(row._id ?? row.id);
-    const files: FileItem[] = [
-      {
-        id: `chat-${caseId}`,
-        name: 'team-chat.txt',
-        type: 'text',
-        content: row.chat || 'No chat data',
-      },
+      const files = await filesForCase(row);
 
-      {
-        id: `feed-${caseId}`,
-        name: 'live-feed.txt',
-        type: 'text',
-        content: row.feed || 'No live feed data',
-      },
-
-      {
-        id: `report-${caseId}`,
-        name: 'report.txt',
-        type: 'text',
-        content: generateReportText(row),
-      },
-    ];
-
-    try {
-      const attachments = await getCaseAttachments(caseId);
-      for (const attachment of attachments) {
-        if (attachment.mimeType !== 'application/pdf') continue;
-        files.push({
-          id: attachment.id,
-          attachmentId: attachment.id,
-          name: attachment.filename,
-          type: 'pdf',
-        });
-      }
-    } catch {
-      // Keep the generated notes visible when the attachment list fails.
-    }
-
-    return {
-      id: caseId,
-
-      title: row.title,
-
-      createdAt: row.createdAt,
-
-      lastUpdatedAt: row.lastUpdatedAt,
-
-      status: row.status ?? 'CLOSED',
-
-      locationX: row.locationX,
-
-      locationY: row.locationY,
-
-      locationLabel: row.locationLabel,
-
-      floor: row.floor,
-
-      feed: row.feed,
-
-      chat: row.chat,
-
-      files,
-    };
+      return {
+        id: String(row._id ?? row.id),
+        title: row.title,
+        createdAt: row.createdAt,
+        lastUpdatedAt: row.lastUpdatedAt,
+        status: row.status ?? 'CLOSED',
+        locationX: row.locationX,
+        locationY: row.locationY,
+        locationLabel: row.locationLabel,
+        floor: row.floor,
+        feed: row.feed,
+        chat: row.chat,
+        files,
+      };
     }),
   );
 };
@@ -182,8 +194,6 @@ export default function VaultScreen() {
   const isDesktop = width >= 768;
 
   const [vaultData, setVaultData] = useState<CaseItem[]>([]);
-
-  const [selectedText, setSelectedText] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
 
@@ -201,6 +211,7 @@ export default function VaultScreen() {
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [uploading, setUploading] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [previewText, setPreviewText] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
   const GRID_COLUMNS = 1;
@@ -223,45 +234,48 @@ export default function VaultScreen() {
     const cases = await loadCases();
 
     setVaultData(cases);
-    setExpandedCase((current) => {
-      if (!current) return current;
-      return cases.find((item) => item.id === current.id) ?? null;
-    });
     return cases;
   };
 
   useEffect(() => {
-    if (!selectedFile || selectedFile.type !== 'pdf' || !selectedFile.attachmentId || !expandedCase) {
-      setPreviewUri(null);
-      setPreviewLoading(false);
-      return;
-    }
-
-    let cancelled = false;
     let objectUrl: string | null = null;
-    setPreviewLoading(true);
-    setPreviewUri(null);
+    let cancelled = false;
 
-    (async () => {
+    async function loadPreview() {
+      setPreviewUri(null);
+      setPreviewText(null);
+      if (!selectedFile) return;
+
+      if (selectedFile.content != null && !selectedFile.attachmentId) {
+        setPreviewText(selectedFile.content);
+        return;
+      }
+
+      if (!selectedFile.attachmentId || !selectedFile.caseId) return;
+
+      setPreviewLoading(true);
       try {
         const blob = await fetchAttachmentBlob(
-          expandedCase.id,
-          selectedFile.attachmentId as string,
+          selectedFile.caseId,
+          selectedFile.attachmentId,
         );
         if (cancelled) return;
-        if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
-          throw new Error('Unable to preview this PDF on this device.');
-        }
-        objectUrl = URL.createObjectURL(blob);
-        if (cancelled) {
-          URL.revokeObjectURL(objectUrl);
+
+        if (selectedFile.kind === 'text') {
+          setPreviewText(await blob.text());
           return;
         }
+
+        if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+          throw new Error('Unable to preview this file on this device.');
+        }
+
+        objectUrl = URL.createObjectURL(blob);
         setPreviewUri(objectUrl);
       } catch (error) {
         if (!cancelled) {
-          showAlert(
-            'Unable to open PDF',
+          Alert.alert(
+            'Unable to open file',
             error instanceof Error ? error.message : 'Please try again.',
           );
           setSelectedFile(null);
@@ -269,15 +283,16 @@ export default function VaultScreen() {
       } finally {
         if (!cancelled) setPreviewLoading(false);
       }
-    })();
+    }
 
+    loadPreview();
     return () => {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [selectedFile, expandedCase]);
+  }, [selectedFile]);
 
-  const handleUploadPdf = async () => {
+  const handleAddFile = async () => {
     if (!expandedCase || uploading) return;
 
     try {
@@ -286,41 +301,17 @@ export default function VaultScreen() {
 
       setUploading(true);
       await uploadCaseAttachment(expandedCase.id, picked);
-      await refreshVault();
+      const cases = await refreshVault();
+      const updated = cases.find((item) => item.id === expandedCase.id);
+      if (updated) setExpandedCase(updated);
     } catch (error) {
-      showAlert(
+      Alert.alert(
         'Upload failed',
         error instanceof Error ? error.message : 'Please try again.',
       );
     } finally {
       setUploading(false);
     }
-  };
-
-  const handleDeleteFile = (file: FileItem) => {
-    if (!file.attachmentId || !expandedCase) return;
-    const caseId = expandedCase.id;
-    const attachmentId = file.attachmentId;
-
-    showAlert('Delete PDF', `Delete ${file.name} from this case folder?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteCaseAttachment(caseId, attachmentId);
-            setSelectedFile(null);
-            await refreshVault();
-          } catch (error) {
-            showAlert(
-              'Could not delete PDF',
-              error instanceof Error ? error.message : 'Please try again.',
-            );
-          }
-        },
-      },
-    ]);
   };
 
   const handleDeleteCase = (caseId: string) => {
@@ -356,57 +347,11 @@ export default function VaultScreen() {
   };
   
   const handleNativeDownload = async (file: FileItem | null) => {
-  if (!file) return;
-  if (file.type !== 'pdf' && !file.content) return;
+  if (!file || !file.content) return;
 
   try {
-    if (file.type === 'pdf' && file.attachmentId && expandedCase) {
-      const blob = await fetchAttachmentBlob(expandedCase.id, file.attachmentId);
-      if (Platform.OS === 'web') {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = file.name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        return;
-      }
-
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onerror = () => reject(reader.error);
-        reader.onload = () => {
-          const result = String(reader.result || '');
-          const comma = result.indexOf(',');
-          resolve(comma >= 0 ? result.slice(comma + 1) : result);
-        };
-        reader.readAsDataURL(blob);
-      });
-      const baseDirectory =
-        (FileSystem as any).cacheDirectory ??
-        (FileSystem as any).documentDirectory ??
-        '';
-      const fileUri = `${baseDirectory}${file.name}`;
-      await FileSystem.writeAsStringAsync(fileUri, base64, {
-        encoding: 'base64' as any,
-      });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/pdf',
-          dialogTitle: `Save ${file.name}`,
-          UTI: 'com.adobe.pdf',
-        });
-      } else {
-        showAlert('File Saved', `Saved to ${fileUri}`);
-      }
-      return;
-    }
-
-    if (!file.content) return;
-
     if (Platform.OS === 'web') {
+      // Web RAM download
       const blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -417,28 +362,31 @@ export default function VaultScreen() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } else {
+      // Native iOS / Android sandbox download
       const baseDirectory =
         (FileSystem as any).documentDirectory ??
         (FileSystem as any).cacheDirectory ??
         '';
       const fileUri = `${baseDirectory}${file.name}`;
 
+      // Write string directly from state to local disk
       await FileSystem.writeAsStringAsync(fileUri, file.content, {
         encoding: 'utf8' as any,
       });
 
+      // Open native OS "Save to Files" / Share sheet
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri, {
           mimeType: 'text/plain',
           dialogTitle: `Save ${file.name}`,
-          UTI: 'public.plain-text',
+          UTI: 'public.plain-text', // iOS file type identifier
         });
       } else {
-        showAlert('File Saved', `Saved to ${fileUri}`);
+        Alert.alert('File Saved', `Saved to ${fileUri}`);
       }
     }
-  } catch {
-    showAlert('Download Failed', 'Unable to save file to device.');
+  } catch (error) {
+    Alert.alert('Download Failed', 'Unable to save file to device.');
   }
 };
 
@@ -541,25 +489,50 @@ export default function VaultScreen() {
     <Pressable
       style={({ pressed }) => [styles.fileItem, pressed && { opacity: 0.7 }]}
       onPress={() => {
-        setSelectedText(item.content ?? null);
+        setSelectedFile(item);
       }}
     >
       <View
         style={[
           styles.fileIconBox,
           {
-            backgroundColor: '#D1FAE5',
+            backgroundColor:
+              item.kind === 'image'
+                ? '#DBEAFE'
+                : item.kind === 'pdf'
+                  ? '#FEE2E2'
+                  : '#D1FAE5',
           },
         ]}
       >
-        <Ionicons name="reader-outline" size={20} color="#059669" />
+        <Ionicons
+          name={
+            item.kind === 'image'
+              ? 'image-outline'
+              : item.kind === 'pdf'
+                ? 'document-outline'
+                : 'reader-outline'
+          }
+          size={20}
+          color={
+            item.kind === 'image'
+              ? '#2563EB'
+              : item.kind === 'pdf'
+                ? '#DC2626'
+                : '#059669'
+          }
+        />
       </View>
 
       <View style={{ flex: 1 }}>
         <ThemedText style={styles.fileName}>{item.name}</ThemedText>
 
         <ThemedText style={styles.fileType}>
-          {item.type === 'pdf' ? 'PDF' : 'TEXT'}
+          {item.kind === 'image'
+            ? 'IMAGE'
+            : item.kind === 'pdf'
+              ? 'PDF'
+              : 'TEXT'}
         </ThemedText>
       </View>
 
@@ -765,12 +738,11 @@ export default function VaultScreen() {
             )}
 
             <FlatList
-              style={{ flex: 1 }}
               data={expandedCase?.files || []}
               keyExtractor={(f) => f.id}
               numColumns={3}
               contentContainerStyle={{
-                paddingBottom: 24,
+                paddingBottom: 40,
               }}
               renderItem={({ item }) => (
                 <Pressable
@@ -778,30 +750,26 @@ export default function VaultScreen() {
                   onPress={() => setSelectedFile(item)}
                 >
                   <Ionicons
-                    name={item.type === 'pdf' ? 'document-outline' : 'reader-outline'}
+                    name={
+                      item.kind === 'image'
+                        ? 'image-outline'
+                        : item.kind === 'pdf'
+                          ? 'document-outline'
+                          : 'reader-outline'
+                    }
                     size={22}
-                    color={item.type === 'pdf' ? '#DC2626' : '#059669'}
+                    color={
+                      item.kind === 'image'
+                        ? '#2563EB'
+                        : item.kind === 'pdf'
+                          ? '#DC2626'
+                          : '#059669'
+                    }
                   />
 
-                  <ThemedText numberOfLines={2} style={styles.gridFileName}>
+                  <ThemedText numberOfLines={1} style={styles.gridFileName}>
                     {item.name}
                   </ThemedText>
-                  <ThemedText style={styles.gridFileKind}>
-                    {item.type === 'pdf' ? 'PDF' : 'TEXT'}
-                  </ThemedText>
-
-                  {item.attachmentId ? (
-                    <Pressable
-                      style={styles.gridDelete}
-                      hitSlop={8}
-                      onPress={(event) => {
-                        event.stopPropagation?.();
-                        handleDeleteFile(item);
-                      }}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#DC2626" />
-                    </Pressable>
-                  ) : null}
                 </Pressable>
               )}
             />
@@ -809,7 +777,7 @@ export default function VaultScreen() {
             <Pressable
               style={[styles.addFileBtn, uploading && { opacity: 0.7 }]}
               disabled={uploading}
-              onPress={handleUploadPdf}
+              onPress={handleAddFile}
             >
               {uploading ? (
                 <ActivityIndicator color="#fff" />
@@ -818,7 +786,7 @@ export default function VaultScreen() {
               )}
 
               <ThemedText style={styles.addFileBtnText}>
-                {uploading ? 'Uploading…' : 'Upload PDF'}
+                {uploading ? 'Uploading…' : 'Add File'}
               </ThemedText>
             </Pressable>
 
@@ -829,7 +797,7 @@ export default function VaultScreen() {
                   onPress={() => setSelectedFile(null)}
                 />
 
-                <View style={[styles.textBox, selectedFile?.type === 'pdf' && styles.pdfBox]}>
+                <View style={styles.textBox}>
                   <View style={styles.modalHeader}>
                     <ThemedText style={styles.modalTitle}>
                       {selectedFile?.name}
@@ -843,52 +811,33 @@ export default function VaultScreen() {
                         <Ionicons name="download-outline" size={22} color="#059669" />
                       </Pressable>
 
-                      {selectedFile?.attachmentId ? (
-                        <Pressable
-                          onPress={() => handleDeleteFile(selectedFile)}
-                          hitSlop={8}
-                        >
-                          <Ionicons name="trash-outline" size={22} color="#DC2626" />
-                        </Pressable>
-                      ) : null}
-
                       <Pressable onPress={() => setSelectedFile(null)} hitSlop={8}>
                         <Ionicons name="close" size={22} color="#111827" />
                       </Pressable>
                     </View>
                   </View>
 
-                  {selectedFile?.type === 'pdf' ? (
-                    previewLoading ? (
-                      <ActivityIndicator color="#2563EB" />
-                    ) : previewUri && Platform.OS === 'web' ? (
-                      <View style={styles.pdfFrame}>
-                        {React.createElement('iframe', {
-                          src: previewUri,
-                          title: selectedFile.name,
-                          style: {
-                            width: '100%',
-                            height: '100%',
-                            border: 'none',
-                          },
-                        })}
-                      </View>
-                    ) : previewUri ? (
-                      <Pressable
-                        style={styles.saveRenameBtn}
-                        onPress={() => handleNativeDownload(selectedFile)}
-                      >
-                        <ThemedText style={styles.saveRenameText}>Open PDF</ThemedText>
-                      </Pressable>
-                    ) : (
-                      <ThemedText style={styles.textContent}>
-                        This PDF could not be previewed.
+                  {previewLoading ? (
+                    <ActivityIndicator color="#2563EB" />
+                  ) : selectedFile?.kind === 'image' && previewUri ? (
+                    <Image
+                      source={{ uri: previewUri }}
+                      style={styles.previewImage}
+                      resizeMode="contain"
+                    />
+                  ) : selectedFile?.kind === 'pdf' && previewUri ? (
+                    <Pressable
+                      style={styles.saveRenameBtn}
+                      onPress={() => WebBrowser.openBrowserAsync(previewUri)}
+                    >
+                      <ThemedText style={styles.saveRenameText}>
+                        Open PDF
                       </ThemedText>
-                    )
+                    </Pressable>
                   ) : (
                     <ScrollView>
                       <ThemedText style={styles.textContent}>
-                        {selectedFile?.content}
+                        {previewText ?? selectedFile?.content ?? ''}
                       </ThemedText>
                     </ScrollView>
                   )}
@@ -1230,32 +1179,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  gridFileKind: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-
-  gridDelete: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-
-  pdfBox: {
-    height: '78%',
-    maxHeight: '78%',
-  },
-
-  pdfFrame: {
-    flex: 1,
-    minHeight: 420,
-    width: '100%',
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#F3F4F6',
-  },
-
   showAllLink: {
     color: '#2563EB',
     fontWeight: '600',
@@ -1302,6 +1225,13 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     marginLeft: 6,
+  },
+
+  previewImage: {
+    width: '100%',
+    height: 320,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
   },
 
   folderFooter: {

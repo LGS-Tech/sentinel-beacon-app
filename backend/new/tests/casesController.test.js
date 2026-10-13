@@ -7,6 +7,29 @@ let createCaseArgs;
 let updateCaseArgs;
 let existingCase;
 
+const usersPath = require.resolve("../db/queries/users");
+const departmentsPath = require.resolve("../db/queries/departments");
+
+require.cache[usersPath] = {
+  id: usersPath,
+  filename: usersPath,
+  loaded: true,
+  exports: {
+    getUserById: async (id) =>
+      Number(id) === 99 ? null : { id: Number(id), userType: "staff" },
+  },
+};
+
+require.cache[departmentsPath] = {
+  id: departmentsPath,
+  filename: departmentsPath,
+  loaded: true,
+  exports: {
+    getDepartmentById: async (id) =>
+      Number(id) === 50 ? null : { id: Number(id), name: "Facilities" },
+  },
+};
+
 require.cache[queriesPath] = {
   id: queriesPath,
   filename: queriesPath,
@@ -44,21 +67,29 @@ function mockRes() {
   };
 }
 
-async function postCase(body, user = { userId: 7 }) {
+async function postCase(body, user = {}) {
   const res = mockRes();
   let nextError;
-  await createNewCase({ body, user }, res, (err) => {
-    nextError = err;
-  });
+  await createNewCase(
+    { body, user: { userId: 7, organizationId: 1, ...user } },
+    res,
+    (err) => {
+      nextError = err;
+    }
+  );
   assert.equal(nextError, undefined);
   return res;
 }
 
-async function putCase(body, user) {
+async function putCase(body, user = {}) {
   const res = mockRes();
   let nextError;
   await updateExistingCase(
-    { body, user, params: { id: "test-case-id" } },
+    {
+      body,
+      user: { userId: 7, organizationId: 1, ...user },
+      params: { id: "test-case-id" },
+    },
     res,
     (err) => {
       nextError = err;

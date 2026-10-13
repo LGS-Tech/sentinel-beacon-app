@@ -1,6 +1,6 @@
 # Case attachments API
 
-Authenticated Vault PDFs. **Bytes go to Cloudflare R2. PostgreSQL stores metadata only.**
+Authenticated Vault files. **Bytes go to Cloudflare R2. PostgreSQL stores metadata only.** The API never writes files to the Render disk, and R2 credentials never leave the server.
 
 ## Endpoints
 
@@ -9,13 +9,75 @@ Base path: **`/cases/:caseId/attachments`** (JWT required)
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/cases/:caseId/attachments` | List attachment metadata for a case |
-| POST | `/cases/:caseId/attachments` | Multipart upload (`file`) of a PDF |
-| GET | `/cases/:caseId/attachments/:attachmentId` | Get one attachment |
-| GET | `/cases/:caseId/attachments/:attachmentId/content` | Stream the PDF through the API |
-| DELETE | `/cases/:caseId/attachments/:attachmentId` | Delete metadata, then the R2 object |
+| POST | `/cases/:caseId/attachments` | Multipart upload (`file`) to R2, then insert metadata |
+| GET | `/cases/:caseId/attachments/:attachmentId` | Get one attachment (metadata + content path) |
+| GET | `/cases/:caseId/attachments/:attachmentId/content` | Stream the file through the API (auth required) |
+| DELETE | `/cases/:caseId/attachments/:attachmentId` | Delete Postgres metadata first, then the R2 object |
 
-Allowed type: **PDF**. Max size: **10 MB**.
+Allowed types: **TXT, PDF, JPG, PNG**. Max size: **10 MB**.
 
-`storageUrl` in the JSON response is an API path, not a public R2 URL. Postgres stores the private object key.
+### POST (multipart)
 
-R2 env vars (server only): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`.
+Field name: `file`
+
+```bash
+curl -X POST "$API/cases/$CASE_ID/attachments" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@broken-tap.jpg;type=image/jpeg"
+```
+
+JSON body uploads (client-supplied URLs) are rejected. The server chooses the R2 object key.
+
+### Response shape
+
+```json
+{
+  "id": "uuid",
+  "caseId": "uuid",
+  "filename": "broken-tap.jpg",
+  "mimeType": "image/jpeg",
+  "storageUrl": "/cases/uuid/attachments/uuid/content",
+  "storageProvider": "r2",
+  "fileSizeBytes": 245760,
+  "uploadedByUserId": 7,
+  "uploadedByName": "Aisha Khan",
+  "createdAt": 1787102249027
+}
+```
+
+`storageUrl` is an API path, not a public R2 URL. Open files by fetching that path with the same Bearer token. Postgres stores the private object key; that key is not returned to clients.
+
+Upload failures return a controlled JSON error (`400` / `413` / `502` / `503`) — they do not crash the API.
+
+## Storage
+
+| Layer | What it holds |
+|-------|----------------|
+| Cloudflare R2 | File bytes (private bucket) |
+| PostgreSQL `case_attachments` | filename, MIME type, size, provider, object key, uploader |
+| Render disk | nothing |
+
+R2 env vars (server only, see `.env.example`):
+
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET_NAME`
+
+Do not put these in Expo / GitHub Pages env.
+
+`GET /health` includes `"storage": { "ready": true, "provider": "r2" }` when those vars are set. It does not echo secrets or the bucket name.
+
+Delete order: PostgreSQL metadata is removed first. Only after that succeeds does the API delete the R2 object. If object storage then fails, the client still gets `204` (the row is gone) and an orphaned object may remain in the bucket. The reverse order is worse: a DB failure would leave metadata pointing at a deleted file.
+
+## Database
+
+Table: `case_attachments` in `db/schema.sql`  
+Queries: `db/queries/attachments.js`
+
+```bash
+cd backend/new
+npm run db:setup
+npm run smoke:vault-files
+npm run db:smoke-attachments
+```

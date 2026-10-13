@@ -13,6 +13,10 @@
     "db:ping": "node scripts/ping-postgres.js",
     "db:smoke": "node scripts/smoke-data-layer.js",
     "db:smoke-attachments": "node scripts/smoke-attachments.js",
+    "db:smoke-org": "node scripts/smoke-org-isolation.js",
+    "db:smoke-departments": "node scripts/smoke-departments-api.js",
+    "db:smoke-org-access": "node scripts/smoke-org-access.js",
+    "smoke:vault-files": "node scripts/smoke-vault-files.js",
     "db:hash-seeds": "node scripts/hashSeedPasswords.js"
   },
   "keywords": [],
@@ -20,7 +24,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1150.0",
+    "@aws-sdk/client-s3": "^3.1136.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

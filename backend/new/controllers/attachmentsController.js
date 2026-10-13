@@ -6,61 +6,79 @@ const {
   deleteAttachment,
 } = require("../db/queries/attachments");
 const { getCaseById } = require("../db/queries/cases");
+const { requireRequestOrganization } = require("../db/orgScope");
 const { canViewCase, canModifyCase } = require("../utils/casePolicy");
 const r2 = require("../storage/r2");
-const { validateVaultFile, objectKey, contentPath } = require("../storage/vaultFiles");
+const { validateVaultFile, objectKey } = require("../storage/vaultFiles");
 
 function clientError(res, err, fallbackStatus, fallbackMessage) {
-  const status = err.status || err.statusCode || fallbackStatus;
-  const message = err.status || err.statusCode ? err.message : fallbackMessage;
-  return res.status(status).json({ error: message || fallbackMessage });
+  const status = err.status || fallbackStatus;
+  const message =
+    err.status && err.message ? err.message : fallbackMessage;
+  return res.status(status).json({ error: message });
 }
 
-// Sends 404 (case hidden from this user) or 403 (visible, not modifiable)
-// and returns false when the user may not act on the parent case.
+// Sends 403 when the session has no organisation, 404 when the case is
+// outside that organisation or hidden by role, and 403 when a write is
+// not allowed. Returns the organisation id when the caller may continue.
 async function checkCaseAccess(req, res, { modify = false } = {}) {
-  const found = await getCaseById(req.params.caseId);
+  const organizationId = requireRequestOrganization(req, res);
+  if (organizationId == null) return null;
+
+  const found = await getCaseById(req.params.caseId, organizationId);
   if (!canViewCase(req.user, found)) {
     res.status(404).json({ error: "Case not found" });
-    return false;
+    return null;
   }
   if (modify && !canModifyCase(req.user, found)) {
     res.status(403).json({ error: "Forbidden: Insufficient permissions" });
-    return false;
+    return null;
   }
-  return true;
+  return organizationId;
 }
 
-const listCaseAttachments = async (req, res, next) => {
+const listCaseAttachments = async (req, res) => {
   try {
-    if (!(await checkCaseAccess(req, res))) return;
+    const organizationId = await checkCaseAccess(req, res);
+    if (organizationId == null) return;
     const { caseId } = req.params;
-    const items = await listAttachmentsByCaseId(caseId);
+    const items = await listAttachmentsByCaseId(caseId, organizationId);
     res.json(items);
   } catch (err) {
-    return next(err);
+    console.error(err);
+    res.status(500).json({ error: "Failed to list attachments" });
   }
 };
 
-const getCaseAttachment = async (req, res, next) => {
+const getCaseAttachment = async (req, res) => {
   try {
-    if (!(await checkCaseAccess(req, res))) return;
+    const organizationId = await checkCaseAccess(req, res);
+    if (organizationId == null) return;
     const { caseId, attachmentId } = req.params;
-    const found = await getAttachmentForCase(caseId, attachmentId);
+    const found = await getAttachmentForCase(
+      caseId,
+      attachmentId,
+      organizationId
+    );
     if (!found) {
       return res.status(404).json({ error: "Attachment not found" });
     }
     res.json(found);
   } catch (err) {
-    return next(err);
+    res.status(500).json({ error: "Failed to fetch attachment" });
   }
 };
 
-const getCaseAttachmentContent = async (req, res, next) => {
+const getCaseAttachmentContent = async (req, res) => {
   try {
-    if (!(await checkCaseAccess(req, res))) return;
+    const organizationId = await checkCaseAccess(req, res);
+    if (organizationId == null) return;
     const { caseId, attachmentId } = req.params;
-    const row = await getAttachmentRowForCase(caseId, attachmentId);
+    const row = await getAttachmentRowForCase(
+      caseId,
+      attachmentId,
+      organizationId
+    );
     if (!row) {
       return res.status(404).json({ error: "Attachment not found" });
     }
@@ -74,7 +92,10 @@ const getCaseAttachmentContent = async (req, res, next) => {
     const object = await r2.getObject(row.storage_url);
     const bytes = await object.Body.transformToByteArray();
 
-    res.setHeader("Content-Type", row.mime_type || "application/pdf");
+    res.setHeader(
+      "Content-Type",
+      row.mime_type || "application/octet-stream"
+    );
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader(
@@ -87,17 +108,18 @@ const getCaseAttachmentContent = async (req, res, next) => {
   }
 };
 
-const addCaseAttachment = async (req, res, next) => {
+const addCaseAttachment = async (req, res) => {
   const { caseId } = req.params;
   let uploadedKey = null;
 
   try {
-    if (!(await checkCaseAccess(req, res, { modify: true }))) return;
+    const organizationId = await checkCaseAccess(req, res, { modify: true });
+    if (organizationId == null) return;
 
     const file = req.file;
     if (!file) {
       return res.status(400).json({
-        error: "Upload a PDF in the file field.",
+        error: "Upload a file in the file field (TXT, PDF, JPG, or PNG).",
       });
     }
 
@@ -124,51 +146,59 @@ const addCaseAttachment = async (req, res, next) => {
     });
 
     const uploadedByUserId = req.user?.userId ?? req.user?.id ?? null;
-    const created = await createAttachment(caseId, {
-      filename: check.filename,
-      mimeType: check.mimeType,
-      storageUrl: uploadedKey,
-      storageProvider: "r2",
-      fileSizeBytes: file.size,
-      uploadedByUserId,
-    });
+
+    const created = await createAttachment(
+      caseId,
+      {
+        filename: check.filename,
+        mimeType: check.mimeType,
+        storageUrl: uploadedKey,
+        storageProvider: "r2",
+        fileSizeBytes: file.size,
+        uploadedByUserId,
+      },
+      organizationId
+    );
 
     if (!created) {
       await r2.deleteObject(uploadedKey);
       return res.status(404).json({ error: "Case not found" });
     }
 
-    res.status(201).json({
-      ...created,
-      storageUrl: contentPath(caseId, created.id),
-    });
+    res.status(201).json(created);
   } catch (err) {
     if (uploadedKey) {
       try {
         await r2.deleteObject(uploadedKey);
       } catch {
-        // The storage helper already logged the failure.
+        // already logged in r2 helper
       }
     }
-    if (err.status || err.statusCode) {
-      return clientError(res, err, 400, "Failed to add attachment");
-    }
-    return next(err);
+    return clientError(res, err, 400, "Failed to add attachment");
   }
 };
 
-const removeCaseAttachment = async (req, res, next) => {
+const removeCaseAttachment = async (req, res) => {
   try {
-    if (!(await checkCaseAccess(req, res, { modify: true }))) return;
+    const organizationId = await checkCaseAccess(req, res, { modify: true });
+    if (organizationId == null) return;
     const { caseId, attachmentId } = req.params;
-    const row = await getAttachmentRowForCase(caseId, attachmentId);
+    const row = await getAttachmentRowForCase(
+      caseId,
+      attachmentId,
+      organizationId
+    );
     if (!row) {
       return res.status(404).json({ error: "Attachment not found" });
     }
 
     // Confirm Postgres metadata is gone before touching R2. Deleting the
     // object first could leave a row pointing at a missing file.
-    const removed = await deleteAttachment(caseId, attachmentId);
+    const removed = await deleteAttachment(
+      caseId,
+      attachmentId,
+      organizationId
+    );
     if (!removed) {
       return res.status(404).json({ error: "Attachment not found" });
     }

@@ -35,6 +35,7 @@ Category: Fire, Intruder, Injury, Maintenance, Missing, Facilities, IT Support, 
 ```js
 const db = require("./db"); // from backend/new
 
+await db.departments.listDepartments();
 await db.users.listUsers();
 await db.users.getUserByEmail("aisha.khan@student.lgs.ac.uk");
 await db.cases.createCase({ title: "Fire Case", locationX: 0.4, locationY: 0.2 });
@@ -44,6 +45,21 @@ await db.cases.analyticsSummary();
 ```
 
 Rows are mapped to the current API shape (`createdAt`, `_id`, `"phone number"`, …) so routes can switch later without a frontend rewrite.
+
+## Departments HTTP API
+
+Authenticated (`Authorization: Bearer <token>`), same as `/users` and `/cases`:
+
+| Method | Path | Notes |
+|--------|------|--------|
+| GET | `/departments` | Active departments (`id`, `name`, `slug`, `kind`, `isActive`) |
+| GET | `/departments?activeOnly=false` | Include inactive rows |
+| GET | `/departments?name=Facilities` | Lookup by name (case-insensitive) |
+| GET | `/departments/:id` | One department by numeric id |
+
+```bash
+npm run db:smoke-departments
+```
 
 ## Quick start (Docker — recommended)
 
