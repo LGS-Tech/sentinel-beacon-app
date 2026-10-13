@@ -105,34 +105,13 @@ CREATE INDEX IF NOT EXISTS idx_users_department_id ON users (department_id);
 CREATE INDEX IF NOT EXISTS idx_users_user_type ON users (user_type);
 CREATE INDEX IF NOT EXISTS idx_users_college_id ON users (college_id);
 
--- Seed demo staff plus maintainer and student
-INSERT INTO users (
-  id, username, password, email, name, phone, role, authorisation,
-  user_type, department_id, college_id
-) VALUES
-  (1, 'jimstevens322', 'London588', 'jimstevens@gmail.com', 'Jim',
-    '+4476338674998', 'Art teacher', 2, 'staff', NULL, NULL),
-  (2, 'markdavis99', 'Football456', 'markdavis@gmail.com', 'Mark',
-    '+447658713447', 'Maths teacher', 2, 'staff', NULL, NULL),
-  (3, 'lindsaywilliams1874', 'TableTop22', 'lindsaywilliams@gmail.com', 'Lindsay',
-    '+447566345922', 'Head teacher', 1, 'lead', NULL, NULL),
-  (4, 'ellamcintosh111', 'TableTop22', 'ellamcintosh@gmail.com', 'Ella',
-    '+447455698236', 'English teacher', 2, 'staff', NULL, NULL),
-  (5, 'patel.estates', 'Estates221', 'estates@lgs.ac.uk', 'Priya Patel',
-    '+447400100501', 'Estates maintainer', 2, 'maintainer', 6, 'STAFF-EST-01'),
-  (6, 'chen.it', 'ITSupport19', 'itsupport@lgs.ac.uk', 'Wei Chen',
-    '+447400100502', 'IT technician', 2, 'maintainer', 2, 'STAFF-IT-04'),
-  (7, 'aisha.student', 'Student100', 'aisha.khan@student.lgs.ac.uk', 'Aisha Khan',
-    '+447400100601', 'Student', 2, 'student', NULL, 'LGS-2026-4412')
-ON CONFLICT (id) DO NOTHING;
-
-UPDATE users SET user_type = 'lead', authorisation = 1 WHERE id = 3 AND user_type = 'staff';
-UPDATE users SET department_id = 6 WHERE id = 5 AND department_id IS NULL;
-UPDATE users SET department_id = 2 WHERE id = 6 AND department_id IS NULL;
+-- No users are seeded here. Demo accounts for local development come from
+-- `npm run db:seed-demo` (scripts/seed-demo.js), which never runs in production.
 
 SELECT setval(
   pg_get_serial_sequence('users', 'id'),
-  (SELECT COALESCE(MAX(id), 1) FROM users)
+  (SELECT COALESCE(MAX(id), 1) FROM users),
+  (SELECT COUNT(*) > 0 FROM users)
 );
 
 -- ---------------------------------------------------------------------------

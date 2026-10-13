@@ -17,7 +17,7 @@ cp .env.example .env
 npm install
 docker compose up -d
 npm run db:setup
-npm run db:hash-seeds
+npm run db:seed-demo
 npm start
 ```
 
@@ -64,6 +64,7 @@ POSTGRES_PASSWORD=<password from backend chat>
 POSTGRES_DB=lgs_tech
 DATABASE_URL=postgresql://LGS_Tech:<password from backend chat>@localhost:5432/lgs_tech
 JWT_SECRET=<long random string>
+DEMO_SEED_PASSWORD=<your own password for the local demo users, 8+ characters>
 REQUIRE_AUTH=false
 PORT=3000
 ```
@@ -86,15 +87,18 @@ Then run `docker compose up -d` again.
 #### 3. Apply schema and check connection
 ```bash
 npm run db:setup
-npm run db:hash-seeds
+npm run db:seed-demo
 npm run db:ping
 ```
 
 You should see something like:
 - `PostgreSQL schema applied.`
 - `departments rows: 6`
-- `users rows: 7` (seed staff, maintainers, student)
+- `users rows: 0` on a fresh database (the schema creates no users)
+- `Demo seed done. Created: 7, already present (skipped): 0`
 - `PostgreSQL OK: ...`
+
+`npm run db:seed-demo` creates the 7 demo users (4 staff incl. one lead, 2 maintainers, 1 student) and gives all of them the password from `DEMO_SEED_PASSWORD` in your `.env`, stored as a bcrypt hash. Log in with one of their emails (see `scripts/seed-demo.js`) and that password. It skips users that already exist and refuses to run when `NODE_ENV=production`; production accounts are never seeded.
 
 Optional: `npm run db:smoke` and `npm run db:smoke-attachments`
 
@@ -105,7 +109,7 @@ docker compose logs -f     # DB logs
 docker compose down        # stop Postgres
 npm run db:ping            # quick connectivity check
 npm run db:smoke           # data-layer smoke test
-npm run db:hash-seeds      # bcrypt-hash demo user passwords
+npm run db:seed-demo       # create the demo users (local only)
 ```
 
 #### What gets created
@@ -169,7 +173,7 @@ Settings → Profile and Settings → Integrations talk to the **PostgreSQL API*
 cd backend/new
 docker compose up -d
 npm run db:setup
-npm run db:hash-seeds
+npm run db:seed-demo
 npm start
 ```
 
@@ -199,7 +203,7 @@ On a physical device, use your computer’s LAN IP instead of `localhost` / `10.
 ## Server
 
 The API lives in **`backend/new`** — Node.js + Express + **PostgreSQL** (`pg`).  
-There is no MongoDB or file-based `users.json` backend anymore. Demo users are seeded via `db/schema.sql` and `npm run db:hash-seeds`.
+There is no MongoDB or file-based `users.json` backend anymore. Demo users are created only by `npm run db:seed-demo` (local/demo, never in production); `db/schema.sql` contains no accounts or passwords.
 
 The legacy `serverOLD/` folder is archived mock JSON storage — do not use it for new work.
 
