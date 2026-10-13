@@ -105,6 +105,7 @@ docker compose logs -f     # DB logs
 docker compose down        # stop Postgres
 npm run db:ping            # quick connectivity check
 npm run db:smoke           # data-layer smoke test
+npm run db:smoke-departments  # departments API smoke test
 npm run db:hash-seeds      # bcrypt-hash demo user passwords
 ```
 
@@ -115,16 +116,16 @@ npm run db:hash-seeds      # bcrypt-hash demo user passwords
 | `users` | Students / staff / maintainers / leads |
 | `cases` | Tickets and incidents (location, category, assignment) |
 | `case_events` | Feed and assignment history |
-| `case_attachments` | File/image metadata (URL only) |
+| `case_attachments` | Vault file metadata (bytes in Cloudflare R2) |
 
-API routes: `/cases`, `/users`, `/auth/login`, `/auth/signup`, `/cases/:id/attachments`
+API routes: `/cases`, `/users`, `/departments`, `/auth/login`, `/auth/signup`, `/cases/:id/attachments`
 
 ### Demo hosting (GitHub Pages + Render)
 
 | Environment | Frontend | Backend API |
 |-------------|----------|-------------|
 | **Development** | `npx expo start` on your machine | Local `backend/new` → `http://localhost:3000` |
-| **Production (demo)** | GitHub Pages | Render → `https://sentinel-beacon-app.onrender.com` |
+| **Production (demo)** | GitHub Pages | Render → `https://sentinel-beacon-app-t6wz.onrender.com` |
 
 Env files in `expo-app/`:
 - `.env.development` → local API

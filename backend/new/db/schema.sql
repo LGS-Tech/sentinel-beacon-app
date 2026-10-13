@@ -288,7 +288,7 @@ CREATE TABLE IF NOT EXISTS case_events (
 CREATE INDEX IF NOT EXISTS idx_case_events_case_id ON case_events (case_id, created_at);
 
 -- ---------------------------------------------------------------------------
--- Case attachments (metadata only — binary stored outside Postgres)
+-- Case attachments (metadata only — file bytes live in Cloudflare R2)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS case_attachments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -297,7 +297,7 @@ CREATE TABLE IF NOT EXISTS case_attachments (
   mime_type TEXT,
   storage_url TEXT NOT NULL,
   storage_provider TEXT NOT NULL DEFAULT 'external'
-    CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'other')),
+    CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'r2', 'other')),
   file_size_bytes BIGINT,
   uploaded_by_user_id INTEGER REFERENCES users (id),
   created_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
@@ -308,3 +308,154 @@ CREATE INDEX IF NOT EXISTS idx_case_attachments_case_id
 
 CREATE INDEX IF NOT EXISTS idx_case_attachments_uploaded_by
   ON case_attachments (uploaded_by_user_id);
+
+-- ---------------------------------------------------------------------------
+-- Organisations (data-layer tenancy)
+-- There is no floors table. cases.floor is isolated by cases.organization_id.
+-- HTTP must not choose the organisation. Routes use organizationId from the JWT.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS organisations (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO organisations (name, slug)
+SELECT 'LGS Demo', 'lgs-demo'
+WHERE NOT EXISTS (
+  SELECT 1 FROM organisations WHERE slug = 'lgs-demo'
+);
+
+SELECT setval(
+  pg_get_serial_sequence('organisations', 'id'),
+  (SELECT COALESCE(MAX(id), 1) FROM organisations)
+);
+
+ALTER TABLE departments ADD COLUMN IF NOT EXISTS organization_id INTEGER;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_id INTEGER;
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS organization_id INTEGER;
+ALTER TABLE case_attachments ADD COLUMN IF NOT EXISTS organization_id INTEGER;
+
+UPDATE departments
+SET organization_id = (SELECT id FROM organisations WHERE slug = 'lgs-demo')
+WHERE organization_id IS NULL;
+
+UPDATE users
+SET organization_id = (SELECT id FROM organisations WHERE slug = 'lgs-demo')
+WHERE organization_id IS NULL;
+
+UPDATE cases
+SET organization_id = (SELECT id FROM organisations WHERE slug = 'lgs-demo')
+WHERE organization_id IS NULL;
+
+UPDATE case_attachments AS a
+SET organization_id = c.organization_id
+FROM cases AS c
+WHERE a.case_id = c.id
+  AND a.organization_id IS NULL;
+
+UPDATE case_attachments
+SET organization_id = (SELECT id FROM organisations WHERE slug = 'lgs-demo')
+WHERE organization_id IS NULL;
+
+ALTER TABLE departments ALTER COLUMN organization_id SET NOT NULL;
+ALTER TABLE users ALTER COLUMN organization_id SET NOT NULL;
+ALTER TABLE cases ALTER COLUMN organization_id SET NOT NULL;
+ALTER TABLE case_attachments ALTER COLUMN organization_id SET NOT NULL;
+
+DO $$
+DECLARE
+  demo_id INTEGER;
+BEGIN
+  SELECT id INTO demo_id FROM organisations WHERE slug = 'lgs-demo';
+
+  EXECUTE format(
+    'ALTER TABLE departments ALTER COLUMN organization_id SET DEFAULT %s',
+    demo_id
+  );
+  EXECUTE format(
+    'ALTER TABLE users ALTER COLUMN organization_id SET DEFAULT %s',
+    demo_id
+  );
+  EXECUTE format(
+    'ALTER TABLE cases ALTER COLUMN organization_id SET DEFAULT %s',
+    demo_id
+  );
+  EXECUTE format(
+    'ALTER TABLE case_attachments ALTER COLUMN organization_id SET DEFAULT %s',
+    demo_id
+  );
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'departments_organization_id_fkey'
+  ) THEN
+    ALTER TABLE departments
+      ADD CONSTRAINT departments_organization_id_fkey
+      FOREIGN KEY (organization_id) REFERENCES organisations (id);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'users_organization_id_fkey'
+  ) THEN
+    ALTER TABLE users
+      ADD CONSTRAINT users_organization_id_fkey
+      FOREIGN KEY (organization_id) REFERENCES organisations (id);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'cases_organization_id_fkey'
+  ) THEN
+    ALTER TABLE cases
+      ADD CONSTRAINT cases_organization_id_fkey
+      FOREIGN KEY (organization_id) REFERENCES organisations (id);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'case_attachments_organization_id_fkey'
+  ) THEN
+    ALTER TABLE case_attachments
+      ADD CONSTRAINT case_attachments_organization_id_fkey
+      FOREIGN KEY (organization_id) REFERENCES organisations (id);
+  END IF;
+END
+$$;
+
+-- Department names are unique per organisation, not globally.
+ALTER TABLE departments DROP CONSTRAINT IF EXISTS departments_name_key;
+ALTER TABLE departments DROP CONSTRAINT IF EXISTS departments_slug_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS departments_organization_id_name_uidx
+  ON departments (organization_id, name);
+CREATE UNIQUE INDEX IF NOT EXISTS departments_organization_id_slug_uidx
+  ON departments (organization_id, slug);
+
+CREATE INDEX IF NOT EXISTS idx_departments_organization_id
+  ON departments (organization_id);
+CREATE INDEX IF NOT EXISTS idx_users_organization_id
+  ON users (organization_id);
+CREATE INDEX IF NOT EXISTS idx_cases_organization_id
+  ON cases (organization_id);
+CREATE INDEX IF NOT EXISTS idx_case_attachments_organization_id
+  ON case_attachments (organization_id);
+
+-- Existing databases may still have the pre-R2 storage_provider check.
+DO $$
+DECLARE
+  constraint_row record;
+BEGIN
+  FOR constraint_row IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'case_attachments'::regclass
+      AND contype = 'c'
+      AND pg_get_constraintdef(oid) ILIKE '%storage_provider%'
+  LOOP
+    EXECUTE format(
+      'ALTER TABLE case_attachments DROP CONSTRAINT %I',
+      constraint_row.conname
+    );
+  END LOOP;
+
+  ALTER TABLE case_attachments
+    ADD CONSTRAINT case_attachments_storage_provider_check
+    CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'r2', 'other'));
+END $$;
