@@ -23,10 +23,10 @@ test("accepts a PDF when the browser omits a specific type", () => {
   assert.equal(result.filename, "scan.PDF");
 });
 
-test("rejects files that are not PDFs", () => {
+test("rejects files that are not TXT, PDF, JPG, or PNG", () => {
   const result = validateVaultFile({
-    originalname: "notes.txt",
-    mimetype: "text/plain",
+    originalname: "payload.exe",
+    mimetype: "application/octet-stream",
     size: 20,
   });
   assert.equal(result.ok, false);
