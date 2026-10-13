@@ -18,6 +18,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Public self-registration stays off in production (issue #56).
+      - key: ALLOW_PUBLIC_SIGNUP
+        value: "false"
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET

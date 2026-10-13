@@ -120,6 +120,55 @@ npm run db:hash-seeds      # bcrypt-hash demo user passwords
 
 API routes: `/cases`, `/users`, `/departments`, `/auth/login`, `/auth/signup`, `/cases/:id/attachments`
 
+#### Accounts: signup and provisioning
+
+Public self-registration is **off by default**. `POST /auth/signup` only works when
+`ALLOW_PUBLIC_SIGNUP` is exactly `true`; with the variable unset or set to anything
+else it returns `403 {"error":"Self-registration is disabled. Contact your administrator."}`.
+
+- Local development: `.env.example` sets `ALLOW_PUBLIC_SIGNUP=true`, so the app's
+  Create Account screen keeps working. Add the line to an existing `.env`.
+- Production (Render): `render.yaml` sets it to `"false"`. Do not enable it there.
+
+Accounts are created by an authorised person instead. Every account belongs to
+one organisation (tenant). Provisioning a new client, from `backend/new`:
+
+1. Create the organisation. This prints only the new id and slug, and refuses a
+   slug that already exists:
+
+   ```bash
+   npm run org:create -- --name "Example College" --slug example-college
+   ```
+
+2. Create the client's first lead inside it with the CLI:
+
+   ```bash
+   # bash
+   CREATE_USER_PASSWORD='<password>' npm run user:create -- --org example-college \
+     --email jane@example.org --username jane --name "Jane Doe" --user-type lead
+   ```
+
+   ```powershell
+   # Windows PowerShell
+   $env:CREATE_USER_PASSWORD = '<password>'
+   npm run user:create -- --org example-college --email jane@example.org --username jane --name "Jane Doe" --user-type lead
+   Remove-Item Env:CREATE_USER_PASSWORD
+   ```
+
+3. The lead logs in and creates everyone else with `POST /users`. Those accounts
+   land in the lead's organisation: it comes from the lead's session, and an
+   organisation id in the request body is ignored. A maintainer can also call
+   `POST /users`, but only a lead can create leads, maintainers or
+   `authorisation: 1`.
+
+`--org` is the organisation slug and is required (or set `CREATE_USER_ORG`); the
+script refuses an organisation that does not exist or is inactive. `--user-type` is
+one of `student`, `staff`, `maintainer`, `lead`. The password is read only from
+`CREATE_USER_PASSWORD` (at least 8 characters), is stored as a bcrypt hash and is
+never printed. The script refuses an email or username that already exists. Both
+scripts write to the database in `DATABASE_URL`, so check which one your `.env`
+points at before running them.
+
 ### Demo hosting (GitHub Pages + Render)
 
 | Environment | Frontend | Backend API |
