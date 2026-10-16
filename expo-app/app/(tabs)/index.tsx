@@ -1,7 +1,9 @@
 //dashboard - specialised prompts to be added for each case type
 //the continue button needs to be inactivated until prompts have been selecteed
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+//need to have uploaded floor plan saved to backend instantly
 
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 
 import { showAlert } from '@/lib/alert';
@@ -30,6 +32,8 @@ import LiveFeedSheet, {
   getAllFeedItems,
 } from '@/components/live-feed';
 
+
+
 import CaseClosedSheet from '@/components/close-sheet';
 import PoliceConfirmation from '@/components/police-confirmation';
 import BottomSheet from '@/components/sheet';
@@ -56,7 +60,9 @@ const defaultCoords = {
   y: 0.79,
 };
 
-const caseQuestions: Record<
+
+
+const  caseQuestions: Record<
   string,
   {
     question: string;
@@ -73,7 +79,6 @@ const caseQuestions: Record<
       type: 'yesno',
     },
   ],
-
   Intruder: [
     {
       question: 'Describe the intruder',
@@ -111,7 +116,7 @@ const caseQuestions: Record<
     },
     {
       question: 'Does it pose a danger to anyone?',
-      type: 'yesno',
+      type: 'yesno' ,
     },
     {
       question: 'Have the maintenance team been contacted?',
@@ -119,6 +124,7 @@ const caseQuestions: Record<
     },
   ],
 };
+
 
 export default function HomeScreen() {
   const { width } = useWindowDimensions();
@@ -128,7 +134,7 @@ export default function HomeScreen() {
 
   const [incidentType, setIncidentType] = useState('Intruder');
 
-  const [showSituationModal, setShowSituationModal] = useState(false);
+  const [showSituationModal,setShowSituationModal] = useState(false);
 
   const [locationConfirmed, setLocationConfirmed] = useState(false);
 
@@ -191,6 +197,8 @@ export default function HomeScreen() {
   const [selectedFloor, setSelectedFloor] =
     useState<FloorId>(DEFAULT_FLOOR_ID);
   const [caseFloor, setCaseFloor] = useState<FloorId>(DEFAULT_FLOOR_ID);
+  // A user-provided floor plan overrides the bundled floor-plan image for this session.
+  const [uploadedFloorPlan, setUploadedFloorPlan] = useState<string | null>(null);
 
   const questionsComplete = (caseQuestions[selectedCaseType] || []).every(
     (question, index) => questionAnswers[index]?.trim().length > 0
@@ -198,7 +206,9 @@ export default function HomeScreen() {
 
   const inFlightCases = useRef<Promise<void> | null>(null);
 
-  const activeFloorPlan = getFloorById(selectedFloor).image;
+  const activeFloorPlan = uploadedFloorPlan
+    ? { uri: uploadedFloorPlan }
+    : getFloorById(selectedFloor).image;
   const floorCases = openCases.filter((c) =>
     caseMatchesFloor(c, selectedFloor),
   );
@@ -213,6 +223,8 @@ export default function HomeScreen() {
     }
     setMapRefreshKey((prev) => prev + 1);
   }
+
+
 
   async function saveLocation(x: number, y: number, label: string) {
     const newCase = await createCase({
@@ -242,7 +254,6 @@ export default function HomeScreen() {
 
     await loadOpenCases();
   }
-
   function updateServiceStatusFromAnswer(question: string, answer: string) {
     const isEmergencyQuestion =
       question.includes('emergency services') ||
@@ -265,7 +276,7 @@ export default function HomeScreen() {
   }
 
   useEffect(() => {
-    if (!caseActive) {
+    if (!caseActive ) {
       loadOpenCases();
     }
   }, [caseActive]);
@@ -283,7 +294,7 @@ export default function HomeScreen() {
         }
 
         if (!(await getAuthToken())) {
-          return;
+          return ;
         }
 
         loadOpenCases();
@@ -417,7 +428,6 @@ export default function HomeScreen() {
     setLocationConfirmed(true);
 
     setUpdatingLocation(false);
-
     clearFeed();
 
     if (caseData.feed) {
@@ -518,7 +528,27 @@ export default function HomeScreen() {
     ]);
   }
 
+  async function handleFloorPlanUpload() {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setUploadedFloorPlan(result.assets[0].uri);
+      }
+    } catch (error) {
+      showAlert(
+        'Unable to upload floor plan',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    }
+  }
+
   function handleStartCase() {
+    if (!uploadedFloorPlan) return;
     setShowSituationModal(true);
   }
 
@@ -605,6 +635,8 @@ export default function HomeScreen() {
       : 'Emergency Services';
   }
 
+
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -640,20 +672,56 @@ export default function HomeScreen() {
         {!caseActive && (
           <View style={[{ flex: 1 }, isDesktop && styles.desktopRow]}>
             <View style={[{ flex: 1 }, isDesktop && { flex: 3 }]}>
-              <DashboardMap
-                cases={floorCases}
-                selectedCase={selectedMapCase}
-                floorPlan={activeFloorPlan}
-                selectedFloor={selectedFloor}
-                onFloorChange={handleFloorChange}
-                onMarkerPress={setSelectedMapCase}
-                onView={openExistingCase}
-              />
+              <View style={styles.dashboardMapWrap}>
+                <DashboardMap
+                  cases={floorCases}
+                  selectedCase={selectedMapCase}
+                  floorPlan={activeFloorPlan}
+                  selectedFloor={selectedFloor}
+                  onFloorChange={handleFloorChange}
+                  onMarkerPress={setSelectedMapCase}
+                  onView={openExistingCase}
+                />
+                {!uploadedFloorPlan && (
+                  <>
+                    <View
+                      pointerEvents="none"
+                      style={styles.floorPlanDimmer}
+                    />
+                    <View style={styles.floorPlanUploadOverlay}>
+                      <Text style={styles.floorPlanUploadTitle}>
+                        Upload your floor plan
+                      </Text>
+                      <Text style={styles.floorPlanUploadDescription}>
+                        The map is dimmed until you upload a clear floor plan.
+                      </Text>
+                      <Pressable
+                        style={styles.floorPlanUploadButton}
+                        onPress={handleFloorPlanUpload}
+                      >
+                        <Text style={styles.floorPlanUploadButtonText}>
+                          Choose image
+                        </Text>
+                      </Pressable>
+                      <Text style={styles.floorPlanQuality}>
+                        For best results, use a straight, high-resolution PNG or
+                        JPG with the whole floor visible, readable room labels,
+                        clear walls and corridors, and minimal blur or glare.
+                        Avoid screenshots with toolbars or cropped edges.
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </View>
             </View>
 
             {!isDesktop && (
               <Pressable
-                style={styles.floatingStartCase}
+                style={[
+                  styles.floatingStartCase,
+                  !uploadedFloorPlan && styles.startCaseDisabled,
+                ]}
+                disabled={!uploadedFloorPlan}
                 onPress={handleStartCase}
               >
                 <Text style={styles.floatingStartText}>Start Case</Text>
@@ -711,13 +779,15 @@ export default function HomeScreen() {
                 <ScrollView>
                   <Pressable
                     style={{
-                      backgroundColor: '#2563EB',
+                      backgroundColor: uploadedFloorPlan ? '#2563EB' : '#9CA3AF',
+                      opacity: uploadedFloorPlan ? 1 : 0.65,
                       marginTop: 18,
                       marginBottom: 20,
                       borderRadius: 12,
                       paddingVertical: 15,
                       alignItems: 'center',
                     }}
+                    disabled={!uploadedFloorPlan}
                     onPress={handleStartCase}
                   >
                     <Text
@@ -1247,6 +1317,7 @@ export default function HomeScreen() {
 
       <Modal visible={showFireModal} transparent animationType="fade">
   <View style={styles.modalOverlay}>
+
     <View style={styles.modalBox}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.modalTitle}>
@@ -1444,6 +1515,7 @@ export default function HomeScreen() {
 
 
 
+
 <Modal visible={showInjuryModal} transparent animationType="fade">
   <View style={styles.modalOverlay}>
     <View style={styles.modalBox}>
@@ -1512,6 +1584,8 @@ export default function HomeScreen() {
             );
           })}
         </View>
+
+
 
         <Pressable
           style={[
@@ -1670,7 +1744,7 @@ export default function HomeScreen() {
       </Modal>
 
       <Modal visible={showLabelModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
+        <View  style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Enter Location</Text>
 
@@ -1756,7 +1830,78 @@ export default function HomeScreen() {
   );
 }
 
+
+
+
+
+
+
 const styles = StyleSheet.create({
+  dashboardMapWrap: {
+    flex: 1,
+    position: 'relative',
+  },
+  floorPlanDimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(107, 114, 128, 0.48)',
+    zIndex: 5,
+  },
+  floorPlanUploadOverlay: {
+    position: 'absolute',
+    zIndex: 6,
+    alignSelf: 'center',
+    top: '22%',
+    width: '84%',
+    maxWidth: 460,
+    padding: 22,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.97)',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
+  },
+  
+  floorPlanUploadTitle: {
+    fontSize: 21,
+    fontWeight: '800',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  floorPlanUploadDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#4B5563',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  floorPlanUploadButton: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    marginBottom: 14,
+  },
+  floorPlanUploadButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  floorPlanQuality: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  startCaseDisabled: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.55,
+  },
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',
@@ -1906,7 +2051,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 16,
   },
-
   deskPanelBtn: {
     paddingVertical: 11,
     borderRadius: 10,
@@ -1966,7 +2110,7 @@ const styles = StyleSheet.create({
   handleLine: {
     width: 40,
     height: 5,
-    borderRadius: 999,
+    borderRadius: 999 ,
     backgroundColor: '#6B7280',
     marginBottom: 6,
   },
@@ -1979,12 +2123,12 @@ const styles = StyleSheet.create({
 
   actionsBox: {
     backgroundColor: '#ebeaea',
-    padding: 12,
+    padding: 12 ,
   },
 
   actionButtonsRow: {
     flexDirection: 'row',
-    marginBottom: 10,
+    marginBottom:  10,
   },
 
   actionButton: {
@@ -2049,7 +2193,7 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 480,
     backgroundColor: '#F5F5F5',
-    borderRadius: 28,
+    borderRadius:  28,
     padding: 24,
   },
 
@@ -2147,7 +2291,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 5,
+    marginBottom:  5 ,
   },
 
   caseDateCard: {
@@ -2293,7 +2437,7 @@ const styles = StyleSheet.create({
   situationText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#111827',
+    color: ' #111827',
   },
 
   chevron: {
@@ -2365,7 +2509,7 @@ maintenanceOptionSelected: {
 
 maintenanceIcon: {
   fontSize: 32,
-  marginBottom: 10,
+  marginBottom:  10,
 },
 
 maintenanceOptionText: {
@@ -2503,7 +2647,7 @@ injuryOptionTextSelected: {
   },
 
   caseFloorChipText: {
-    fontSize: 13,
+    fontSize:13,
     fontWeight: '600',
     color: '#4B5563',
   },
@@ -2511,6 +2655,12 @@ injuryOptionTextSelected: {
   caseFloorChipTextActive: {
     color: '#1D4ED8',
   },
+
+  
+
+
+
+
 
   
 });
