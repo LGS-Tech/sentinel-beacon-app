@@ -38,7 +38,7 @@ After linking the blueprint or updating an existing service, set in the Render d
 | Key | Notes |
 |-----|--------|
 | `JWT_SECRET` | **Required** — long random string for `/auth/login` |
-| `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,http://localhost:8081` |
+| `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,https://app.lgstech.co,http://localhost:8081` |
 | `R2_ACCOUNT_ID` | Cloudflare account ID for R2 |
 | `R2_ACCESS_KEY_ID` | R2 API token access key (Object Read & Write) |
 | `R2_SECRET_ACCESS_KEY` | R2 API token secret — never commit this |
@@ -53,7 +53,7 @@ After linking the blueprint or updating an existing service, set in the Render d
 | `DATABASE_URL` | **Required** — from Render Postgres **Internal** connection string |
 | `JWT_SECRET` | **Required** — long random string for `/auth/login` |
 | `REQUIRE_AUTH` | `false` for demo until all clients send Bearer tokens; `true` in production |
-| `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,http://localhost:8081` |
+| `ALLOWED_ORIGINS` | e.g. `https://lgs-tech.github.io,https://lgstech.co,https://www.lgstech.co,https://app.lgstech.co,http://localhost:8081` |
 | `R2_ACCOUNT_ID` | Cloudflare account ID for R2 |
 | `R2_ACCESS_KEY_ID` | R2 API token access key |
 | `R2_SECRET_ACCESS_KEY` | R2 API token secret — dashboard only |

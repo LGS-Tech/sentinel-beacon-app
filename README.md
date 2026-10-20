@@ -133,12 +133,15 @@ Env files in `expo-app/`:
 
 On every push to `main`, GitHub Actions builds the static web app and deploys Pages.
 
-**Demo URL:** https://lgs-tech.github.io/sentinel-beacon-app/
+**App URL:** https://app.lgstech.co
+
+`expo-app/public/CNAME` publishes the app at that host. Add the free DNS CNAME
+for `app` before deploying. Opening the site shows the login screen.
 
 **One-time GitHub setup (org admin):**
 1. Repo → **Settings → Pages**
 2. Source: **GitHub Actions**
-3. On Render, set `ALLOWED_ORIGINS=https://lgs-tech.github.io`
+3. On Render, add `https://app.lgstech.co` to `ALLOWED_ORIGINS`
 
 Local backend (dev) still:
 ```bash
