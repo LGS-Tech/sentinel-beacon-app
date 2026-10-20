@@ -18,6 +18,7 @@ function buildCorsOptions() {
     "https://lgs-tech.github.io",
     "https://lgstech.co",
     "https://www.lgstech.co",
+    "https://app.lgstech.co",
     "http://localhost:8081",
     "http://localhost:19006",
     "http://127.0.0.1:8081",
