@@ -1,7 +1,7 @@
 //dashboard - specialised prompts to be added for each case type
 //the continue button needs to be inactivated until prompts have been selecteed
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-//need to have uploaded floor plan saved to backend instantly
+// Floor plans are saved to the API on upload and restored after reload.
 
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
@@ -41,12 +41,20 @@ import BottomSheet from '@/components/sheet';
 //import { db } from "@/lib/db"
 
 import { getAuthToken } from '@/lib/api';
-import { createCase, getCases, updateCase } from '@/lib/db';
+import {
+  createCase,
+  fetchFloorPlanBlob,
+  getCases,
+  listFloorPlans,
+  updateCase,
+  uploadFloorPlan,
+} from '@/lib/db';
 import {
   caseMatchesFloor,
   DEFAULT_FLOOR_ID,
   FLOORS,
   getFloorById,
+  isFloorId,
   normalizeFloorId,
   type FloorId,
 } from '@/lib/floors';
@@ -197,8 +205,13 @@ export default function HomeScreen() {
   const [selectedFloor, setSelectedFloor] =
     useState<FloorId>(DEFAULT_FLOOR_ID);
   const [caseFloor, setCaseFloor] = useState<FloorId>(DEFAULT_FLOOR_ID);
-  // A user-provided floor plan overrides the bundled floor-plan image for this session.
-  const [uploadedFloorPlan, setUploadedFloorPlan] = useState<string | null>(null);
+  // Saved floor-plan object URLs, keyed by floor. Restored from the API on load.
+  const [uploadedFloorPlans, setUploadedFloorPlans] = useState<
+    Partial<Record<FloorId, string>>
+  >({});
+  const [floorPlansReady, setFloorPlansReady] = useState(false);
+  const floorPlanObjectUrls = useRef<string[]>([]);
+  const uploadedFloorPlan = uploadedFloorPlans[selectedFloor] ?? null;
 
   const questionsComplete = (caseQuestions[selectedCaseType] || []).every(
     (question, index) => questionAnswers[index]?.trim().length > 0
@@ -280,6 +293,68 @@ export default function HomeScreen() {
       loadOpenCases();
     }
   }, [caseActive]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSavedFloorPlans() {
+      try {
+        if (!(await getAuthToken())) {
+          return;
+        }
+
+        const plans = await listFloorPlans();
+        if (cancelled) return;
+
+        const next: Partial<Record<FloorId, string>> = {};
+        const objectUrls: string[] = [];
+        for (const plan of plans) {
+          if (!isFloorId(plan.floor)) continue;
+          const blob = await fetchFloorPlanBlob(plan.floor);
+          if (cancelled) {
+            objectUrls.forEach((uri) => URL.revokeObjectURL(uri));
+            return;
+          }
+          if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+            throw new Error('Unable to preview this floor plan on this device.');
+          }
+          const uri = URL.createObjectURL(blob);
+          objectUrls.push(uri);
+          next[plan.floor] = uri;
+        }
+
+        if (cancelled) {
+          objectUrls.forEach((uri) => URL.revokeObjectURL(uri));
+          return;
+        }
+
+        floorPlanObjectUrls.current.forEach((uri) => {
+          URL.revokeObjectURL(uri);
+        });
+        floorPlanObjectUrls.current = objectUrls;
+        setUploadedFloorPlans(next);
+      } catch (error) {
+        console.warn(
+          'loadSavedFloorPlans failed:',
+          error instanceof Error ? error.message : error,
+        );
+      } finally {
+        if (!cancelled) {
+          setFloorPlansReady(true);
+        }
+      }
+    }
+
+    loadSavedFloorPlans();
+
+    return () => {
+      cancelled = true;
+      floorPlanObjectUrls.current.forEach((uri) => {
+        URL.revokeObjectURL(uri);
+      });
+      floorPlanObjectUrls.current = [];
+    };
+  }, []);
 
   // poll only while this tab is focused, the app is in the foreground and the user is signed in
   useFocusEffect(
@@ -529,6 +604,8 @@ export default function HomeScreen() {
   }
 
   async function handleFloorPlanUpload() {
+    const floorId = selectedFloor;
+    let localUri: string | null = null;
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -536,10 +613,33 @@ export default function HomeScreen() {
         quality: 1,
       });
 
-      if (!result.canceled && result.assets?.[0]?.uri) {
-        setUploadedFloorPlan(result.assets[0].uri);
+      if (result.canceled || !result.assets?.[0]?.uri) {
+        return;
       }
+
+      const asset = result.assets[0];
+      localUri = asset.uri;
+      setUploadedFloorPlans((prev) => ({ ...prev, [floorId]: localUri! }));
+
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      const mimeType = asset.mimeType || blob.type || 'image/png';
+      const name =
+        asset.fileName ||
+        `floor-${floorId}.${mimeType === 'image/jpeg' ? 'jpg' : 'png'}`;
+      await uploadFloorPlan(floorId, {
+        name,
+        mimeType,
+        blob,
+        uri: asset.uri,
+      });
     } catch (error) {
+      setUploadedFloorPlans((prev) => {
+        if (!localUri || prev[floorId] !== localUri) return prev;
+        const next = { ...prev };
+        delete next[floorId];
+        return next;
+      });
       showAlert(
         'Unable to upload floor plan',
         error instanceof Error ? error.message : 'Please try again.',
@@ -683,12 +783,13 @@ export default function HomeScreen() {
                   onView={openExistingCase}
                 />
                 {!uploadedFloorPlan && (
-                  <>
-                    <View
-                      pointerEvents="none"
-                      style={styles.floorPlanDimmer}
-                    />
-                    <View style={styles.floorPlanUploadOverlay}>
+                  <View
+                    pointerEvents="none"
+                    style={styles.floorPlanDimmer}
+                  />
+                )}
+                {floorPlansReady && !uploadedFloorPlan && (
+                  <View style={styles.floorPlanUploadOverlay}>
                       <Text style={styles.floorPlanUploadTitle}>
                         Upload your floor plan
                       </Text>
@@ -710,7 +811,6 @@ export default function HomeScreen() {
                         Avoid screenshots with toolbars or cropped edges.
                       </Text>
                     </View>
-                  </>
                 )}
               </View>
             </View>

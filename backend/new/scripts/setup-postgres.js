@@ -36,6 +36,9 @@ async function main() {
     const organisations = await client.query(
       "SELECT COUNT(*)::int AS count FROM organisations"
     );
+    const floorPlans = await client.query(
+      "SELECT COUNT(*)::int AS count FROM floor_plans"
+    );
     console.log("PostgreSQL schema applied.");
     console.log(`departments rows: ${departments.rows[0].count}`);
     console.log(`users rows: ${users.rows[0].count}`);
@@ -43,6 +46,7 @@ async function main() {
     console.log(`case_events rows: ${events.rows[0].count}`);
     console.log(`case_attachments rows: ${attachments.rows[0].count}`);
     console.log(`organisations rows: ${organisations.rows[0].count}`);
+    console.log(`floor_plans rows: ${floorPlans.rows[0].count}`);
   } finally {
     await client.end();
   }

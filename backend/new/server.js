@@ -57,6 +57,7 @@ app.get("/", (_req, res) => {
       "/users",
       "/departments",
       "/cases/:id/attachments",
+      "/floors",
     ],
   });
 });

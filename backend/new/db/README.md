@@ -18,6 +18,8 @@ This folder is the **PostgreSQL backend** for LGS Tech. Express `server.js` uses
 | `users` | Students, staff, maintainers, and leads |
 | `cases` | Tickets / incidents (expanded from Mongo `Case`) |
 | `case_events` | Feed + assignment / status history |
+| `case_attachments` | Vault file metadata (bytes in R2) |
+| `floor_plans` | One floor-plan image per organisation + floor (`1`/`2`; bytes in R2) |
 
 ### Users (extra vs JSON)
 

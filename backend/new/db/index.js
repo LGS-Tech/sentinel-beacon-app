@@ -11,6 +11,7 @@ const departments = require("./queries/departments");
 const users = require("./queries/users");
 const cases = require("./queries/cases");
 const attachments = require("./queries/attachments");
+const floorPlans = require("./queries/floorPlans");
 
 module.exports = {
   pool,
@@ -19,5 +20,6 @@ module.exports = {
   users,
   cases,
   attachments,
+  floorPlans,
   ping: pool.ping,
 };
