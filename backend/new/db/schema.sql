@@ -311,7 +311,8 @@ CREATE INDEX IF NOT EXISTS idx_case_attachments_uploaded_by
 
 -- ---------------------------------------------------------------------------
 -- Organisations (data-layer tenancy)
--- There is no floors table. cases.floor is isolated by cases.organization_id.
+-- There is no floors lookup table. cases.floor is a label ('1'|'2') isolated
+-- by cases.organization_id. Floor-plan images live in floor_plans (R2 + metadata).
 -- HTTP must not choose the organisation. Routes use organizationId from the JWT.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS organisations (
@@ -459,3 +460,26 @@ BEGIN
     ADD CONSTRAINT case_attachments_storage_provider_check
     CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'r2', 'other'));
 END $$;
+
+-- ---------------------------------------------------------------------------
+-- Floor plans (metadata only — image bytes live in Cloudflare R2)
+-- One plan per organisation + floor. HTTP uses organizationId from the JWT.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS floor_plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id INTEGER NOT NULL REFERENCES organisations (id),
+  floor TEXT NOT NULL CHECK (floor IN ('1', '2')),
+  filename TEXT NOT NULL,
+  mime_type TEXT,
+  storage_url TEXT NOT NULL,
+  storage_provider TEXT NOT NULL DEFAULT 'r2'
+    CHECK (storage_provider IN ('external', 'local', 's3', 'blob', 'r2', 'other')),
+  file_size_bytes BIGINT,
+  uploaded_by_user_id INTEGER REFERENCES users (id),
+  created_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT,
+  updated_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT,
+  UNIQUE (organization_id, floor)
+);
+
+CREATE INDEX IF NOT EXISTS idx_floor_plans_organization_id
+  ON floor_plans (organization_id);

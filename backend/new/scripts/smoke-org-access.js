@@ -13,6 +13,7 @@ const cases = require("../controllers/casesController");
 const users = require("../controllers/usersController");
 const departments = require("../controllers/departmentController");
 const attachments = require("../controllers/attachmentsController");
+const floorPlans = require("../controllers/floorPlansController");
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -67,6 +68,7 @@ async function main() {
   let departmentB = null;
   let userB = null;
   let caseB = null;
+  let planB = null;
 
   try {
     departmentB = await db.departments.createDepartment({
@@ -105,6 +107,13 @@ async function main() {
       },
       orgB.id
     );
+    planB = await db.floorPlans.upsertFloorPlan(orgB.id, "1", {
+      filename: "secret-plan.png",
+      mimeType: "image/png",
+      storageUrl: `floor-plans/${orgB.id}/1/secret.png`,
+      storageProvider: "external",
+      uploadedByUserId: userB.id,
+    });
 
     const userBSession = {
       userId: userB.id,
@@ -194,11 +203,32 @@ async function main() {
     );
     assert(stillThere, "organisation B's vault metadata was removed");
 
+    const planList = await invoke(floorPlans.listOrganisationFloorPlans, {
+      user: userASession,
+      query: { organizationId: orgB.id },
+    });
+    assert(planList.statusCode === 200, "floor plan list should be 200");
+    assert(
+      !planList.body.some((row) => row.id === planB.id),
+      "user A listed organisation B's floor plan"
+    );
+
+    const planGet = await invoke(floorPlans.getOrganisationFloorPlan, {
+      user: userASession,
+      params: { floorId: "1" },
+    });
+    assert(
+      planGet.statusCode === 404 ||
+        (planGet.statusCode === 200 && planGet.body.id !== planB.id),
+      "user A read organisation B's floor plan"
+    );
+
     console.log("org access smoke ok", {
       organisationA: orgA.id,
       organisationB: orgB.id,
     });
   } finally {
+    if (planB) await db.floorPlans.deleteFloorPlan(orgB.id, "1");
     if (caseB) await db.cases.deleteCase(caseB.id, orgB.id);
     if (userB) await db.users.deleteUser(userB.id, orgB.id);
     if (departmentB) await db.departments.deleteDepartment(departmentB.id, orgB.id);

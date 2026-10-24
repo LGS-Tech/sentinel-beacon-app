@@ -4,6 +4,7 @@
  */
 
 const { contentPath } = require("../storage/vaultFiles");
+const { contentPath: floorPlanContentPath } = require("../storage/floorPlans");
 
 function clientStorageUrl(row) {
   if (!row) return null;
@@ -11,6 +12,26 @@ function clientStorageUrl(row) {
     return contentPath(row.case_id, row.id);
   }
   return row.storage_url;
+}
+
+function floorPlanToApi(row) {
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    floor: row.floor,
+    filename: row.filename,
+    mimeType: row.mime_type,
+    storageUrl: floorPlanContentPath(row.floor),
+    storageProvider: row.storage_provider,
+    fileSizeBytes:
+      row.file_size_bytes != null ? Number(row.file_size_bytes) : null,
+    uploadedByUserId: row.uploaded_by_user_id,
+    uploadedByName: row.uploaded_by_name ?? null,
+    createdAt: row.created_at != null ? Number(row.created_at) : null,
+    updatedAt: row.updated_at != null ? Number(row.updated_at) : null,
+    organizationId: row.organization_id ?? null,
+  };
 }
 
 function attachmentToApi(row) {
@@ -152,6 +173,7 @@ function pick(body, camel, snake) {
 module.exports = {
   userToPublicApi,
   attachmentToApi,
+  floorPlanToApi,
   userToApi,
   departmentToApi,
   organisationToApi,

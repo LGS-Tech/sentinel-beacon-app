@@ -17,6 +17,7 @@
     "db:smoke-departments": "node scripts/smoke-departments-api.js",
     "db:smoke-org-access": "node scripts/smoke-org-access.js",
     "smoke:vault-files": "node scripts/smoke-vault-files.js",
+    "smoke:floor-plans": "node scripts/smoke-floor-plans.js",
     "db:hash-seeds": "node scripts/hashSeedPasswords.js"
   },
   "keywords": [],

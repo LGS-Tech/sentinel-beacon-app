@@ -42,7 +42,7 @@ After linking the blueprint or updating an existing service, set in the Render d
 | `R2_ACCOUNT_ID` | Cloudflare account ID for R2 |
 | `R2_ACCESS_KEY_ID` | R2 API token access key (Object Read & Write) |
 | `R2_SECRET_ACCESS_KEY` | R2 API token secret — never commit this |
-| `R2_BUCKET_NAME` | Private R2 bucket for Vault files |
+| `R2_BUCKET_NAME` | Private R2 bucket for Vault files and floor plans |
 
 `REQUIRE_AUTH` defaults to `false` for the demo; set `true` when all clients send Bearer tokens.
 
@@ -94,6 +94,7 @@ curl https://sentinel-beacon-app-t6wz.onrender.com/health
 curl https://sentinel-beacon-app-t6wz.onrender.com/cases/analytics
 curl https://sentinel-beacon-app-t6wz.onrender.com/cases
 curl -H "Authorization: Bearer TOKEN" https://sentinel-beacon-app-t6wz.onrender.com/departments
+curl -H "Authorization: Bearer TOKEN" https://sentinel-beacon-app-t6wz.onrender.com/floors
 curl -X POST https://sentinel-beacon-app-t6wz.onrender.com/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"<demo-password>"}'

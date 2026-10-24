@@ -29,6 +29,10 @@ export function getFloorById(id: string | null | undefined): FloorDefinition {
   return FLOORS.find((f) => f.id === id) ?? FLOORS[0];
 }
 
+export function isFloorId(value: unknown): value is FloorId {
+  return value === '1' || value === '2';
+}
+
 export function normalizeFloorId(value: unknown): FloorId {
   if (value === '2') return '2';
   return '1';

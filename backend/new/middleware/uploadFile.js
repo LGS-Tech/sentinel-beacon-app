@@ -1,5 +1,6 @@
 const multer = require("multer");
 const { MAX_FILE_BYTES, validateVaultFile } = require("../storage/vaultFiles");
+const { validateFloorPlanFile } = require("../storage/floorPlans");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -23,18 +24,47 @@ const upload = multer({
 function handleVaultUpload(req, res, next) {
   upload.single("file")(req, res, (err) => {
     if (!err) return next();
-
-    if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(413).json({
-        error: "File is too large. Maximum size is 10 MB.",
-      });
-    }
-
-    const status = err.status || 400;
-    return res.status(status).json({
-      error: err.message || "Upload failed. Please try again.",
-    });
+    return sendUploadError(res, err);
   });
 }
 
-module.exports = { handleVaultUpload };
+const floorPlanUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_BYTES, files: 1 },
+  fileFilter(_req, file, cb) {
+    const check = validateFloorPlanFile({
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: 1,
+    });
+    if (!check.ok) {
+      const err = new Error(check.error);
+      err.status = check.status;
+      err.code = "INVALID_FILE_TYPE";
+      return cb(err);
+    }
+    cb(null, true);
+  },
+});
+
+function sendUploadError(res, err) {
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({
+      error: "File is too large. Maximum size is 10 MB.",
+    });
+  }
+
+  const status = err.status || 400;
+  return res.status(status).json({
+    error: err.message || "Upload failed. Please try again.",
+  });
+}
+
+function handleFloorPlanUpload(req, res, next) {
+  floorPlanUpload.single("file")(req, res, (err) => {
+    if (!err) return next();
+    return sendUploadError(res, err);
+  });
+}
+
+module.exports = { handleVaultUpload, handleFloorPlanUpload };

@@ -158,6 +158,116 @@ export async function fetchAttachmentBlob(
   return response.blob();
 }
 
+export type FloorPlan = {
+  id: string;
+  floor: string;
+  filename: string;
+  mimeType: string | null;
+  storageUrl: string;
+  storageProvider: string;
+  fileSizeBytes: number | null;
+  uploadedByUserId: number | null;
+  uploadedByName: string | null;
+  createdAt: number | null;
+  updatedAt: number | null;
+};
+
+export async function listFloorPlans(): Promise<FloorPlan[]> {
+  const data = await requestJson("/floors");
+  return Array.isArray(data) ? data : [];
+}
+
+export async function uploadFloorPlan(
+  floorId: string,
+  file: PickedVaultFile
+): Promise<FloorPlan> {
+  const token = await getAuthToken();
+  const form = new FormData();
+  if (Platform.OS !== "web" && file.uri) {
+    form.append(
+      "file",
+      {
+        uri: file.uri,
+        name: file.name,
+        type: file.mimeType,
+      } as unknown as Blob
+    );
+  } else {
+    form.append("file", file.blob, file.name);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API}/floors/${floorId}`, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: form,
+    });
+  } catch (error) {
+    throw new Error(
+      `Cannot reach API at ${API}/floors/${floorId}. (${
+        error instanceof Error ? error.message : "Failed to fetch"
+      })`
+    );
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    if (isAuthFailure(`/floors/${floorId}`, response.status, text)) {
+      await handleAuthFailure();
+      throw new Error(SESSION_EXPIRED_MESSAGE);
+    }
+    let message = `Upload failed (${response.status})`;
+    try {
+      const parsed = JSON.parse(text) as { error?: string };
+      if (parsed.error) message = parsed.error;
+    } catch {
+      if (text) message = text;
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+export async function fetchFloorPlanBlob(floorId: string): Promise<Blob> {
+  const token = await getAuthToken();
+  let response: Response;
+  try {
+    response = await fetch(`${API}/floors/${floorId}/content`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      `Cannot open the floor plan. (${
+        error instanceof Error ? error.message : "Failed to fetch"
+      })`
+    );
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    if (isAuthFailure(`/floors/${floorId}/content`, response.status, text)) {
+      await handleAuthFailure();
+      throw new Error(SESSION_EXPIRED_MESSAGE);
+    }
+    let message = `Unable to open floor plan (${response.status})`;
+    try {
+      const parsed = JSON.parse(text) as { error?: string };
+      if (parsed.error) message = parsed.error;
+    } catch {
+      if (text) message = text;
+    }
+    throw new Error(message);
+  }
+
+  return response.blob();
+}
+
 export async function getCases() {
   const data = await requestJson("/cases");
   return (data as any[]).map((c: any) => ({
