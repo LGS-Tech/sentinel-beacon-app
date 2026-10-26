@@ -117,6 +117,7 @@ function caseToApi(row) {
     category: row.category,
     description: row.description,
     priority: row.priority,
+    severity: row.severity ?? null,
     assignedDepartmentId: row.assigned_department_id,
     assignedDepartmentName: row.assigned_department_name ?? null,
     assignedUserId: row.assigned_user_id,

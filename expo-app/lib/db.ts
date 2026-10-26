@@ -174,7 +174,12 @@ export type FloorPlan = {
 
 export async function listFloorPlans(): Promise<FloorPlan[]> {
   const data = await requestJson("/floors");
-  return Array.isArray(data) ? data : [];
+  if (!Array.isArray(data)) return [];
+  return data.map((plan: FloorPlan) => ({
+    ...plan,
+    // Postgres TEXT is a string; coerce so "1" vs 1 never drops floor 1.
+    floor: String(plan?.floor ?? ""),
+  }));
 }
 
 export async function uploadFloorPlan(
@@ -232,7 +237,9 @@ export async function uploadFloorPlan(
   return response.json();
 }
 
-export async function fetchFloorPlanBlob(floorId: string): Promise<Blob> {
+export async function fetchFloorPlanBlob(
+  floorId: string
+): Promise<Blob | null> {
   const token = await getAuthToken();
   let response: Response;
   try {
@@ -247,6 +254,10 @@ export async function fetchFloorPlanBlob(floorId: string): Promise<Blob> {
         error instanceof Error ? error.message : "Failed to fetch"
       })`
     );
+  }
+
+  if (response.status === 404) {
+    return null;
   }
 
   if (!response.ok) {
