@@ -139,6 +139,12 @@ test("POST /cases responds with 201", async () => {
   assert.equal(res.statusCode, 201);
 });
 
+test("POST /cases keeps severity on the case body", async () => {
+  await postCase({ title: "IT Support", severity: "HIGH", priority: "NORMAL" });
+  assert.equal(createCaseArgs.severity, "HIGH");
+  assert.equal(createCaseArgs.priority, "NORMAL");
+});
+
 for (const userType of ["student", "staff"]) {
   const user = { userId: 7, userType };
 

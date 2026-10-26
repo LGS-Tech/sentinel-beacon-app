@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS cases (
   description TEXT,
   chat TEXT,
   priority TEXT NOT NULL DEFAULT 'NORMAL',
+  severity TEXT,
   assigned_department_id INTEGER REFERENCES departments (id),
   assigned_user_id INTEGER REFERENCES users (id),
   created_by_user_id INTEGER REFERENCES users (id),
@@ -219,6 +220,11 @@ ALTER TABLE cases ADD CONSTRAINT cases_category_check
 ALTER TABLE cases DROP CONSTRAINT IF EXISTS cases_priority_check;
 ALTER TABLE cases ADD CONSTRAINT cases_priority_check
   CHECK (priority IN ('LOW', 'NORMAL', 'HIGH', 'CRITICAL'));
+
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS severity TEXT;
+ALTER TABLE cases DROP CONSTRAINT IF EXISTS cases_severity_check;
+ALTER TABLE cases ADD CONSTRAINT cases_severity_check
+  CHECK (severity IS NULL OR severity IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW'));
 
 DO $$
 BEGIN

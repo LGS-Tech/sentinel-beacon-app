@@ -1,6 +1,9 @@
 /**
  * Campus floor plans bundled in the app (Leon’s LGSUniFloorPlan assets).
  * Case coordinates are floor-specific; `floor` on a case must match one of these ids.
+ *
+ * IDs are the strings "1" | "2". APIs and Postgres may still send 1 / 2 as
+ * numbers, so every comparison goes through parseFloorId().
  */
 export type FloorId = '1' | '2';
 
@@ -25,21 +28,27 @@ export const FLOORS: FloorDefinition[] = [
 
 export const DEFAULT_FLOOR_ID: FloorId = '1';
 
-export function getFloorById(id: string | null | undefined): FloorDefinition {
-  return FLOORS.find((f) => f.id === id) ?? FLOORS[0];
+export function parseFloorId(value: unknown): FloorId | null {
+  if (value == null || value === '') return null;
+  const id = String(value).trim();
+  return id === '1' || id === '2' ? id : null;
+}
+
+export function getFloorById(id: string | number | null | undefined): FloorDefinition {
+  const parsed = parseFloorId(id);
+  return FLOORS.find((f) => f.id === parsed) ?? FLOORS[0];
 }
 
 export function isFloorId(value: unknown): value is FloorId {
-  return value === '1' || value === '2';
+  return parseFloorId(value) !== null;
 }
 
 export function normalizeFloorId(value: unknown): FloorId {
-  if (value === '2') return '2';
-  return '1';
+  return parseFloorId(value) ?? DEFAULT_FLOOR_ID;
 }
 
 export function caseMatchesFloor(
-  caseItem: { floor?: string | null },
+  caseItem: { floor?: string | number | null },
   floorId: FloorId,
 ): boolean {
   return normalizeFloorId(caseItem?.floor) === floorId;

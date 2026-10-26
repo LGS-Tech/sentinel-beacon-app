@@ -1,5 +1,3 @@
-//dashboard - specialised prompts to be added for each case type
-//the continue button needs to be inactivated until prompts have been selecteed
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 // Floor plans are saved to the API on upload and restored after reload.
 
@@ -23,6 +21,7 @@ import {
 import ChatSheet from '@/components/chat';
 
 import DashboardMap from '@/components/dashboard-map';
+import ReportIncidentWizard from '@/components/report-incident-wizard';
 
 import IntruderMap from '@/components/intruder-map';
 
@@ -42,7 +41,6 @@ import BottomSheet from '@/components/sheet';
 
 import { getAuthToken } from '@/lib/api';
 import {
-  createCase,
   fetchFloorPlanBlob,
   getCases,
   listFloorPlans,
@@ -54,8 +52,8 @@ import {
   DEFAULT_FLOOR_ID,
   FLOORS,
   getFloorById,
-  isFloorId,
   normalizeFloorId,
+  parseFloorId,
   type FloorId,
 } from '@/lib/floors';
 
@@ -68,72 +66,6 @@ const defaultCoords = {
   y: 0.79,
 };
 
-
-
-const  caseQuestions: Record<
-  string,
-  {
-    question: string;
-    type: 'text' | 'yesno';
-  }[]
-> = {
-  Fire: [
-    {
-      question: 'Has everyone present been evacuated?',
-      type: 'yesno',
-    },
-    {
-      question: 'Have the fire department been contacted?',
-      type: 'yesno',
-    },
-  ],
-  Intruder: [
-    {
-      question: 'Describe the intruder',
-      type: 'text',
-    },
-    {
-      question: 'Are they carrying out anti-social behaviour?',
-      type: 'yesno',
-    },
-    {
-      question: 'Have the police been contacted?',
-      type: 'yesno',
-    },
-  ],
-
-  Injury: [
-    {
-      question: 'Describe the injury',
-      type: 'text',
-    },
-    {
-      question: 'Have the emergency services been contacted?',
-      type: 'yesno',
-    },
-    {
-      question: 'What medical assistance has been provided?',
-      type: 'text',
-    },
-  ],
-
-  Maintenance: [
-    {
-      question: 'Describe the maintenance issue',
-      type: 'text',
-    },
-    {
-      question: 'Does it pose a danger to anyone?',
-      type: 'yesno' ,
-    },
-    {
-      question: 'Have the maintenance team been contacted?',
-      type: 'yesno',
-    },
-  ],
-};
-
-
 export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
@@ -141,8 +73,6 @@ export default function HomeScreen() {
   const [caseActive, setCaseActive] = useState(false);
 
   const [incidentType, setIncidentType] = useState('Intruder');
-
-  const [showSituationModal,setShowSituationModal] = useState(false);
 
   const [locationConfirmed, setLocationConfirmed] = useState(false);
 
@@ -177,16 +107,9 @@ export default function HomeScreen() {
 
   const [mapRefreshKey, setMapRefreshKey] = useState(0);
 
-  const [showQuestionModal, setShowQuestionModal] = useState(false);
-
-  const [selectedCaseType, setSelectedCaseType] = useState('');
-
-  const [questionAnswers, setQuestionAnswers] = useState<string[]>(['', '']);
   const [currentVaultCaseId, setCurrentVaultCaseId] = useState<number | null>(
     null,
   );
-
-  const [showMap, setShowMap] = useState(false);
 
   const [openCases, setOpenCases] = useState<any[]>([]);
   const [showDashboard, setShowDashboard] = useState(false);
@@ -194,14 +117,6 @@ export default function HomeScreen() {
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [selectedMapCase, setSelectedMapCase] = useState<any | null>(null);
 
-  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
-  const [selectedMaintenanceType, setSelectedMaintenanceType] = useState('');
-  const [showFireModal, setShowFireModal] = useState(false);
-  const [selectedFireType, setSelectedFireType] = useState('');
-  const [showIntruderModal, setShowIntruderModal] = useState(false);
-  const [selectedIntruderType, setSelectedIntruderType] = useState('');
-  const [showInjuryModal, setShowInjuryModal] = useState(false);
-  const [selectedInjuryType, setSelectedInjuryType] = useState('');
   const [selectedFloor, setSelectedFloor] =
     useState<FloorId>(DEFAULT_FLOOR_ID);
   const [caseFloor, setCaseFloor] = useState<FloorId>(DEFAULT_FLOOR_ID);
@@ -209,13 +124,17 @@ export default function HomeScreen() {
   const [uploadedFloorPlans, setUploadedFloorPlans] = useState<
     Partial<Record<FloorId, string>>
   >({});
+  const [savedFloorIds, setSavedFloorIds] = useState<
+    Partial<Record<FloorId, boolean>>
+  >({});
   const [floorPlansReady, setFloorPlansReady] = useState(false);
+  const [showReportWizard, setShowReportWizard] = useState(false);
   const floorPlanObjectUrls = useRef<string[]>([]);
+  const floorPlanLoadId = useRef(0);
   const uploadedFloorPlan = uploadedFloorPlans[selectedFloor] ?? null;
-
-  const questionsComplete = (caseQuestions[selectedCaseType] || []).every(
-    (question, index) => questionAnswers[index]?.trim().length > 0
-  );    
+  const hasSavedPlan = Boolean(
+    uploadedFloorPlan || savedFloorIds[selectedFloor],
+  );
 
   const inFlightCases = useRef<Promise<void> | null>(null);
 
@@ -237,124 +156,112 @@ export default function HomeScreen() {
     setMapRefreshKey((prev) => prev + 1);
   }
 
-
-
-  async function saveLocation(x: number, y: number, label: string) {
-    const newCase = await createCase({
-      title: `${incidentType} Case`,
-
-      createdAt: Date.now(),
-
-      lastUpdatedAt: Date.now(),
-
-      status: 'ACTIVE',
-
-      locationX: x,
-
-      locationY: y,
-
-      locationLabel: label,
-
-      floor: selectedFloor,
-
-      feed: '',
-
-      chat: '',
-    });
-
-    setCaseFloor(selectedFloor);
-    setCurrentVaultCaseId(newCase._id ?? newCase.id);
-
-    await loadOpenCases();
-  }
-  function updateServiceStatusFromAnswer(question: string, answer: string) {
-    const isEmergencyQuestion =
-      question.includes('emergency services') ||
-      question.includes('fire department') ||
-      question.includes('police');
-
-    const isMaintenanceQuestion = question.includes('maintenance team');
-
-    if (!isEmergencyQuestion && !isMaintenanceQuestion) {
-      return;
-    }
-
-    if (isMaintenanceQuestion) {
-      setServiceStatus(answer === 'Yes' ? 'Notified' : 'Not notified');
-
-      return;
-    }
-
-    setServiceStatus(answer === 'Yes' ? 'Notified' : 'Not notified');
-  }
-
   useEffect(() => {
     if (!caseActive ) {
       loadOpenCases();
     }
   }, [caseActive]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadSavedFloorPlans = useCallback(async () => {
+    const loadId = ++floorPlanLoadId.current;
+    try {
+      if (!(await getAuthToken())) {
+        return;
+      }
 
-    async function loadSavedFloorPlans() {
-      try {
-        if (!(await getAuthToken())) {
-          return;
-        }
+      const plans = await listFloorPlans();
+      if (loadId !== floorPlanLoadId.current) return;
 
-        const plans = await listFloorPlans();
-        if (cancelled) return;
+      const listedIds = new Set<FloorId>();
+      for (const plan of plans) {
+        const id = parseFloorId(plan.floor);
+        if (id) listedIds.add(id);
+      }
 
-        const next: Partial<Record<FloorId, string>> = {};
-        const objectUrls: string[] = [];
-        for (const plan of plans) {
-          if (!isFloorId(plan.floor)) continue;
-          const blob = await fetchFloorPlanBlob(plan.floor);
-          if (cancelled) {
-            objectUrls.forEach((uri) => URL.revokeObjectURL(uri));
-            return;
+      const next: Partial<Record<FloorId, string>> = {};
+      const saved: Partial<Record<FloorId, boolean>> = {};
+      const objectUrls: string[] = [];
+
+      // Always try both known floors in parallel. A missing list row must
+      // not skip floor 1 (or 2) if GET /floors/:id/content still has a plan.
+      const fetched = await Promise.all(
+        FLOORS.map(async (floor) => {
+          try {
+            const blob = await fetchFloorPlanBlob(floor.id);
+            return { floor, blob, error: null as unknown };
+          } catch (error) {
+            return { floor, blob: null, error };
           }
-          if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
-            throw new Error('Unable to preview this floor plan on this device.');
-          }
-          const uri = URL.createObjectURL(blob);
-          objectUrls.push(uri);
-          next[plan.floor] = uri;
-        }
+        }),
+      );
 
-        if (cancelled) {
-          objectUrls.forEach((uri) => URL.revokeObjectURL(uri));
-          return;
-        }
+      if (loadId !== floorPlanLoadId.current) return;
 
-        floorPlanObjectUrls.current.forEach((uri) => {
-          URL.revokeObjectURL(uri);
-        });
-        floorPlanObjectUrls.current = objectUrls;
-        setUploadedFloorPlans(next);
-      } catch (error) {
-        console.warn(
-          'loadSavedFloorPlans failed:',
-          error instanceof Error ? error.message : error,
-        );
-      } finally {
-        if (!cancelled) {
-          setFloorPlansReady(true);
+      for (const { floor, blob, error } of fetched) {
+        if (error) {
+          if (listedIds.has(floor.id)) saved[floor.id] = true;
+          console.warn(
+            `loadSavedFloorPlans floor ${floor.id} failed:`,
+            error instanceof Error ? error.message : error,
+          );
+          continue;
         }
+        if (!blob) {
+          if (listedIds.has(floor.id)) saved[floor.id] = true;
+          continue;
+        }
+        saved[floor.id] = true;
+        if (
+          typeof URL === 'undefined' ||
+          typeof URL.createObjectURL !== 'function'
+        ) {
+          continue;
+        }
+        const uri = URL.createObjectURL(blob);
+        objectUrls.push(uri);
+        next[floor.id] = uri;
+      }
+
+      if (loadId !== floorPlanLoadId.current) {
+        objectUrls.forEach((uri) => URL.revokeObjectURL(uri));
+        return;
+      }
+
+      floorPlanObjectUrls.current.forEach((uri) => {
+        URL.revokeObjectURL(uri);
+      });
+      floorPlanObjectUrls.current = objectUrls;
+      setUploadedFloorPlans(next);
+      setSavedFloorIds(saved);
+    } catch (error) {
+      console.warn(
+        'loadSavedFloorPlans failed:',
+        error instanceof Error ? error.message : error,
+      );
+    } finally {
+      if (loadId === floorPlanLoadId.current) {
+        setFloorPlansReady(true);
       }
     }
+  }, []);
 
-    loadSavedFloorPlans();
-
+  useEffect(() => {
     return () => {
-      cancelled = true;
+      floorPlanLoadId.current += 1;
       floorPlanObjectUrls.current.forEach((uri) => {
         URL.revokeObjectURL(uri);
       });
       floorPlanObjectUrls.current = [];
     };
   }, []);
+
+  // Restore floor plans whenever this tab is focused (login + reload).
+  // Do not revoke blob URLs on blur — the tab stays mounted.
+  useFocusEffect(
+    useCallback(() => {
+      loadSavedFloorPlans();
+    }, [loadSavedFloorPlans]),
+  );
 
   // poll only while this tab is focused, the app is in the foreground and the user is signed in
   useFocusEffect(
@@ -391,107 +298,6 @@ export default function HomeScreen() {
       };
     }, [caseActive]),
   );
-
-
-
-  function getSelectedIncidentSubtype() {
-  if (selectedCaseType === 'Fire') {
-    return selectedFireType;
-  }
-
-  if (selectedCaseType === 'Intruder') {
-    return selectedIntruderType;
-  }
-
-  if (selectedCaseType === 'Injury') {
-    return selectedInjuryType;
-  }
-
-  if (selectedCaseType === 'Maintenance') {
-    return selectedMaintenanceType;
-  }
-
-  return '';
-}
-
-
-
-  async function openCase(type: string) {
-    setCurrentVaultCaseId(null);
-
-    clearFeed();
-
-    setIncidentType(type);
-
-    setCaseActive(true);
-
-    setUpdatingLocation(true);
-    setLocationConfirmed(false);
-    setSelectedCoords(null);
-    setIntruderLocation('');
-    setShowDashboard(false);
-
-    addFeedItem(`Mr C Wallace started a new ${type.toLowerCase()} case`);
-
-    loadOpenCases();
-
-    const answers = questionAnswers.filter(
-      (answer) => answer.trim().length > 0,
-    );
-
-    answers.forEach((answer, index) => {
-      const question = caseQuestions[type][index].question;
-
-      addFeedItem(`${question}: ${answer}`);
-
-      loadOpenCases();
-    });
-
-    const descriptionIndex = (caseQuestions[type] || []).findIndex(
-      (item) => item.type === 'text',
-    );
-    const description =
-      descriptionIndex >= 0
-        ? (questionAnswers[descriptionIndex] || '').trim()
-        : '';
-
-
-
-
-    
-    const subtype = getSelectedIncidentSubtype();
-    const caseTitle = subtype
-      ? `${type} — ${subtype}`
-      : `${type} Case`;    
-    const newCase = await createCase({
-      title: caseTitle,
-
-      description: description || undefined,
-
-      createdAt: Date.now(),
-
-      lastUpdatedAt: Date.now(),
-
-      status: 'ACTIVE',
-
-      locationX: defaultCoords.x,
-
-      locationY: defaultCoords.y,
-
-      locationLabel: '',
-
-      floor: selectedFloor,
-
-      chat: '',
-
-      feed: '',
-    });
-
-    setCaseFloor(selectedFloor);
-    setCurrentVaultCaseId(newCase._id ?? newCase.id);
-
-    await loadOpenCases();
-  }
 
   function openExistingCase(caseData: any) {
     setCurrentVaultCaseId(caseData._id ?? caseData.id);
@@ -633,6 +439,7 @@ export default function HomeScreen() {
         blob,
         uri: asset.uri,
       });
+      setSavedFloorIds((prev) => ({ ...prev, [floorId]: true }));
     } catch (error) {
       setUploadedFloorPlans((prev) => {
         if (!localUri || prev[floorId] !== localUri) return prev;
@@ -648,8 +455,8 @@ export default function HomeScreen() {
   }
 
   function handleStartCase() {
-    if (!uploadedFloorPlan) return;
-    setShowSituationModal(true);
+    if (!hasSavedPlan) return;
+    setShowReportWizard(true);
   }
 
   function loadOpenCases() {
@@ -782,13 +589,13 @@ export default function HomeScreen() {
                   onMarkerPress={setSelectedMapCase}
                   onView={openExistingCase}
                 />
-                {!uploadedFloorPlan && (
+                {!hasSavedPlan && (
                   <View
                     pointerEvents="none"
                     style={styles.floorPlanDimmer}
                   />
                 )}
-                {floorPlansReady && !uploadedFloorPlan && (
+                {floorPlansReady && !hasSavedPlan && (
                   <View style={styles.floorPlanUploadOverlay}>
                       <Text style={styles.floorPlanUploadTitle}>
                         Upload your floor plan
@@ -819,9 +626,9 @@ export default function HomeScreen() {
               <Pressable
                 style={[
                   styles.floatingStartCase,
-                  !uploadedFloorPlan && styles.startCaseDisabled,
+                  !hasSavedPlan && styles.startCaseDisabled,
                 ]}
-                disabled={!uploadedFloorPlan}
+                disabled={!hasSavedPlan}
                 onPress={handleStartCase}
               >
                 <Text style={styles.floatingStartText}>Start Case</Text>
@@ -879,15 +686,15 @@ export default function HomeScreen() {
                 <ScrollView>
                   <Pressable
                     style={{
-                      backgroundColor: uploadedFloorPlan ? '#2563EB' : '#9CA3AF',
-                      opacity: uploadedFloorPlan ? 1 : 0.65,
+                      backgroundColor: hasSavedPlan ? '#2563EB' : '#9CA3AF',
+                      opacity: hasSavedPlan ? 1 : 0.65,
                       marginTop: 18,
                       marginBottom: 20,
                       borderRadius: 12,
                       paddingVertical: 15,
                       alignItems: 'center',
                     }}
-                    disabled={!uploadedFloorPlan}
+                    disabled={!hasSavedPlan}
                     onPress={handleStartCase}
                   >
                     <Text
@@ -1234,614 +1041,15 @@ export default function HomeScreen() {
         />
       </BottomSheet>
 
-      <Modal visible={showSituationModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>What describes the situation?</Text>
-
-            <Text style={styles.modalSubtitle}>
-              Choose the option that best describes your report
-            </Text>
-
-            {[
-              {
-                label: 'Fire',
-                icon: '🔥',
-              },
-              {
-                label: 'Intruder',
-                icon: '🚨',
-              },
-              {
-                label: 'Injury',
-                icon: '🩹',
-              },
-              {
-                label: 'Maintenance',
-                icon: '🔧',
-              },
-            ].map((item) => (
-              <Pressable
-                key={item.label}
-                style={styles.situationCard}
-                onPress={() => {
-                  setSelectedCaseType(item.label);
-                  setQuestionAnswers(['', '']);
-
-                  setShowSituationModal(false);
-
-                  if (item.label === 'Maintenance') {
-                    setSelectedMaintenanceType('');
-                    setShowMaintenanceModal(true);
-                  } else if (item.label === 'Fire') {
-                    setSelectedFireType('');
-                    setShowFireModal(true);
-                  } else if (item.label === 'Intruder') {
-                    setSelectedIntruderType('');
-                    setShowIntruderModal(true);
-                  } else if (item.label === 'Injury') {
-                    setSelectedInjuryType('');
-                    setShowInjuryModal(true);
-                  }
-                }}
-              >
-                <View style={styles.situationLeft}>
-                  <Text style={styles.situationEmoji}>{item.icon}</Text>
-
-                  <Text style={styles.situationText}>{item.label}</Text>
-                </View>
-
-                <Text style={styles.chevron}>›</Text>
-              </Pressable>
-            ))}
-
-            <Pressable
-              style={[
-                styles.modalButton,
-                {
-                  backgroundColor: '#d9dbdd',
-                  marginTop: 16,
-                },
-              ]}
-              onPress={() => {
-                setShowSituationModal(false);
-              }}
-            >
-              <Text style={styles.modalButtonText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-
-
-
-
-      <Modal visible={showMaintenanceModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>
-                What type of maintenance is needed?
-              </Text>
-
-              <Text style={styles.modalSubtitle}>
-                Choose the option that best describes the issue
-              </Text>
-
-              <View style={styles.maintenanceGrid}>
-                {[
-                  {
-                    label: 'Plumbing',
-                    icon: '🚰',
-                  },
-                  {
-                    label: 'Electrical',
-                    icon: '⚡',
-                  },
-                  {
-                    label: 'Heating',
-                    icon: '🌡️',
-                  },
-                  {
-                    label: 'Structural',
-                    icon: '🏗️',
-            },
-          ].map((item) => {
-            const selected = selectedMaintenanceType === item.label;
-
-            return (
-              <Pressable
-                key={item.label}
-                style={[
-                  styles.maintenanceOption,
-                  selected && styles.maintenanceOptionSelected,
-                ]}
-                onPress={() => {
-                  setSelectedMaintenanceType(item.label);
-                }}
-              >
-                <Text style={styles.maintenanceIcon}>{item.icon}</Text>
-
-                <Text
-                  style={[
-                    styles.maintenanceOptionText,
-                    selected && styles.maintenanceOptionTextSelected,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-
-                {selected && (
-                  <Text style={styles.maintenanceCheck}>✓</Text>
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Pressable
-          style={[
-            styles.modalButton,
-            {
-              backgroundColor: selectedMaintenanceType
-                ? '#16A34A'
-                : '#9CA3AF',
-              marginTop: 18,
-              opacity: selectedMaintenanceType ? 1 : 0.6,
-            },
-          ]}
-          disabled={!selectedMaintenanceType}
-          onPress={() => {
-            setShowMaintenanceModal(false);
-            setShowQuestionModal(true);
-          }}
-        >
-          <Text style={styles.modalButtonText}>Continue</Text>
-        </Pressable>
-
-            <Pressable
-              style={styles.backButton}
-                onPress={() => {
-                  setShowMaintenanceModal(false);
-                  setShowSituationModal(true);
-                }}
-                >
-                <Text style={styles.backButtonText}>Back</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-
-      <Modal visible={showFireModal} transparent animationType="fade">
-  <View style={styles.modalOverlay}>
-
-    <View style={styles.modalBox}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.modalTitle}>
-          What type of fire incident is this?
-        </Text>
-
-        <Text style={styles.modalSubtitle}>
-          Choose the option that best describes the situation
-        </Text>
-
-        <View style={styles.specialisedGrid}>
-          {[
-            {
-              label: 'Fire',
-              icon: '🔥',
-            },
-            {
-              label: 'Smoke',
-              icon: '💨',
-            },
-            {
-              label: 'Fire alarm',
-              icon: '🚨',
-            },
-            {
-              label: 'Burning smell',
-              icon: '👃',
-            },
-            {
-              label: 'Other',
-              icon: '⚠️',
-            },
-          ].map((item) => {
-            const selected = selectedFireType === item.label;
-
-            return (
-              <Pressable
-                key={item.label}
-                style={[
-                  styles.specialisedOption,
-                  selected && styles.fireOptionSelected,
-                ]}
-                onPress={() => setSelectedFireType(item.label)}
-              >
-                <Text style={styles.specialisedIcon}>{item.icon}</Text>
-
-                <Text
-                  style={[
-                    styles.specialisedOptionText,
-                    selected && styles.fireOptionTextSelected,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-
-                {selected && (
-                  <Text style={styles.specialisedCheck}>✓</Text>
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Pressable
-          style={[
-            styles.modalButton,
-            {
-              backgroundColor: selectedFireType ? '#DC2626' : '#9CA3AF',
-              marginTop: 18,
-              opacity: selectedFireType ? 1 : 0.6,
-            },
-          ]}
-          disabled={!selectedFireType}
-          onPress={() => {
-            setShowFireModal(false);
-            setShowQuestionModal(true);
-          }}
-        >
-          <Text style={styles.modalButtonText}>Continue</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.backButton}
-          onPress={() => {
-            setShowFireModal(false);
-            setShowSituationModal(true);
-          }}
-        >
-          <Text style={styles.backButtonText}>Back</Text>
-        </Pressable>
-      </ScrollView>
-    </View>
-  </View>
-</Modal>
-
-
-<Modal visible={showIntruderModal} transparent animationType="fade">
-  <View style={styles.modalOverlay}>
-    <View style={styles.modalBox}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.modalTitle}>
-          What type of security incident is this?
-        </Text>
-
-        <Text style={styles.modalSubtitle}>
-          Choose the option that best describes the situation
-        </Text>
-
-        <View style={styles.specialisedGrid}>
-          {[
-            {
-              label: 'Intruder',
-              icon: '🚨',
-            },
-            {
-              label: 'Unauthorised person',
-              icon: '🚷',
-            },
-            {
-              label: 'Suspicious behaviour',
-              icon: '👀',
-            },
-            {
-              label: 'Forced entry',
-              icon: '🚪',
-            },
-            {
-              label: 'Other',
-              icon: '⚠️',
-            },
-          ].map((item) => {
-            const selected = selectedIntruderType === item.label;
-
-            return (
-              <Pressable
-                key={item.label}
-                style={[
-                  styles.specialisedOption,
-                  selected && styles.intruderOptionSelected,
-                ]}
-                onPress={() => setSelectedIntruderType(item.label)}
-              >
-                <Text style={styles.specialisedIcon}>{item.icon}</Text>
-
-                <Text
-                  style={[
-                    styles.specialisedOptionText,
-                    selected && styles.intruderOptionTextSelected,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-
-                {selected && (
-                  <Text style={styles.specialisedCheck}>✓</Text>
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Pressable
-          style={[
-            styles.modalButton,
-            {
-              backgroundColor: selectedIntruderType
-                ? '#EA580C'
-                : '#9CA3AF',
-              marginTop: 18,
-              opacity: selectedIntruderType ? 1 : 0.6,
-            },
-          ]}
-          disabled={!selectedIntruderType}
-          onPress={() => {
-            setShowIntruderModal(false);
-            setShowQuestionModal(true);
-          }}
-        >
-          <Text style={styles.modalButtonText}>Continue</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.backButton}
-          onPress={() => {
-            setShowIntruderModal(false);
-            setShowSituationModal(true);
-          }}
-        >
-          <Text style={styles.backButtonText}>Back</Text>
-        </Pressable>
-      </ScrollView>
-    </View>
-  </View>
-</Modal>
-
-
-
-
-<Modal visible={showInjuryModal} transparent animationType="fade">
-  <View style={styles.modalOverlay}>
-    <View style={styles.modalBox}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.modalTitle}>
-          What type of injury has occurred?
-        </Text>
-
-        <Text style={styles.modalSubtitle}>
-          Choose the option that best describes the injury
-        </Text>
-
-        <View style={styles.specialisedGrid}>
-          {[
-            {
-              label: 'Minor injury',
-              icon: '🩹',
-            },
-            {
-              label: 'Serious injury',
-              icon: '🚑',
-            },
-            {
-              label: 'Head injury',
-              icon: '🧠',
-            },
-            {
-              label: 'Burn',
-              icon: '🔥',
-            },
-            {
-              label: 'Medical emergency',
-              icon: '🏥',
-            },
-            {
-              label: 'Other',
-              icon: '⚠️',
-            },
-          ].map((item) => {
-            const selected = selectedInjuryType === item.label;
-
-            return (
-              <Pressable
-                key={item.label}
-                style={[
-                  styles.specialisedOption,
-                  selected && styles.injuryOptionSelected,
-                ]}
-                onPress={() => setSelectedInjuryType(item.label)}
-              >
-                <Text style={styles.specialisedIcon}>{item.icon}</Text>
-
-                <Text
-                  style={[
-                    styles.specialisedOptionText,
-                    selected && styles.injuryOptionTextSelected,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-
-                {selected && (
-                  <Text style={styles.specialisedCheck}>✓</Text>
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-
-
-
-        <Pressable
-          style={[
-            styles.modalButton,
-            {
-              backgroundColor: selectedInjuryType
-                ? '#16A34A'
-                : '#9CA3AF',
-              marginTop: 18,
-              opacity: selectedInjuryType ? 1 : 0.6,
-            },
-          ]}
-          disabled={!selectedInjuryType}
-          onPress={() => {
-            setShowInjuryModal(false);
-            setShowQuestionModal(true);
-          }}
-        >
-          <Text style={styles.modalButtonText}>Continue</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.backButton}
-          onPress={() => {
-            setShowInjuryModal(false);
-            setShowSituationModal(true);
-          }}
-        >
-          <Text style={styles.backButtonText}>Back</Text>
-        </Pressable>
-      </ScrollView>
-    </View>
-  </View>
-</Modal>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      <Modal visible={showQuestionModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>{selectedCaseType} Details</Text>
-
-              {(caseQuestions[selectedCaseType] || []).map((item, index) => (
-                <View key={item.question} style={{ marginBottom: 16 }}>
-                  <Text style={styles.questionLabel}>{item.question}</Text>
-
-                  {item.type === 'yesno' ? (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        gap: 10,
-                      }}
-                    >
-                      <Pressable
-                        style={[
-                          styles.yesNoButton,
-                          questionAnswers[index] === 'Yes' && {
-                            backgroundColor: '#34b864',
-                          },
-                        ]}
-                        onPress={() => {
-                          const updated = [...questionAnswers];
-
-                          updated[index] = 'Yes';
-
-                          setQuestionAnswers(updated);
-
-                          updateServiceStatusFromAnswer(item.question, 'Yes');
-                        }}
-                      >
-                        <Text style={styles.modalButtonText}>Yes</Text>
-                      </Pressable>
-
-                      <Pressable
-                        style={[
-                          styles.yesNoButton,
-                          questionAnswers[index] === 'No' && {
-                            backgroundColor: '#e13f3f',
-                          },
-                        ]}
-                        onPress={() => {
-                          const updated = [...questionAnswers];
-
-                          updated[index] = 'No';
-
-                          setQuestionAnswers(updated);
-
-                          updateServiceStatusFromAnswer(item.question, 'No');
-                        }}
-                      >
-                        <Text style={styles.modalButtonText}>No</Text>
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter response..."
-                      placeholderTextColor="#999"
-                      value={questionAnswers[index] || ''}
-                      onChangeText={(text) => {
-                        const updated = [...questionAnswers];
-
-                        updated[index] = text;
-
-                        setQuestionAnswers(updated);
-                      }}
-                    />
-                  )}
-                </View>
-              ))}
-
-              <Pressable
-                style={[
-                  styles.modalButton,
-                  {
-                    backgroundColor: questionsComplete ? '#16A34A' : '#9CA3AF',
-                    marginTop: 10,
-                    opacity: questionsComplete ? 1 : 0.6,
-                  },
-                ]}
-                disabled={!questionsComplete}
-                onPress={() => {
-                  setShowQuestionModal(false);
-
-                  openCase(selectedCaseType);
-                }}
-              >
-                <Text style={styles.modalButtonText}>Continue</Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.backButton}
-                onPress={() => {
-                  setShowQuestionModal(false);
-                  setShowSituationModal(true);
-                }}
-              >
-                <Text style={styles.backButtonText}>Back</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <ReportIncidentWizard
+        visible={showReportWizard}
+        onClose={() => setShowReportWizard(false)}
+        onSubmitted={() => {
+          loadOpenCases();
+        }}
+        initialFloor={selectedFloor}
+        uploadedFloorPlans={uploadedFloorPlans}
+      />
 
       <Modal visible={showLabelModal} transparent animationType="fade">
         <View  style={styles.modalOverlay}>
