@@ -118,7 +118,7 @@ npm run db:hash-seeds      # bcrypt-hash demo user passwords
 | `case_events` | Feed and assignment history |
 | `case_attachments` | Vault file metadata (bytes in Cloudflare R2) |
 
-API routes: `/cases`, `/users`, `/departments`, `/auth/login`, `/auth/signup`, `/cases/:id/attachments`
+API routes: `/cases`, `/users`, `/departments`, `/auth/login`, `/cases/:id/attachments`. Public `/auth/signup` is disabled. Accounts require provisioning into an approved email-domain organisation; see [organisation setup and rollout](docs/organisation-domains.md).
 
 ### Demo hosting (GitHub Pages + Render)
 

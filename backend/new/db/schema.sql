@@ -16,6 +16,10 @@ CREATE TABLE IF NOT EXISTS departments (
   is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
+-- Legacy demo seeds run only before domain isolation is installed.
+DO $$
+BEGIN
+  IF to_regclass('public.organisation_domains') IS NULL THEN
 INSERT INTO departments (id, name, slug, kind) VALUES
   (1, 'Facilities', 'facilities', 'facilities'),
   (2, 'IT Support', 'it-support', 'it'),
@@ -24,6 +28,8 @@ INSERT INTO departments (id, name, slug, kind) VALUES
   (5, 'Medical', 'medical', 'medical'),
   (6, 'Estates / Maintenance', 'estates', 'facilities')
 ON CONFLICT (id) DO NOTHING;
+  END IF;
+END $$;
 
 SELECT setval(
   pg_get_serial_sequence('departments', 'id'),
@@ -106,6 +112,10 @@ CREATE INDEX IF NOT EXISTS idx_users_user_type ON users (user_type);
 CREATE INDEX IF NOT EXISTS idx_users_college_id ON users (college_id);
 
 -- Seed demo staff plus maintainer and student
+-- Legacy demo seeds run only before domain isolation is installed.
+DO $$
+BEGIN
+  IF to_regclass('public.organisation_domains') IS NULL THEN
 INSERT INTO users (
   id, username, password, email, name, phone, role, authorisation,
   user_type, department_id, college_id
@@ -125,6 +135,8 @@ INSERT INTO users (
   (7, 'aisha.student', 'Student100', 'aisha.khan@student.lgs.ac.uk', 'Aisha Khan',
     '+447400100601', 'Student', 2, 'student', NULL, 'LGS-2026-4412')
 ON CONFLICT (id) DO NOTHING;
+  END IF;
+END $$;
 
 UPDATE users SET user_type = 'lead', authorisation = 1 WHERE id = 3 AND user_type = 'staff';
 UPDATE users SET department_id = 6 WHERE id = 5 AND department_id IS NULL;
