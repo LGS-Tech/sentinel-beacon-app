@@ -21,7 +21,16 @@ async function main() {
   await client.connect();
 
   try {
-    await client.query(sql);
+    await client.query('BEGIN');
+    try {
+      await client.query(sql);
+      const migration = fs.readFileSync(path.join(__dirname, '..', 'db', 'migrations', '20261029-organisation-domains.sql'), 'utf8');
+      await client.query(migration);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    }
     const departments = await client.query(
       "SELECT COUNT(*)::int AS count FROM departments"
     );

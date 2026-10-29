@@ -3,11 +3,10 @@ const jwt = require("jsonwebtoken");
 
 const {
   getUserByEmail,
-  createUser,
   recordLogin,
 } = require("../db/queries/users");
 const { userToPublicApi } = require("../db/mappers");
-const { ROLES } = require("../utils/casePolicy");
+const { requireEmailOrganisation } = require("../db/queries/organisationDomains");
 
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
@@ -17,48 +16,10 @@ function getJwtSecret() {
   return secret;
 }
 
-const signup = async (req, res, next) => {
-  const {
-    username,
-    password,
-    email,
-    name,
-    phone,
-    role,
-    collegeId,
-    yearSemester,
-  } = req.body;
-
-  if (!username || !password || !email || !name) {
-    return res.status(400).json({
-      error: "Username, password, email, and name are required.",
-    });
-  }
-
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await createUser({
-      username,
-      password: hashedPassword,
-      email,
-      name,
-      phone,
-      role,
-      // Self-signup never picks its own access level; body values are ignored.
-      authorisation: 2,
-      userType: ROLES.STUDENT,
-      collegeId,
-      yearSemester,
-    });
-
-    res.status(201).json({
-      message: "User registered successfully",
-      user: userToPublicApi(newUser),
-    });
-  } catch (err) {
-    return next(err);
-  }
-};
+// Account creation is an authenticated administrator/operator action only.
+const signup = (_req, res) => res.status(403).json({
+  error: "Self-registration is disabled. Contact your administrator.",
+});
 
 const login = async (req, res, next) => {
   const { email, password } = req.body;
@@ -83,6 +44,8 @@ const login = async (req, res, next) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    if (!user.isActive) return res.status(401).json({ error: "Invalid credentials" });
+    await requireEmailOrganisation(user.email, user.organizationId);
     await recordLogin(user.id);
 
     if (!user.organizationId) {

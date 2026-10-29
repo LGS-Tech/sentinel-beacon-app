@@ -210,13 +210,13 @@ async function createCase(body, organizationId) {
     ]
   );
 
-  const created = await getCaseById(result.rows[0].id);
+  const created = await getCaseById(result.rows[0].id, orgId);
   await addCaseEvent(created.id, {
     eventType: "created",
     message: `Case opened${f.category ? ` (${f.category})` : ""}`,
     userId: f.created_by_user_id ?? null,
-  });
-  return getCaseById(created.id);
+  }, orgId);
+  return getCaseById(created.id, orgId);
 }
 
 async function updateCase(id, body, organizationId) {
@@ -309,43 +309,44 @@ async function assignCase(
     eventType: "assignment",
     message: `Assigned to ${parts.join(" / ") || "unspecified"}`,
     userId: actorUserId ?? null,
-  });
+  }, organizationId);
   return getCaseById(updated.id, organizationId);
 }
 
-async function closeCase(id, { actorUserId, status = "CLOSED" } = {}) {
-  const existing = await getCaseById(id);
+async function closeCase(id, { actorUserId, status = "CLOSED", organizationId } = {}) {
+  const existing = await getCaseById(id, organizationId);
   if (!existing) return null;
   await updateCase(id, {
     status,
     closedAt: nowMs(),
     closedByUserId: actorUserId ?? null,
-  });
+  }, organizationId);
   await addCaseEvent(id, {
     eventType: "closed",
     message: `Case ${status.toLowerCase()}`,
     userId: actorUserId ?? null,
-  });
-  return getCaseById(id);
+  }, organizationId);
+  return getCaseById(id, organizationId);
 }
 
-async function reopenCase(id, { actorUserId } = {}) {
-  const existing = await getCaseById(id);
+async function reopenCase(id, { actorUserId, organizationId } = {}) {
+  const existing = await getCaseById(id, organizationId);
   if (!existing) return null;
   await updateCase(id, {
     status: "ACTIVE",
     closedAt: null,
     closedByUserId: null,
-  });
+  }, organizationId);
   await addCaseEvent(id, {
     eventType: "reopened",
     message: "Case reopened",
     userId: actorUserId ?? null,
-  });
-  return getCaseById(id);
+  }, organizationId);
+  return getCaseById(id, organizationId);
 }
 
-async function addCaseEvent(caseId, { message, eventType = "note", userId } = {}) {
+async function addCaseEvent(caseId, { message, eventType = "note", userId } = {}, organizationId) {
+  if (!await getCaseById(caseId, organizationId)) return null;
   if (!message) throw new Error("event message is required");
 
   const createdAt = nowMs();
@@ -380,7 +381,8 @@ async function addCaseEvent(caseId, { message, eventType = "note", userId } = {}
   return eventToApi(result.rows[0]);
 }
 
-async function listCaseEvents(caseId) {
+async function listCaseEvents(caseId, organizationId) {
+  if (!await getCaseById(caseId, organizationId)) return [];
   const result = await query(
     `SELECT e.*, u.name AS user_name
      FROM case_events e

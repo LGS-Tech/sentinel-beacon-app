@@ -18,7 +18,8 @@
     "db:smoke-org-access": "node scripts/smoke-org-access.js",
     "smoke:vault-files": "node scripts/smoke-vault-files.js",
     "smoke:floor-plans": "node scripts/smoke-floor-plans.js",
-    "db:hash-seeds": "node scripts/hashSeedPasswords.js"
+    "db:hash-seeds": "node scripts/hashSeedPasswords.js",
+    "org:provision": "node scripts/provision-organisation.js"
   },
   "keywords": [],
   "author": "",
@@ -35,5 +36,8 @@
     "pg": "^8.22.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13"
   }
 }
