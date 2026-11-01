@@ -37,3 +37,15 @@ Use a unique password of at least 12 characters and deliver credentials securely
 55 backend tests pass. The added suite starts real Express routes against an isolated PostgreSQL WASM engine (PGlite), exercises schema/migration twice, and checks same-domain sharing, cross-domain denial, tenant override attempts, invalid tokens, disabled memberships, public signup denial and missing-scope failures. The existing role and file-controller tests also pass. Tests do not access production or upload real R2 objects; denied content requests are rejected before storage access.
 
 Legacy demo-based smoke commands require provisioned fixtures and explicit organisation IDs under this policy. Use `npm test` for the isolated regression suite. Rollback requires a reviewed code/database plan: restoring the old permissive authentication would remove these protections.
+
+## Authorised disposable-test rollout (1 November 2026)
+
+The owner authorised removing all previous test accounts and records and replacing them with exactly two organisations and eight users. `scripts/setup-postgres.js` accepts an optional `LGS_TEST_RESET_MANIFEST` environment value for this explicit one-time operation. It is NOT enabled by default and is not a general production migration.
+
+The manifest must name the exact database, use confirmation `lgs-isolation-test-reset-2026-11-01`, and specify `lgs-test-a` / `lgs-test-b` with reserved domains `org-a.lgs.test` / `org-b.lgs.test`, four users each, and bcrypt cost-12 password hashes. No plaintext passwords belong in this variable or the repository. These are synthetic test login identifiers, not real mailboxes or verified customer domains.
+
+The transaction locks the known tables, queues referenced R2 objects for cleanup, deletes existing accounts and business records without cascading to unknown tables, provisions replacements, and records completion in `operator_resets`. User ID sequences are never restarted. A repeat invocation preserves subsequent test data and IDs. Failed SQL rolls the entire reset back. R2 cleanup runs after commit and retries outstanding keys on startup; missing storage configuration or cleanup failures prevent the new instance from starting until addressed. Remove the manifest environment value after successful verification.
+
+The legacy baseline is no longer replayed after the domain-mapping migration is installed, so restarts cannot restore demo accounts or mutate new users by their old seed IDs. Subsequent schema changes must be explicit migrations.
+
+Validation now includes 56 passing tests, with real HTTP login and data access for all eight reset fixtures, rollback after a forced SQL failure, cross-organisation denial, old-token rejection, storage cleanup retry and preservation of new cases on a repeated reset.
