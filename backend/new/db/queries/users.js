@@ -1,4 +1,5 @@
 const { query } = require("../pool");
+const { requireEmailOrganisation } = require("./organisationDomains");
 const { userToApi, pick } = require("../mappers");
 const {
   appendOrganizationFilter,
@@ -110,6 +111,7 @@ async function createUser(body, organizationId) {
     throw new Error("username, password, and email are required");
   }
   const orgId = await resolveOrganizationId(organizationId);
+  await requireEmailOrganisation(f.email, orgId);
 
   const result = await query(
     `INSERT INTO users (
@@ -134,11 +136,13 @@ async function createUser(body, organizationId) {
       orgId,
     ]
   );
-  return getUserById(result.rows[0].id);
+  return getUserById(result.rows[0].id, orgId);
 }
 
 async function updateUser(id, body, organizationId) {
   const f = buildUserFields(body);
+  await resolveOrganizationId(organizationId);
+  if (f.email !== undefined) await requireEmailOrganisation(f.email, organizationId);
   const sets = ["updated_at = NOW()"];
   const params = [];
 
@@ -192,7 +196,7 @@ async function recordLogin(id) {
     `UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1`,
     [id]
   );
-  return getUserById(id);
+
 }
 
 async function listAssignableUsers(organizationId) {

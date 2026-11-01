@@ -102,7 +102,7 @@ async function createAttachment(caseId, body, organizationId) {
     ]
   );
 
-  return getAttachmentById(result.rows[0].id);
+  return getAttachmentById(result.rows[0].id, organizationId);
 }
 
 async function deleteAttachment(caseId, attachmentId, organizationId) {

@@ -21,7 +21,22 @@ async function main() {
   await client.connect();
 
   try {
-    await client.query(sql);
+    await client.query('BEGIN');
+    try {
+      const installed = await client.query("SELECT to_regclass('public.organisation_domains') AS name");
+      // The legacy baseline mutates seed IDs. Never replay it after migration.
+      if (!installed.rows[0].name) await client.query(sql);
+      const migration = fs.readFileSync(path.join(__dirname, '..', 'db', 'migrations', '20261029-organisation-domains.sql'), 'utf8');
+      await client.query(migration);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    }
+    const { resetTestOrganisations, cleanupResetStorage } = require('./reset-test-organisations');
+    const reset = await resetTestOrganisations(client, process.env.LGS_TEST_RESET_MANIFEST);
+    await cleanupResetStorage(client, require('../storage/r2'));
+    if (reset) console.log('Authorised test reset completed: two organisations, eight users.');
     const departments = await client.query(
       "SELECT COUNT(*)::int AS count FROM departments"
     );

@@ -3,7 +3,6 @@
  * HTTP routes must pass organizationId from the authenticated user (JWT),
  * never from the request body or query string.
  */
-const { query } = require("./pool");
 
 const DEMO_ORGANISATION_SLUG = "lgs-demo";
 
@@ -20,21 +19,12 @@ async function resolveOrganizationId(value) {
   const parsed = parseOrganizationId(value);
   if (parsed != null) return parsed;
 
-  const result = await query(
-    `SELECT id FROM organisations WHERE slug = $1 LIMIT 1`,
-    [DEMO_ORGANISATION_SLUG]
-  );
-  if (!result.rows[0]) {
-    throw new Error(
-      "default organisation lgs-demo is missing; run npm run db:setup"
-    );
-  }
-  return result.rows[0].id;
+  throw new Error("Explicit organizationId is required; demo fallback is disabled");
 }
 
 function appendOrganizationFilter(clauses, params, organizationId, column) {
   const id = parseOrganizationId(organizationId);
-  if (id == null) return;
+  if (id == null) throw new Error("Explicit organizationId is required");
   params.push(id);
   clauses.push(`${column} = $${params.length}`);
 }

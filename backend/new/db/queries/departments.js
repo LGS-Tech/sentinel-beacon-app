@@ -53,7 +53,7 @@ async function createDepartment({ name, slug, kind = "other", organizationId }) 
      RETURNING id`,
     [name, slug, kind, orgId]
   );
-  return getDepartmentById(result.rows[0].id);
+  return getDepartmentById(result.rows[0].id, orgId);
 }
 
 async function deleteDepartment(id, organizationId) {
