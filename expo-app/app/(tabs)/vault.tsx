@@ -94,6 +94,7 @@ CASE REPORT: ${caseId}
 Title:        ${row.title || "N/A"}
 Status:       ${row.status || "Unknown"}
 Priority:     ${row.priority || "N/A"}
+Severity:     ${row.severity || "N/A"}
 Category:     ${row.category || "N/A"}
 
 Department:   ${row.assignedDepartmentName || row.assignedDepartmentId || "N/A"}

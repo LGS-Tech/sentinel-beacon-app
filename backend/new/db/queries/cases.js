@@ -21,6 +21,7 @@ const CASE_SELECT = `
     c.description,
     c.chat,
     c.priority,
+    c.severity,
     c.assigned_department_id,
     d.name AS assigned_department_name,
     c.assigned_user_id,
@@ -149,6 +150,7 @@ function buildCaseFields(body) {
     description: pick(body, "description", "description"),
     chat: pick(body, "chat", "chat"),
     priority: pick(body, "priority", "priority"),
+    severity: pick(body, "severity", "severity"),
     assigned_department_id: pick(body, "assignedDepartmentId", "assigned_department_id"),
     assigned_user_id: pick(body, "assignedUserId", "assigned_user_id"),
     created_by_user_id: pick(body, "createdByUserId", "created_by_user_id"),
@@ -176,12 +178,12 @@ async function createCase(body, organizationId) {
     `INSERT INTO cases (
        title, created_at, last_updated_at, status,
        location_x, location_y, location_label, floor, feed,
-       category, description, chat, priority,
+       category, description, chat, priority, severity,
        assigned_department_id, assigned_user_id, created_by_user_id,
        estimated_cost, police_contacted, fire_contacted,
        ambulance_contacted, maintenance_contacted, organization_id
      ) VALUES (
-       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
      )
      RETURNING id`,
     [
@@ -198,6 +200,7 @@ async function createCase(body, organizationId) {
       f.description ?? null,
       f.chat ?? "",
       f.priority ?? "NORMAL",
+      f.severity ?? null,
       f.assigned_department_id ?? null,
       f.assigned_user_id ?? null,
       f.created_by_user_id ?? null,
@@ -236,6 +239,7 @@ async function updateCase(id, body, organizationId) {
     ["description", f.description],
     ["chat", f.chat],
     ["priority", f.priority],
+    ["severity", f.severity],
     ["assigned_department_id", f.assigned_department_id],
     ["assigned_user_id", f.assigned_user_id],
     ["created_by_user_id", f.created_by_user_id],
