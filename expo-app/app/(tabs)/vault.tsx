@@ -5,6 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useMemo, useState } from 'react';
 
+import { showAlert } from '@/lib/alert';
+import * as WebBrowser from 'expo-web-browser';
 import {
   ActivityIndicator,
   Alert,
@@ -19,8 +21,6 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
-import { showAlert } from '@/lib/alert';
-import * as WebBrowser from 'expo-web-browser';
 
 import {
   CaseAttachment,
@@ -56,8 +56,6 @@ type CaseItem = {
   createdAt: number;
   lastUpdatedAt: number;
   status: 'ACTIVE' | 'CLOSED';
-  locationX?: number;
-  locationY?: number;
   locationLabel?: string;
   floor?: string;
   feed?: string;
@@ -104,8 +102,6 @@ Created at:   ${createdDate}
 Last Updated: ${updatedDate}
 
 Location:     ${row.locationLabel || "N/A"}
-Location X:   ${row.locationX || "N/A"}
-Location Y:   ${row.locationY || "N/A"}
 Floor:        ${row.floor || "N/A"}
 
 DESCRIPTION:
