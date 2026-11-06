@@ -214,6 +214,13 @@ function errorMessageFromBody(text: string, status: number): string {
   return text;
 }
 
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function request<T>(
   base: string,
   path: string,
@@ -240,7 +247,7 @@ async function request<T>(
         await handleAuthFailure();
         throw new Error(SESSION_EXPIRED_MESSAGE);
       }
-      throw new Error(errorMessageFromBody(text, res.status));
+      throw new ApiError(errorMessageFromBody(text, res.status), res.status);
     }
 
     if (res.status === 204) return undefined as T;

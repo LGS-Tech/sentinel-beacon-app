@@ -4,7 +4,8 @@
  * Roles (users.user_type): student, staff, maintainer, lead.
  * - student: sees cases they created or are assigned to; modifies only cases they created
  * - staff / maintainer / lead: full list/view/create/update/close
- * - delete: lead only; analytics and assign: maintainer + lead
+ * - delete and analytics: lead only (the administrative role)
+ * - assign: maintainer + lead
  *   (assign covers POST /cases/assign and assignedUserId /
  *   assignedDepartmentId on create/update)
  * - creating users: only a lead may create a lead/maintainer or grant authorisation 1
@@ -23,7 +24,7 @@ const ROLES = Object.freeze({
 });
 
 const CASE_DELETE_ROLES = [ROLES.LEAD];
-const CASE_ANALYTICS_ROLES = [ROLES.MAINTAINER, ROLES.LEAD];
+const CASE_ANALYTICS_ROLES = [ROLES.LEAD];
 const CASE_ASSIGN_ROLES = [ROLES.MAINTAINER, ROLES.LEAD];
 
 // Roles that see and modify every case. Anything else (students, unknown
