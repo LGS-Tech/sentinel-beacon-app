@@ -36,7 +36,7 @@ test("case privileges follow the role policy", () => {
   assert.equal(canAssign({ userType: "maintainer" }), true);
   assert.equal(canAssign({ userType: "lead" }), true);
   assert.deepEqual(CASE_DELETE_ROLES, ["lead"]);
-  assert.deepEqual(CASE_ANALYTICS_ROLES, ["maintainer", "lead"]);
+  assert.deepEqual(CASE_ANALYTICS_ROLES, ["lead"]);
 });
 
 test("non-leads cannot create privileged users", () => {

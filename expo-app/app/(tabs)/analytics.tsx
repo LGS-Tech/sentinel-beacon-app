@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 
-import { getAnalyticsSummary, type AnalyticsSummary } from '@/lib/api';
+import { ApiError, getAnalyticsSummary, type AnalyticsSummary } from '@/lib/api';
 
 function formatDuration(ms: number): string {
   if (!ms || ms <= 0) return '—';
@@ -69,6 +69,7 @@ export default function AnalyticsScreen() {
   const [data, setData] = useState<AnalyticsSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [restricted, setRestricted] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -76,6 +77,8 @@ export default function AnalyticsScreen() {
 
       (async () => {
         setLoading(true);
+        setData(null);
+        setRestricted(false);
         setError(null);
 
         try {
@@ -87,6 +90,7 @@ export default function AnalyticsScreen() {
         } catch (e) {
           if (active) {
             setData(null);
+            setRestricted(e instanceof ApiError && e.status === 403);
             setError(
               e instanceof Error
                 ? e.message
@@ -118,6 +122,16 @@ export default function AnalyticsScreen() {
     );
   }
 
+  if (restricted) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.errorHint} accessibilityRole="text">
+          You have restricted access. Contact admin.
+        </Text>
+      </View>
+    );
+  }
+
   if (error && !data) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -130,7 +144,7 @@ export default function AnalyticsScreen() {
         </Text>
 
         <Text style={styles.errorHint}>
-          Start the PostgreSQL backend (`npm start` in backend/new).
+          Please try again shortly. If the problem continues, contact admin.
         </Text>
       </View>
     );
