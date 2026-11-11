@@ -32,6 +32,13 @@ function normalizeMime(mimeType, filename) {
     .trim()
     .toLowerCase();
   if (raw === "image/jpg") return "image/jpeg";
+  if (
+    raw === "application/x-pdf" ||
+    raw === "application/acrobat" ||
+    raw === "application/vnd.pdf"
+  ) {
+    return "application/pdf";
+  }
   if (!raw || raw === "application/octet-stream") {
     return guessMimeFromName(filename);
   }
