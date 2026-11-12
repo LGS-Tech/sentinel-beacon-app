@@ -148,17 +148,6 @@ const sections: SettingSection[] = [
       },
     ],
   },
-  {
-    title: "Dev",
-    data: [
-      {
-        id: "dev1",
-        label: "Open Login Screen",
-        route: "/login-page",
-        icon: "login",
-      },
-    ],
-  },
 ];
 
 export default function SettingsScreen() {
