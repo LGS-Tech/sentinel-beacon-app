@@ -3,6 +3,9 @@ const {
   getFloorPlan,
   getFloorPlanRow,
   upsertFloorPlan,
+  MAX_FLOOR_PLAN_CHANGES,
+  getFloorPlanChangeCount,
+  incrementFloorPlanChanges,
 } = require("../db/queries/floorPlans");
 const { requireRequestOrganization } = require("../db/orgScope");
 const r2 = require("../storage/r2");
@@ -130,6 +133,15 @@ const upsertOrganisationFloorPlan = async (req, res) => {
         ? previous.storage_url
         : null;
 
+      if (previous) {
+        const changes = await getFloorPlanChangeCount(organizationId);
+     if (changes >= MAX_FLOOR_PLAN_CHANGES) {
+        return res.status(403).json({
+          error: `Floor plan change limit reached (${MAX_FLOOR_PLAN_CHANGES}).`,
+      });
+      }
+    }
+
     uploadedKey = objectKey(organizationId, floorId, check.ext);
     await r2.putObject({
       key: uploadedKey,
@@ -151,6 +163,10 @@ const upsertOrganisationFloorPlan = async (req, res) => {
         uploadedByUserId,
       }
     );
+
+        if (previous) {
+      await incrementFloorPlanChanges(organizationId);
+    }
 
     if (previousKey && previousKey !== uploadedKey) {
       try {
