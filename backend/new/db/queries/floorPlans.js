@@ -124,10 +124,35 @@ async function deleteFloorPlan(organizationId, floorId) {
   return result.rowCount > 0;
 }
 
+
+const MAX_FLOOR_PLAN_CHANGES = 3;
+
+// How many times this organisation has already replaced a floor plan.
+async function getFloorPlanChangeCount(organizationId) {
+  const result = await query(
+    `SELECT floor_plan_changes FROM organisations WHERE id = $1`,
+    [organizationId]
+  );
+  return result.rows[0]?.floor_plan_changes ?? 0;
+}
+
+// Adds 1 to the organisation's counter.
+async function incrementFloorPlanChanges(organizationId) {
+  await query(
+    `UPDATE organisations
+     SET floor_plan_changes = floor_plan_changes + 1
+     WHERE id = $1`,
+    [organizationId]
+  );
+}
+
+
 module.exports = {
   listFloorPlans,
   getFloorPlanRow,
   getFloorPlan,
   upsertFloorPlan,
   deleteFloorPlan,
+  getFloorPlanChangeCount,
+  incrementFloorPlanChanges
 };

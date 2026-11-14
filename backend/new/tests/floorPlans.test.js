@@ -62,7 +62,10 @@ require.cache[require.resolve("../db/queries/floorPlans")] = stub({
       storageUrl: `/floors/${floorId}/content`,
       organizationId,
     };
-  },
+  }, 
+    MAX_FLOOR_PLAN_CHANGES: 3,
+  getFloorPlanChangeCount: async () => 0,
+  incrementFloorPlanChanges: async () => {},
 });
 
 require.cache[require.resolve("../storage/r2")] = stub({

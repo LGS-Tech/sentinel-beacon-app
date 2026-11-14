@@ -341,6 +341,8 @@ WHERE NOT EXISTS (
   SELECT 1 FROM organisations WHERE slug = 'lgs-demo'
 );
 
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS floor_plan_changes INTEGER NOT NULL DEFAULT 0;
+
 SELECT setval(
   pg_get_serial_sequence('organisations', 'id'),
   (SELECT COALESCE(MAX(id), 1) FROM organisations)
