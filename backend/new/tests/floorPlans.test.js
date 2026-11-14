@@ -26,6 +26,13 @@ require.cache[require.resolve("../db/queries/floorPlans")] = stub({
         storageUrl: "/floors/1/content",
         organizationId,
       },
+      {
+        id: "plan-2",
+        floor: "2",
+        filename: "floor-2.png",
+        storageUrl: "/floors/2/content",
+        organizationId,
+      },
     ];
   },
   getFloorPlan: async (organizationId, floorId) => {
@@ -133,6 +140,8 @@ beforeEach(() => {
 test("floor ids are 1 or 2", () => {
   assert.equal(parseFloorId("1"), "1");
   assert.equal(parseFloorId("2"), "2");
+  assert.equal(parseFloorId(1), "1");
+  assert.equal(parseFloorId(2), "2");
   assert.equal(parseFloorId("3"), null);
   assert.equal(parseFloorId(""), null);
 });
@@ -188,7 +197,11 @@ test("user A cannot list or open organisation B floor plans", async () => {
   assert.equal(listed.statusCode, 200);
   assert.equal(calls[0][0], "listFloorPlans");
   assert.equal(calls[0][1], 1);
-  assert.equal(listed.body.length, 1);
+  assert.equal(listed.body.length, 2);
+  assert.deepEqual(
+    listed.body.map((row) => row.floor).sort(),
+    ["1", "2"]
+  );
 
   const hiddenList = await run(floorPlans.listOrganisationFloorPlans, {
     user: userB,
@@ -239,6 +252,33 @@ test("floor plan upload is refused before R2 when the session has no organisatio
   assert.equal(uploaded.statusCode, 403);
   assert.equal(calls.some((call) => call[0] === "putObject"), false);
   assert.equal(calls.some((call) => call[0] === "upsertFloorPlan"), false);
+});
+
+test("GET /floors lists floor 1 and floor 2 for the owning organisation", async () => {
+  const listed = await run(floorPlans.listOrganisationFloorPlans, {
+    user: userA,
+  });
+  assert.equal(listed.statusCode, 200);
+  assert.deepEqual(
+    listed.body.map((row) => String(row.floor)).sort(),
+    ["1", "2"]
+  );
+});
+
+test("floor 1 and floor 2 content both open for the owning organisation", async () => {
+  for (const floorId of ["1", "2"]) {
+    const opened = await run(floorPlans.getOrganisationFloorPlanContent, {
+      user: userA,
+      params: { floorId },
+    });
+    assert.equal(opened.statusCode, 200);
+    assert.equal(
+      calls.some(
+        (call) => call[0] === "getFloorPlanRow" && call[2] === floorId
+      ),
+      true
+    );
+  }
 });
 
 test("first upload for a floor returns 201", async () => {
