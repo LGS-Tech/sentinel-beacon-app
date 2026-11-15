@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 // Floor plans are saved to the API on upload and restored after reload.
 
+
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 
@@ -26,6 +27,9 @@ import DashboardMap from '@/components/dashboard-map';
 
 import IntruderMap from '@/components/intruder-map';
 
+import ReportIncidentFlow from '@/components/report-incident/ReportIncidentFlow';
+
+
 import LiveFeedSheet, {
   addFeedItem,
   clearFeed,
@@ -40,6 +44,7 @@ import BottomSheet from '@/components/sheet';
 
 //import { db } from "@/lib/db"
 
+import SubTypePicker from '@/components/report-incident/SubTypePicker';
 import { getAuthToken } from '@/lib/api';
 import {
   createCase,
@@ -141,6 +146,12 @@ export default function HomeScreen() {
   const [caseActive, setCaseActive] = useState(false);
 
   const [incidentType, setIncidentType] = useState('Intruder');
+
+  const [showReportFlow, setShowReportFlow] = useState(false);
+
+  const [showSubType, setShowSubType] = useState(false);
+
+  const [selectedSubType, setSelectedSubType] = useState('');
 
   const [showSituationModal,setShowSituationModal] = useState(false);
 
@@ -1234,6 +1245,27 @@ export default function HomeScreen() {
         />
       </BottomSheet>
 
+      <SubTypePicker
+          visible={showSubType}
+          category={selectedCaseType}
+          onBack={() => {
+            setShowSubType(false);
+            setShowSituationModal(true);
+          }}
+          onContinue={(subType) => {
+            setSelectedSubType(subType);
+            setShowSubType(false);
+            setShowReportFlow(true);
+          }}
+          />
+
+          <ReportIncidentFlow
+            visible={showReportFlow}
+            category={selectedCaseType}
+            subType={selectedSubType}
+            onClose={() => setShowReportFlow(false)}
+          />
+
       <Modal visible={showSituationModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -1245,20 +1277,20 @@ export default function HomeScreen() {
 
             {[
               {
-                label: 'Fire',
-                icon: '🔥',
+                label: 'IT Support',
+                icon: '💻',
               },
               {
-                label: 'Intruder',
-                icon: '🚨',
+                label: 'Facilities',
+                icon: '🧹',
+              },
+              {
+                label: 'Engineering',
+                icon: '⚙️',
               },
               {
                 label: 'Injury',
                 icon: '🩹',
-              },
-              {
-                label: 'Maintenance',
-                icon: '🔧',
               },
             ].map((item) => (
               <Pressable
@@ -1266,24 +1298,9 @@ export default function HomeScreen() {
                 style={styles.situationCard}
                 onPress={() => {
                   setSelectedCaseType(item.label);
-                  setQuestionAnswers(['', '']);
-
                   setShowSituationModal(false);
-
-                  if (item.label === 'Maintenance') {
-                    setSelectedMaintenanceType('');
-                    setShowMaintenanceModal(true);
-                  } else if (item.label === 'Fire') {
-                    setSelectedFireType('');
-                    setShowFireModal(true);
-                  } else if (item.label === 'Intruder') {
-                    setSelectedIntruderType('');
-                    setShowIntruderModal(true);
-                  } else if (item.label === 'Injury') {
-                    setSelectedInjuryType('');
-                    setShowInjuryModal(true);
-                  }
-                }}
+                  setShowSubType(true);
+                  }}
               >
                 <View style={styles.situationLeft}>
                   <Text style={styles.situationEmoji}>{item.icon}</Text>
