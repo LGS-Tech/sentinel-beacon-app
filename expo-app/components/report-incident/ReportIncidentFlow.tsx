@@ -13,8 +13,22 @@ import { shared } from './styles';
 
 const STEPS = ['Details', 'Location', 'Review', 'Assign'];
 
-type Props = { visible: boolean; category: string; subType: string; onClose: () => void };
-export default function ReportIncidentFlow({ visible, category, subType, onClose }: Props) {
+
+type Props = {
+  visible: boolean;
+  category: string;
+  subType: string;
+  onSubmit: (data: {
+    details: { description: string; priority: string; severity: string };
+    location: { building: string; floor: string; room: string; landmark: string };
+    note: string;
+    departmentId: number | null;
+    personId: number | null;
+  }) => Promise<void>;
+  onClose: () => void;
+};
+
+export default function ReportIncidentFlow({ visible, category, subType, onSubmit, onClose }: Props) {
   const [step, setStep] = useState(0);
 
   const [details, setDetails] = useState({
@@ -125,7 +139,18 @@ function updateDetails(field: 'description' | 'priority' | 'severity', value: st
           </Pressable>
           <Pressable
             style={styles.nextBtn}
-            onPress={() => (step === 3 ? close() : setStep(step + 1))}
+            onPress={async () => {
+            if (step < 3) {
+                setStep(step + 1);
+                return;
+            }
+            try {
+                await onSubmit({ details, location, note, departmentId, personId });
+                close();
+            } catch (e) {
+                console.error('Submit failed', e);
+            }
+            }}
           >
             <Text style={styles.nextText}>{step === 3 ? 'Submit Report' : 'Next →'}</Text>
           </Pressable>

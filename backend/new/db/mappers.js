@@ -131,6 +131,12 @@ function caseToApi(row) {
     fireContacted: row.fire_contacted,
     ambulanceContacted: row.ambulance_contacted,
     maintenanceContacted: row.maintenance_contacted,
+    severity: row.severity ?? null,
+    subType: row.sub_type ?? null,
+    building: row.building ?? null,
+    room: row.room ?? null,
+    landmark: row.landmark ?? null,
+    note: row.note ?? null,
     organizationId: row.organization_id ?? null,
   };
 }

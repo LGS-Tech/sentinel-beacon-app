@@ -28,6 +28,8 @@ import DashboardMap from '@/components/dashboard-map';
 import IntruderMap from '@/components/intruder-map';
 
 import ReportIncidentFlow from '@/components/report-incident/ReportIncidentFlow';
+import { ReportData, submitReport } from '@/components/report-incident/submitReport';
+
 
 
 import LiveFeedSheet, {
@@ -222,7 +224,7 @@ export default function HomeScreen() {
   >({});
   const [floorPlansReady, setFloorPlansReady] = useState(false);
   const floorPlanObjectUrls = useRef<string[]>([]);
-  const uploadedFloorPlan = uploadedFloorPlans[selectedFloor] ?? null;
+  const uploadedFloorPlan = uploadedFloorPlans[selectedFloor] ?? null ;
 
   const questionsComplete = (caseQuestions[selectedCaseType] || []).every(
     (question, index) => questionAnswers[index]?.trim().length > 0
@@ -662,6 +664,20 @@ export default function HomeScreen() {
     if (!uploadedFloorPlan) return;
     setShowSituationModal(true);
   }
+
+  async function handleSubmitReport(data: Omit<ReportData, 'category' | 'subType' | 'x' | 'y'>) {
+      const newCase = await submitReport({
+        ...data,
+        category: selectedCaseType,
+        subType: selectedSubType,
+        x: defaultCoords.x,
+        y: defaultCoords.y,
+      });
+
+      setCaseFloor(data.location.floor as FloorId);
+      setCurrentVaultCaseId(newCase._id ?? newCase.id);
+      await loadOpenCases();
+    }
 
   function loadOpenCases() {
     if (!inFlightCases.current) {
@@ -1263,6 +1279,7 @@ export default function HomeScreen() {
             visible={showReportFlow}
             category={selectedCaseType}
             subType={selectedSubType}
+            onSubmit={handleSubmitReport}
             onClose={() => setShowReportFlow(false)}
           />
 
