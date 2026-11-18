@@ -1,6 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
+
+
+import type { PickedVaultFile } from '@/lib/pickVaultFile';
+import AttachmentsBox from './AttachmentsBox';
+
 type Props = {
   category: string;
   subType: string;
@@ -8,6 +13,10 @@ type Props = {
   priority: string;
   severity: string;
   note: string;
+  files: PickedVaultFile[];
+  onAdd: (file: PickedVaultFile) => void;
+  onRemove: (index: number) => void;
+  location: { building: string; floor: string; room: string; landmark: string };
   onNoteChange: (value: string) => void;
 };
 
@@ -25,6 +34,11 @@ export default function ReviewStep({
   priority,
   severity,
   note,
+  location,
+  files,
+  onAdd,
+  onRemove,
+  
   onNoteChange,
 }: Props) {
   const { width } = useWindowDimensions();
@@ -61,7 +75,11 @@ export default function ReviewStep({
             <Text style={styles.icon}>📍</Text>
             <View style={styles.cardBody}>
               <Text style={styles.cardTitle}>Location</Text>
-              <Text style={styles.muted}>Coming with the Location step</Text>
+              <Text style={styles.strong}>{location.room || 'No room entered'}</Text>
+              <Text style={styles.muted}>
+                {location.building}, Floor {location.floor}
+                {location.landmark ? ` · ${location.landmark}` : ''}
+              </Text>
             </View>
           </View>
         </View>
@@ -69,7 +87,7 @@ export default function ReviewStep({
         <View style={twoColumns ? styles.column : undefined}>
           <View style={styles.panel}>
             <Text style={styles.cardTitle}>📎 Attachments</Text>
-            <Text style={styles.muted}>Attachments will be added here later.</Text>
+            <AttachmentsBox files={files} onAdd={onAdd} onRemove={onRemove} />
           </View>
 
           <View style={styles.panel}>

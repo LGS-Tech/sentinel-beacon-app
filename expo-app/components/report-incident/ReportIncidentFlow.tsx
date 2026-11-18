@@ -6,8 +6,10 @@ import AssignStep from './AssignStep';
 import DetailsStep from './DetailsStep';
 import LocationStep, { LocationValue } from './LocationStep';
 import ReviewStep from './ReviewStep';
- 
 
+ 
+import type { PickedVaultFile } from '@/lib/pickVaultFile';
+import AttachmentsBox from './AttachmentsBox';
 import { shared } from './styles';
 
 
@@ -18,17 +20,21 @@ type Props = {
   visible: boolean;
   category: string;
   subType: string;
+  floorPlan?: any;
+
   onSubmit: (data: {
     details: { description: string; priority: string; severity: string };
     location: { building: string; floor: string; room: string; landmark: string };
     note: string;
     departmentId: number | null;
     personId: number | null;
+    coords: { x: number; y: number } | null;
+    files: PickedVaultFile[];
   }) => Promise<void>;
   onClose: () => void;
 };
 
-export default function ReportIncidentFlow({ visible, category, subType, onSubmit, onClose }: Props) {
+export default function ReportIncidentFlow({ visible, category, subType, floorPlan, onSubmit, onClose }: Props) {
   const [step, setStep] = useState(0);
 
   const [details, setDetails] = useState({
@@ -38,6 +44,8 @@ export default function ReportIncidentFlow({ visible, category, subType, onSubmi
 });
 
 const [note, setNote] = useState('');
+const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
+const [files, setFiles] = useState<PickedVaultFile[]>([]);
 
 const [location, setLocation] = useState<LocationValue>({
   building: 'Main Building',
@@ -88,6 +96,7 @@ function updateDetails(field: 'description' | 'priority' | 'severity', value: st
 
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
             {step === 0 ? (
+              <>
                 <DetailsStep
                     title={(category ?? '').toUpperCase()}
                     description={details.description}
@@ -96,10 +105,20 @@ function updateDetails(field: 'description' | 'priority' | 'severity', value: st
                     onChange={updateDetails}
                 />
 
+                  <AttachmentsBox
+                    files={files}
+                    onAdd={(f) => setFiles((prev) => [...prev, f])}
+                    onRemove={(i) => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                  />
+                  </>
+
                 ) : step === 1 ? (
                 <LocationStep
-                        value={location}
-                        onChange={(field, v) => setLocation((prev) => ({ ...prev, [field]: v }))}
+                      value={location}
+                      floorPlan={floorPlan}
+                      coords={coords}
+                      onPickCoords={setCoords}
+                      onChange={(field, v) => setLocation((prev) => ({ ...prev, [field]: v }))}
                 />
 
                 ) : step === 2 ? (
@@ -110,7 +129,11 @@ function updateDetails(field: 'description' | 'priority' | 'severity', value: st
                     priority={details.priority}
                     severity={details.severity}
                     note={note}
+                    location={location}
                     onNoteChange={setNote}
+                    files={files}
+                    onAdd={(f) => setFiles((prev) => [...prev, f])}
+                    onRemove={(i) => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
                 />
                 ) : step === 3 ? (
             <AssignStep
@@ -145,7 +168,7 @@ function updateDetails(field: 'description' | 'priority' | 'severity', value: st
                 return;
             }
             try {
-                await onSubmit({ details, location, note, departmentId, personId });
+                await onSubmit({ details, location, note, departmentId, personId, coords, files });
                 close();
             } catch (e) {
                 console.error('Submit failed', e);

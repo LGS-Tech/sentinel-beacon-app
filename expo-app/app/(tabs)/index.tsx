@@ -30,7 +30,7 @@ import IntruderMap from '@/components/intruder-map';
 import ReportIncidentFlow from '@/components/report-incident/ReportIncidentFlow';
 import { ReportData, submitReport } from '@/components/report-incident/submitReport';
 
-
+import { uploadCaseAttachment } from '@/lib/db';
 
 import LiveFeedSheet, {
   addFeedItem,
@@ -65,6 +65,7 @@ import {
   normalizeFloorId,
   type FloorId,
 } from '@/lib/floors';
+import { PickedVaultFile } from '@/lib/pickVaultFile';
 
 //const db = SQLite.openDatabaseSync("app.db")
 
@@ -665,17 +666,26 @@ export default function HomeScreen() {
     setShowSituationModal(true);
   }
 
-  async function handleSubmitReport(data: Omit<ReportData, 'category' | 'subType' | 'x' | 'y'>) {
+  async function handleSubmitReport( data: Omit<ReportData, 'category' | 'subType' | 'x' | 'y'> & { coords: { x: number; y: number } | null; files: PickedVaultFile[] }
+) {
       const newCase = await submitReport({
         ...data,
         category: selectedCaseType,
         subType: selectedSubType,
-        x: defaultCoords.x,
-        y: defaultCoords.y,
+        x: data.coords?.x ?? defaultCoords.x,
+        y: data.coords?.y ?? defaultCoords.y,
       });
 
       setCaseFloor(data.location.floor as FloorId);
       setCurrentVaultCaseId(newCase._id ?? newCase.id);
+        const newCaseId = String(newCase._id ?? newCase.id);
+        for (const file of data.files) {
+          try {
+            await uploadCaseAttachment(newCaseId, file);
+          } catch (e) {
+            console.error('Attachment upload failed', file.name, e);
+          }
+        }
       await loadOpenCases();
     }
 
@@ -1280,6 +1290,7 @@ export default function HomeScreen() {
             category={selectedCaseType}
             subType={selectedSubType}
             onSubmit={handleSubmitReport}
+            floorPlan={activeFloorPlan}
             onClose={() => setShowReportFlow(false)}
           />
 

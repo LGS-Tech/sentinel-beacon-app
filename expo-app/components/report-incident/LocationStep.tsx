@@ -1,3 +1,4 @@
+import IntruderMap from '@/components/intruder-map';
 import React from 'react';
 import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
@@ -11,6 +12,9 @@ export type LocationValue = {
 type Props = {
   value: LocationValue;
   onChange: (field: keyof LocationValue, v: string) => void;
+  floorPlan: any;
+  coords: { x: number; y: number } | null;
+  onPickCoords: (c: { x: number; y: number }) => void;
 };
 
 const BUILDINGS = ['Main Building'];
@@ -19,7 +23,7 @@ const FLOORS = [
   { id: '2', label: '2nd Floor' },
 ];
 
-export default function LocationStep({ value, onChange }: Props) {
+export default function LocationStep({ value, onChange, floorPlan, coords, onPickCoords }: Props) {
   const { width } = useWindowDimensions();
   const twoColumns = width >= 768;
 
@@ -29,8 +33,15 @@ export default function LocationStep({ value, onChange }: Props) {
       <Text style={styles.subheading}>Select the exact location</Text>
 
       <View style={twoColumns ? styles.columns : undefined}>
+
         <View style={[styles.mapBox, twoColumns && styles.column]}>
-          <Text style={styles.muted}>Map with pin: coming next</Text>
+            <IntruderMap
+              floorPlan={floorPlan}
+              updateMode={true}
+              showMarker={coords !== null}
+              selectedCoords={coords ?? { x: 0, y: 0 }}
+              onMapPress={onPickCoords}
+            />
         </View>
 
         <View style={twoColumns ? styles.column : undefined}>
@@ -95,19 +106,14 @@ const styles = StyleSheet.create({
   columns: { flexDirection: 'row', gap: 16 },
   column: { flex: 1 },
   mapBox: {
-    minHeight: 220, backgroundColor: '#E5E7EB', borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 12,
-  },
+  height: 320, backgroundColor: '#E5E7EB', borderRadius: 12,
+  overflow: 'hidden', marginBottom: 12,},
   label: { fontWeight: '700', marginTop: 12, marginBottom: 6 },
   row: { flexDirection: 'row', gap: 8 },
   chip: {
-    paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10,
-    borderWidth: 1, borderColor: '#DDD', backgroundColor: '#FFF',
-  },
+  paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10,
+  borderWidth: 1, borderColor: '#DDD', backgroundColor: '#FFF',},
   chipSelected: { borderColor: '#D71920', backgroundColor: '#FDECEC' },
-  input: {
-    backgroundColor: '#FFF', borderRadius: 10, borderWidth: 1,
-    borderColor: '#DDD', padding: 12,
-  },
+  input: {backgroundColor: '#FFF', borderRadius: 10, borderWidth: 1,borderColor: '#DDD', padding: 12,},
   muted: { color: '#666' },
 });
