@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 // Floor plans are saved to the API on upload and restored after reload.
 
+
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 
@@ -26,6 +27,11 @@ import DashboardMap from '@/components/dashboard-map';
 
 import IntruderMap from '@/components/intruder-map';
 
+import ReportIncidentFlow from '@/components/report-incident/ReportIncidentFlow';
+import { ReportData, submitReport } from '@/components/report-incident/submitReport';
+
+import { uploadCaseAttachment } from '@/lib/db';
+
 import LiveFeedSheet, {
   addFeedItem,
   clearFeed,
@@ -40,6 +46,7 @@ import BottomSheet from '@/components/sheet';
 
 //import { db } from "@/lib/db"
 
+import SubTypePicker from '@/components/report-incident/SubTypePicker';
 import { getAuthToken } from '@/lib/api';
 import {
   createCase,
@@ -58,6 +65,7 @@ import {
   normalizeFloorId,
   type FloorId,
 } from '@/lib/floors';
+import { PickedVaultFile } from '@/lib/pickVaultFile';
 
 //const db = SQLite.openDatabaseSync("app.db")
 
@@ -142,6 +150,12 @@ export default function HomeScreen() {
 
   const [incidentType, setIncidentType] = useState('Intruder');
 
+  const [showReportFlow, setShowReportFlow] = useState(false);
+
+  const [showSubType, setShowSubType] = useState(false);
+
+  const [selectedSubType, setSelectedSubType] = useState('');
+
   const [showSituationModal,setShowSituationModal] = useState(false);
 
   const [locationConfirmed, setLocationConfirmed] = useState(false);
@@ -211,7 +225,7 @@ export default function HomeScreen() {
   >({});
   const [floorPlansReady, setFloorPlansReady] = useState(false);
   const floorPlanObjectUrls = useRef<string[]>([]);
-  const uploadedFloorPlan = uploadedFloorPlans[selectedFloor] ?? null;
+  const uploadedFloorPlan = uploadedFloorPlans[selectedFloor] ?? null ;
 
   const questionsComplete = (caseQuestions[selectedCaseType] || []).every(
     (question, index) => questionAnswers[index]?.trim().length > 0
@@ -651,6 +665,29 @@ export default function HomeScreen() {
     if (!uploadedFloorPlan) return;
     setShowSituationModal(true);
   }
+
+  async function handleSubmitReport( data: Omit<ReportData, 'category' | 'subType' | 'x' | 'y'> & { coords: { x: number; y: number } | null; files: PickedVaultFile[] }
+) {
+      const newCase = await submitReport({
+        ...data,
+        category: selectedCaseType,
+        subType: selectedSubType,
+        x: data.coords?.x ?? defaultCoords.x,
+        y: data.coords?.y ?? defaultCoords.y,
+      });
+
+      setCaseFloor(data.location.floor as FloorId);
+      setCurrentVaultCaseId(newCase._id ?? newCase.id);
+        const newCaseId = String(newCase._id ?? newCase.id);
+        for (const file of data.files) {
+          try {
+            await uploadCaseAttachment(newCaseId, file);
+          } catch (e) {
+            console.error('Attachment upload failed', file.name, e);
+          }
+        }
+      await loadOpenCases();
+    }
 
   function loadOpenCases() {
     if (!inFlightCases.current) {
@@ -1234,6 +1271,29 @@ export default function HomeScreen() {
         />
       </BottomSheet>
 
+      <SubTypePicker
+          visible={showSubType}
+          category={selectedCaseType}
+          onBack={() => {
+            setShowSubType(false);
+            setShowSituationModal(true);
+          }}
+          onContinue={(subType) => {
+            setSelectedSubType(subType);
+            setShowSubType(false);
+            setShowReportFlow(true);
+          }}
+          />
+
+          <ReportIncidentFlow
+            visible={showReportFlow}
+            category={selectedCaseType}
+            subType={selectedSubType}
+            onSubmit={handleSubmitReport}
+            floorPlan={activeFloorPlan}
+            onClose={() => setShowReportFlow(false)}
+          />
+
       <Modal visible={showSituationModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -1245,20 +1305,20 @@ export default function HomeScreen() {
 
             {[
               {
-                label: 'Fire',
-                icon: '🔥',
+                label: 'IT Support',
+                icon: '💻',
               },
               {
-                label: 'Intruder',
-                icon: '🚨',
+                label: 'Facilities',
+                icon: '🧹',
+              },
+              {
+                label: 'Engineering',
+                icon: '⚙️',
               },
               {
                 label: 'Injury',
                 icon: '🩹',
-              },
-              {
-                label: 'Maintenance',
-                icon: '🔧',
               },
             ].map((item) => (
               <Pressable
@@ -1266,24 +1326,9 @@ export default function HomeScreen() {
                 style={styles.situationCard}
                 onPress={() => {
                   setSelectedCaseType(item.label);
-                  setQuestionAnswers(['', '']);
-
                   setShowSituationModal(false);
-
-                  if (item.label === 'Maintenance') {
-                    setSelectedMaintenanceType('');
-                    setShowMaintenanceModal(true);
-                  } else if (item.label === 'Fire') {
-                    setSelectedFireType('');
-                    setShowFireModal(true);
-                  } else if (item.label === 'Intruder') {
-                    setSelectedIntruderType('');
-                    setShowIntruderModal(true);
-                  } else if (item.label === 'Injury') {
-                    setSelectedInjuryType('');
-                    setShowInjuryModal(true);
-                  }
-                }}
+                  setShowSubType(true);
+                  }}
               >
                 <View style={styles.situationLeft}>
                   <Text style={styles.situationEmoji}>{item.icon}</Text>

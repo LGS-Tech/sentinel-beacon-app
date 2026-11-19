@@ -34,7 +34,13 @@ const CASE_SELECT = `
     c.fire_contacted,
     c.ambulance_contacted,
     c.maintenance_contacted,
-    c.organization_id
+    c.organization_id,
+    c.severity,
+    c.sub_type,
+    c.building,
+    c.room,
+    c.landmark,
+    c.note
   FROM cases c
   LEFT JOIN departments d ON d.id = c.assigned_department_id
   LEFT JOIN users au ON au.id = c.assigned_user_id
@@ -144,6 +150,12 @@ function buildCaseFields(body) {
     location_y: pick(body, "locationY", "location_y"),
     location_label: pick(body, "locationLabel", "location_label"),
     floor: pick(body, "floor", "floor"),
+    severity: pick(body, "severity", "severity"),
+    sub_type: pick(body, "subType", "sub_type"),
+    building: pick(body, "building", "building"),
+    room: pick(body, "room", "room"),
+    landmark: pick(body, "landmark", "landmark"),
+    note: pick(body, "note", "note"),
     feed: pick(body, "feed", "feed"),
     category,
     description: pick(body, "description", "description"),
@@ -179,9 +191,9 @@ async function createCase(body, organizationId) {
        category, description, chat, priority,
        assigned_department_id, assigned_user_id, created_by_user_id,
        estimated_cost, police_contacted, fire_contacted,
-       ambulance_contacted, maintenance_contacted, organization_id
+       ambulance_contacted, maintenance_contacted, organization_id, severity, sub_type, building, room, landmark, note
      ) VALUES (
-       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
      )
      RETURNING id`,
     [
@@ -207,6 +219,12 @@ async function createCase(body, organizationId) {
       Boolean(f.ambulance_contacted),
       Boolean(f.maintenance_contacted),
       orgId,
+      f.severity ?? null,
+      f.sub_type ?? null,
+      f.building ?? null,
+      f.room ?? null,
+      f.landmark ?? null,
+      f.note ?? null,
     ]
   );
 
@@ -246,6 +264,12 @@ async function updateCase(id, body, organizationId) {
     ["fire_contacted", f.fire_contacted],
     ["ambulance_contacted", f.ambulance_contacted],
     ["maintenance_contacted", f.maintenance_contacted],
+    ["severity", f.severity],
+    ["sub_type", f.sub_type],
+    ["building", f.building],
+    ["room", f.room],
+    ["landmark", f.landmark],
+    ["note", f.note],
   ];
 
   for (const [col, value] of columns) {
