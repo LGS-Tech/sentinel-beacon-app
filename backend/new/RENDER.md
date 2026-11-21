@@ -135,3 +135,21 @@ npm run db:setup
 npm run db:hash-seeds
 npm start
 ```
+
+## Incident report schema upgrade
+
+The incident report redesign reads and writes `severity`, `sub_type`, `building`,
+`room`, `landmark`, and `note`. Existing databases need
+`db/migrations/20261121-report-incident-fields.sql`, even if they already have
+`organisation_domains`. Without it both GET and POST `/cases` can return 500.
+
+Run `npm run db:setup` before starting the updated backend. The existing Render
+start command (`npm run db:setup && npm run db:hash-seeds && npm start`) does this
+on deployment. The migration only adds missing nullable text columns and can run
+again safely; it does not reset accounts, reports or attachments. Do not replay
+`schema.sql` manually on a provisioned database because it includes legacy seeds.
+
+After deployment, check authenticated case listing and submit a report with a
+floor, severity, location details and assignee. Confirm it can be reloaded within
+its organisation and cannot be accessed by another organisation. The regression
+in `tests/reportMigration.test.js` covers this upgrade using isolated PostgreSQL.
