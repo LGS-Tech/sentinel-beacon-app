@@ -1,5 +1,5 @@
 /**
- * Apply schema.sql using DATABASE_URL (LGS_Tech credentials).
+ * Apply the baseline (new databases only) and incremental migrations using DATABASE_URL.
  * Usage: node scripts/setup-postgres.js
  */
 require("dotenv").config();
@@ -8,31 +8,35 @@ const fs = require("fs");
 const path = require("path");
 const { Client } = require("pg");
 
+// Shared with upgrade regression tests; never replays legacy seeds on migrated databases.
+async function applySchema(client) {
+  await client.query('BEGIN');
+  try {
+    const installed = await client.query("SELECT to_regclass('public.organisation_domains') AS name");
+    // The legacy baseline mutates seed IDs. Never replay it after migration.
+    if (!installed.rows[0].name) await client.query(fs.readFileSync(path.join(__dirname, "..", "db", "schema.sql"), "utf8"));
+    const migration = fs.readFileSync(path.join(__dirname, '..', 'db', 'migrations', '20261029-organisation-domains.sql'), 'utf8');
+    await client.query(migration);
+    const reportMigration = fs.readFileSync(path.join(__dirname, '..', 'db', 'migrations', '20261121-report-incident-fields.sql'), 'utf8');
+    await client.query(reportMigration);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
+}
+
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error("DATABASE_URL missing in .env");
   }
 
-  const schemaPath = path.join(__dirname, "..", "db", "schema.sql");
-  const sql = fs.readFileSync(schemaPath, "utf8");
-
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
 
   try {
-    await client.query('BEGIN');
-    try {
-      const installed = await client.query("SELECT to_regclass('public.organisation_domains') AS name");
-      // The legacy baseline mutates seed IDs. Never replay it after migration.
-      if (!installed.rows[0].name) await client.query(sql);
-      const migration = fs.readFileSync(path.join(__dirname, '..', 'db', 'migrations', '20261029-organisation-domains.sql'), 'utf8');
-      await client.query(migration);
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    }
+    await applySchema(client);
     const { resetTestOrganisations, cleanupResetStorage } = require('./reset-test-organisations');
     const reset = await resetTestOrganisations(client, process.env.LGS_TEST_RESET_MANIFEST);
     await cleanupResetStorage(client, require('../storage/r2'));
@@ -67,7 +71,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+module.exports = { applySchema };
+
+if (require.main === module) main().catch((err) => {
   console.error("setup-postgres failed:", err.message);
   process.exit(1);
 });
