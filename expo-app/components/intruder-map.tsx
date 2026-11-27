@@ -11,6 +11,7 @@ import {
 
 const MAP_W = 1525;
 const MAP_H = 959;
+const MARKER_SIZE = 25;
 
 type Coords = {
   x: number;
@@ -287,12 +288,13 @@ const styles = StyleSheet.create({
 
   marker: {
     position: 'absolute',
-    width: 25,
-    height: 25,
-    borderRadius: 15,
+    width: MARKER_SIZE,
+    height: MARKER_SIZE,
+    borderRadius: MARKER_SIZE / 2,
     backgroundColor: 'red',
     borderWidth: 3,
     borderColor: '#faa4a4', // bit of outlining to increase visibility
-    transform: [{ translateX: -8 }, { translateY: -8 }],
+    // Centre the marker on the picked point.
+    transform: [{ translateX: -MARKER_SIZE / 2 }, { translateY: -MARKER_SIZE / 2 }],
   },
 });

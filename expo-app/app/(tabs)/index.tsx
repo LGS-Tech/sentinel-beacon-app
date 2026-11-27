@@ -233,9 +233,12 @@ export default function HomeScreen() {
 
   const inFlightCases = useRef<Promise<void> | null>(null);
 
-  const activeFloorPlan = uploadedFloorPlan
-    ? { uri: uploadedFloorPlan }
-    : getFloorById(selectedFloor).image;
+  function getFloorPlan(floorId: FloorId) {
+    const uploaded = uploadedFloorPlans[floorId];
+    return uploaded ? { uri: uploaded } : getFloorById(floorId).image;
+  }
+
+  const activeFloorPlan = getFloorPlan(selectedFloor);
   const floorCases = openCases.filter((c) =>
     caseMatchesFloor(c, selectedFloor),
   );
@@ -1290,7 +1293,8 @@ export default function HomeScreen() {
             category={selectedCaseType}
             subType={selectedSubType}
             onSubmit={handleSubmitReport}
-            floorPlan={activeFloorPlan}
+            initialFloor={selectedFloor}
+            getFloorPlan={getFloorPlan}
             onClose={() => setShowReportFlow(false)}
           />
 

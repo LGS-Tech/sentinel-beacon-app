@@ -13,6 +13,7 @@ import { FLOORS, type FloorId } from '@/lib/floors';
 
 const MAP_W = 1525;
 const MAP_H = 959;
+const MARKER_SIZE = 26;
 
 type Props = {
   cases: any[];
@@ -162,8 +163,10 @@ export default function DashboardMap({
             position: 'absolute',
             left: `${item.locationX * 100}%`,
             top: `${item.locationY * 100}%`,
-            transform: [{ translateX: -13 }, { translateY: -13 }],
-            alignItems: 'center',
+            width: MARKER_SIZE,
+            height: MARKER_SIZE,
+            // Centre the marker on the case's point (applied once, here only).
+            transform: [{ translateX: -MARKER_SIZE / 2 }, { translateY: -MARKER_SIZE / 2 }],
           }}
         >
           <Pressable
@@ -265,15 +268,13 @@ const styles = StyleSheet.create({
   image: { width: MAP_W, height: MAP_H },
 
   marker: {
-    position: 'absolute',
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: MARKER_SIZE,
+    height: MARKER_SIZE,
+    borderRadius: MARKER_SIZE / 2,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
-    transform: [{ translateX: -13 }, { translateY: -13 }],
   },
 
   markerGlow: {

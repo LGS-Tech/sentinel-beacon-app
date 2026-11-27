@@ -1,24 +1,25 @@
 import IntruderMap from '@/components/intruder-map';
+import type { FloorId } from '@/lib/floors';
 import React from 'react';
 import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 export type LocationValue = {
   building: string;
-  floor: string;
+  floor: FloorId;
   room: string;
   landmark: string;
 };
 
 type Props = {
   value: LocationValue;
-  onChange: (field: keyof LocationValue, v: string) => void;
+  onChange: <K extends keyof LocationValue>(field: K, v: LocationValue[K]) => void;
   floorPlan: any;
   coords: { x: number; y: number } | null;
   onPickCoords: (c: { x: number; y: number }) => void;
 };
 
 const BUILDINGS = ['Main Building'];
-const FLOORS = [
+const FLOORS: { id: FloorId; label: string }[] = [
   { id: '1', label: '1st Floor' },
   { id: '2', label: '2nd Floor' },
 ];
@@ -31,6 +32,7 @@ export default function LocationStep({ value, onChange, floorPlan, coords, onPic
     <View>
       <Text style={styles.heading}>📍 Location</Text>
       <Text style={styles.subheading}>Select the exact location</Text>
+      {coords === null && <Text style={styles.muted}>Tap the map to place a pin</Text>}
 
       <View style={twoColumns ? styles.columns : undefined}>
 

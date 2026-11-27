@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { getDepartments, getUsers } from '@/lib/api';
+import type { FloorId } from '@/lib/floors';
 import AssignStep from './AssignStep';
 import DetailsStep from './DetailsStep';
 import LocationStep, { LocationValue } from './LocationStep';
@@ -20,7 +21,8 @@ type Props = {
   visible: boolean;
   category: string;
   subType: string;
-  floorPlan?: any;
+  initialFloor: FloorId;
+  getFloorPlan: (floorId: FloorId) => any;
 
   onSubmit: (data: {
     details: { description: string; priority: string; severity: string };
@@ -34,7 +36,7 @@ type Props = {
   onClose: () => void;
 };
 
-export default function ReportIncidentFlow({ visible, category, subType, floorPlan, onSubmit, onClose }: Props) {
+export default function ReportIncidentFlow({ visible, category, subType, initialFloor, getFloorPlan, onSubmit, onClose }: Props) {
   const [step, setStep] = useState(0);
 
   const [details, setDetails] = useState({
@@ -49,7 +51,7 @@ const [files, setFiles] = useState<PickedVaultFile[]>([]);
 
 const [location, setLocation] = useState<LocationValue>({
   building: 'Main Building',
-  floor: '1',
+  floor: initialFloor,
   room: '',
   landmark: '',
 });
@@ -62,9 +64,20 @@ const [personId, setPersonId] = useState<number | null>(null);
 
 useEffect(() => {
   if (!visible) return;
+  // The modal stays mounted, so clear the previous report and start from the dashboard's floor with no pin.
+  setStep(0);
+  setDetails({ description: '', priority: 'Medium', severity: 'Medium' });
+  setNote('');
+  setFiles([]);
+  setCoords(null);
+  setLocation({ building: 'Main Building', floor: initialFloor, room: '', landmark: '' });
+  setDepartmentId(null);
+  setPersonId(null);
   getDepartments().then(setDepartments).catch(() => {});
   getUsers().then(setPeople).catch(() => {});
-}, [visible]);
+}, [visible, initialFloor]);
+
+const nextDisabled = step === 1 && coords === null;
 
 function updateDetails(field: 'description' | 'priority' | 'severity', value: string) {
   setDetails((prev) => ({ ...prev, [field]: value }));
@@ -115,10 +128,14 @@ function updateDetails(field: 'description' | 'priority' | 'severity', value: st
                 ) : step === 1 ? (
                 <LocationStep
                       value={location}
-                      floorPlan={floorPlan}
+                      floorPlan={getFloorPlan(location.floor)}
                       coords={coords}
                       onPickCoords={setCoords}
-                      onChange={(field, v) => setLocation((prev) => ({ ...prev, [field]: v }))}
+                      onChange={(field, v) => {
+                        // A pin only makes sense on the floor it was placed on.
+                        if (field === 'floor' && v !== location.floor) setCoords(null);
+                        setLocation((prev) => ({ ...prev, [field]: v }));
+                      }}
                 />
 
                 ) : step === 2 ? (
@@ -161,7 +178,8 @@ function updateDetails(field: 'description' | 'priority' | 'severity', value: st
             <Text>← Back</Text>
           </Pressable>
           <Pressable
-            style={styles.nextBtn}
+            style={[styles.nextBtn, nextDisabled && styles.nextBtnDisabled]}
+            disabled={nextDisabled}
             onPress={async () => {
             if (step < 3) {
                 setStep(step + 1);
@@ -215,6 +233,7 @@ const styles = StyleSheet.create({
     flex: 1, height: 50, borderRadius: 12, backgroundColor: '#D71920',
     justifyContent: 'center', alignItems: 'center',
   },
+  nextBtnDisabled: { opacity: 0.5 },
   nextText: { color: '#FFF', fontWeight: '700' },
 
   overlay: {
